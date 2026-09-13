@@ -41,9 +41,11 @@ class YouTubeConnector(BaseConnector):
 
                         parsed = json.loads(text[start + 1 : end])
                         if len(parsed) > 1 and isinstance(parsed[1], list):
-                            return [
+                            items = [
                                 item[0] for item in parsed[1] if isinstance(item, list) and item
                             ]
+                            if items:
+                                return items
         except Exception:
             pass
 

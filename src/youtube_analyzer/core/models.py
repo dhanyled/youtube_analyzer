@@ -63,6 +63,12 @@ class Keyword(SQLModel, table=True):
     search_volume: int | None = Field(default=None)
     cpc: float | None = Field(default=None)
     competition_level: str | None = Field(default=None)
+    opportunity_score: float | None = Field(
+        default=None, description="VidIQ/TubeBuddy style opportunity score (0-100)"
+    )
+    estimated_rpm: float | None = Field(
+        default=None, description="NexLev style RPM estimate in USD"
+    )
     created_at: datetime = Field(default_factory=utc_now)
 
     topic: Topic | None = Relationship(back_populates="keywords")
@@ -108,6 +114,12 @@ class Competitor(SQLModel, table=True):
     content_title: str
     content_url: str
     content_type: str = Field(description="e.g. video_tutorial, commercial_landing, blog_post")
+    views: int | None = Field(default=None)
+    channel_median_views: int | None = Field(default=None)
+    outlier_score: float | None = Field(
+        default=None, description="NexLev/VidIQ style outlier multiplier (views / median)"
+    )
+    vph: float | None = Field(default=None, description="Views Per Hour velocity")
     created_at: datetime = Field(default_factory=utc_now)
 
     topic: Topic | None = Relationship(back_populates="competitors")

@@ -13,8 +13,10 @@ except ImportError:
 
 from sqlmodel import Session, select
 
+from youtube_analyzer.core.intelligence import SearchIntelligence
 from youtube_analyzer.core.models import (
     IntentCluster,
+    IntentEnum,
     PlatformEnum,
     Query,
     Topic,
@@ -144,6 +146,83 @@ def get_topic_summary(canonical_id: str) -> str:
             },
             indent=2,
         )
+
+
+@mcp.tool()
+def analyze_keyword_opportunity(
+    keyword: str,
+    search_volume: int = 2500,
+    competition_score: float = 35.0,
+) -> str:
+    """
+    Analyze keyword search demand vs competition (VidIQ / TubeBuddy style).
+    Includes RPM estimate and potential earnings (NexLev style).
+    """
+    opp_score = SearchIntelligence.calculate_opportunity_score(search_volume, competition_score)
+    rpm_data = SearchIntelligence.estimate_rpm(keyword)
+
+    return json.dumps(
+        {
+            "keyword": keyword,
+            "opportunity_score": opp_score,
+            "rating": "HIGH_POTENTIAL"
+            if opp_score >= 65
+            else ("MODERATE" if opp_score >= 45 else "LOW"),
+            "search_volume": search_volume,
+            "competition_score": competition_score,
+            "monetization": rpm_data,
+        },
+        indent=2,
+    )
+
+
+@mcp.tool()
+def detect_outlier_opportunity(
+    video_title: str,
+    views: int,
+    channel_median_views: int,
+) -> str:
+    """
+    Detect viral outlier videos and breakout topics (NexLev / VidIQ style).
+    Checks if a video outperforms the creator's channel median.
+    """
+    outlier = SearchIntelligence.calculate_outlier_score(views, channel_median_views)
+    return json.dumps(
+        {
+            "video_title": video_title,
+            **outlier,
+            "recommendation": (
+                "High-priority topic to replicate/model! High viral breakout indicator."
+                if outlier["is_outlier"]
+                else "Baseline performance. Topic has normal audience reach."
+            ),
+        },
+        indent=2,
+    )
+
+
+@mcp.tool()
+def generate_video_ideas(
+    seed_keyword: str,
+    intent_type: str = "tutorial",
+) -> str:
+    """
+    Generate high-CTR title formulas and hooks based on intent (VidIQ / TubeBuddy style).
+    """
+    try:
+        intent = IntentEnum(intent_type.lower())
+    except ValueError:
+        intent = IntentEnum.TUTORIAL
+
+    titles = SearchIntelligence.generate_high_ctr_titles(seed_keyword, intent)
+    return json.dumps(
+        {
+            "seed_keyword": seed_keyword,
+            "intent": intent.value,
+            "recommended_high_ctr_titles": titles,
+        },
+        indent=2,
+    )
 
 
 if __name__ == "__main__":

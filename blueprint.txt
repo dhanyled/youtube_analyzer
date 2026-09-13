@@ -1,0 +1,372 @@
+Iya. Setelah saya cek lagi, saya justru akan **mengubah sedikit desain yang tadi**: jangan mencoba membuat GKP keyword dan YouTube keyword menjadi satu daftar mentah. Yang lebih tepat adalah membuat **satu "keyword/topic universe"**, lalu setiap platform punya metrik dan ekspansi sendiri.
+
+### MCP Google Trends yang bisa dipakai
+
+Ada beberapa opsi:
+
+1. **HasData Google Trends MCP** — GitHub/open source, remote MCP, free tier **1.000 credits/bulan ≈ 200 call**, tanpa kartu. Bisa mengambil interest over time, regional interest, related queries dan related topics. ([GitHub][1])
+   [HasData Google Trends MCP di GitHub](https://github.com/HasData/google-trends-mcp?utm_source=chatgpt.com)
+
+2. **Trends MCP** — GitHub, free tier **100 request/bulan**, dan yang menarik: satu MCP bisa mengakses beberapa sumber termasuk **Google Search dan YouTube**, selain TikTok, Reddit, Amazon, dll. ([GitHub][2])
+   [Trends MCP di GitHub](https://github.com/trendsmcp-ai/google-trends-mcp?utm_source=chatgpt.com)
+
+3. Ada juga `den-indance/google-trends-mcp`, open source dan bisa jalan lokal, tetapi membutuhkan pendekatan proxy karena Google cukup agresif melakukan blocking. ([GitHub][3])
+
+**Untuk proyek kita, saya lebih memilih HasData dulu** karena tool-nya sederhana dan hasilnya terstruktur. Kalau nanti ingin cross-platform trends, baru pertimbangkan Trends MCP.
+
+---
+
+# Nah, soal PAA MCP
+
+Ini justru bagian yang **saya tidak akan buru-buru pasang sebagai MCP khusus PAA**.
+
+Kenapa?
+
+Karena PAA bisa kita dapatkan dari **SERP provider/browser layer**.
+
+Arsitekturnya:
+
+```text
+Google SERP MCP / Playwright
+            ↓
+       Google result
+            ↓
+    ┌───────┴────────┐
+    ↓                ↓
+   PAA         Related Searches
+```
+
+Jadi daripada punya:
+
+```text
+PAA MCP
+SERP MCP
+Google Search MCP
+```
+
+yang semuanya tumpang tindih, lebih bagus **Search/SERP provider** yang menghasilkan:
+
+* organic results
+* featured snippet
+* PAA
+* related searches
+* knowledge panel
+* dan bila provider mendukung, AI Overview
+
+Lalu MCP kita yang mengolahnya menjadi AEO data.
+
+---
+
+# Bagian terpenting: GKP ↔ YouTube
+
+Nah, **jangan melakukan ini:**
+
+```text
+GKP keyword list
+        ↓
+copy semua keyword
+        ↓
+YouTube Search
+```
+
+Itu bukan best practice.
+
+Karena **search behavior Google dan YouTube berbeda**.
+
+Contoh:
+
+### Google
+
+Orang mencari:
+
+> `jasa google ads`
+
+> `biaya google ads`
+
+> `jasa google ads murah`
+
+### YouTube
+
+Orang lebih mungkin mencari:
+
+> `cara pasang google ads`
+
+> `tutorial google ads pemula`
+
+> `google ads untuk UMKM`
+
+> `cara iklan di google`
+
+Jadi keyword-nya **tidak harus identik**.
+
+---
+
+# Best practice-nya: satu "Topic Seed", banyak Search Surface
+
+Saya akan membuat struktur seperti ini:
+
+```text
+                    TOPIC
+                     │
+              "Google Ads UMKM"
+                     │
+       ┌─────────────┼─────────────┐
+       ▼             ▼             ▼
+     Google        YouTube        AI Search
+       │             │             │
+      GKP         YT Search       Prompts
+       │             │             │
+       ▼             ▼             ▼
+  Google KW      YT KW          AI Queries
+```
+
+Jadi yang disinkronkan adalah **TOPIC / ENTITY / INTENT**, bukan string keyword.
+
+Ini konsep yang jauh lebih bagus.
+
+---
+
+# Contoh konkret
+
+Misalnya seed:
+
+> **Google Ads untuk UMKM**
+
+### Google Keyword Planner
+
+Mendapat:
+
+```text
+google ads umkm
+iklan google untuk umkm
+jasa google ads
+biaya google ads
+google ads untuk bisnis
+jasa google ads murah
+```
+
+GKP memang dirancang untuk menemukan keyword terkait bisnis dan memberikan estimasi pencarian serta biaya penargetannya. ([Google Help][4])
+
+---
+
+### Google Trends
+
+Kemudian kita cek:
+
+```text
+google ads
+google ads umkm
+iklan google
+google ads tutorial
+```
+
+Kita lihat:
+
+* trend
+* related queries
+* rising queries
+* regional interest
+
+---
+
+### YouTube
+
+**Bukan hanya mencari keyword GKP tadi.**
+
+Kita ambil:
+
+```text
+Google Ads UMKM
+Google Ads pemula
+Google Ads tutorial
+cara Google Ads
+iklan Google
+Google Ads Indonesia
+```
+
+Kemudian YouTube Search menghasilkan:
+
+```text
+Cara pasang Google Ads untuk pemula
+Tutorial Google Ads 2026
+Cara iklan di Google
+Google Ads untuk UMKM
+Setting Google Ads dari nol
+```
+
+Dan dari **YouTube autocomplete + search results + competitor videos**, kita mendapatkan vocabulary YouTube.
+
+---
+
+# Jadi ada proses "cross-surface expansion"
+
+Saya akan membuat MCP kita melakukan:
+
+```text
+                    SEED
+                     │
+             "Google Ads UMKM"
+                     │
+        ┌────────────┼────────────┐
+        ▼            ▼            ▼
+       GKP         Trends       YouTube
+        │            │            │
+        ▼            ▼            ▼
+ Google terms   Related terms   YT terms
+        │            │            │
+        └────────────┼────────────┘
+                     ▼
+               NORMALIZATION
+                     │
+                     ▼
+              TOPIC / ENTITY
+                     │
+                     ▼
+              INTENT CLUSTER
+```
+
+---
+
+# Contohnya menjadi seperti ini
+
+| Topic cluster     | Google            | YouTube                    | AI/AEO                               |
+| ----------------- | ----------------- | -------------------------- | ------------------------------------ |
+| Google Ads pemula | google ads pemula | tutorial google ads pemula | bagaimana mulai Google Ads           |
+| Biaya             | biaya google ads  | biaya iklan google         | berapa biaya Google Ads              |
+| UMKM              | google ads UMKM   | google ads untuk UMKM      | apakah Google Ads efektif untuk UMKM |
+| Tutorial          | cara google ads   | cara pasang google ads     | bagaimana cara memasang Google Ads   |
+| Jasa              | jasa google ads   | review jasa google ads     | jasa Google Ads terbaik              |
+
+**Inilah yang saya maksud sinkron.**
+
+Bukan:
+
+> keyword Google = keyword YouTube
+
+melainkan:
+
+> **keyword Google + keyword YouTube + AI query = satu intent/topic cluster.**
+
+---
+
+# Bahkan kita bisa membuat "canonical topic"
+
+Misalnya:
+
+```text
+TOPIC_ID: GA-001
+
+Canonical topic:
+Google Ads untuk UMKM
+
+Google keywords:
+- google ads umkm
+- iklan google umkm
+- google ads bisnis kecil
+
+YouTube keywords:
+- google ads untuk pemula
+- tutorial google ads
+- cara iklan di google
+- google ads umkm
+
+AEO questions:
+- apakah google ads efektif untuk umkm?
+- berapa biaya google ads?
+- bagaimana cara mulai google ads?
+
+GEO prompts:
+- jasa google ads terbaik untuk umkm
+- agency google ads untuk bisnis kecil
+- apakah google ads cocok untuk UMKM?
+```
+
+Kemudian **satu topic ID** ini dipakai untuk semuanya.
+
+---
+
+# Dan ini membuat competitor analysis jauh lebih bagus
+
+Misalnya kompetitor YouTube membahas:
+
+> "Cara Pasang Google Ads dari Nol"
+
+Sedangkan website Anda hanya punya:
+
+> "Jasa Google Ads"
+
+Sistem kita bisa menyimpulkan:
+
+```text
+Google SEO:
+Anda punya commercial page
+Kompetitor punya informational content
+
+YouTube:
+Kompetitor punya tutorial
+Anda belum punya
+
+AEO:
+Query "cara memasang Google Ads"
+belum ter-cover
+
+GEO:
+AI query "bagaimana memulai Google Ads"
+belum punya citation source dari Anda
+```
+
+Kemudian output:
+
+> **Opportunity:** buat artikel + video + FAQ yang membahas "Cara Memulai Google Ads untuk UMKM".
+
+Nah, **ini baru Search Intelligence**.
+
+---
+
+# Jadi MCP final saya akan desain seperti ini
+
+```text
+                 SEARCH INTELLIGENCE MCP
+                           │
+                   TOPIC ORCHESTRATOR
+                           │
+       ┌───────────────────┼───────────────────┐
+       ▼                   ▼                   ▼
+    GOOGLE              YOUTUBE              AI
+       │                   │                   │
+ ┌─────┼─────┐       ┌─────┼─────┐       ┌───┼───┐
+ GKP  SERP  Trends    Search  Trends Comp  GPT Gemini Perplexity
+       │      │          │       │    │
+       ▼      ▼          ▼       ▼    ▼
+   Keywords PAA      YT keywords Trends Videos
+       │      │          │       │    │
+       └──────┴──────────┴───────┴────┘
+                           │
+                           ▼
+                  NORMALIZE / CLUSTER
+                           │
+                           ▼
+                    SEARCH INTENTS
+                           │
+                           ▼
+                 CONTENT OPPORTUNITIES
+```
+
+### Jadi keputusan teknis saya:
+
+**Google Trends:** HasData MCP dulu. ([GitHub][1])
+
+**PAA:** jangan dibuat MCP terpisah dulu; ambil dari SERP layer.
+
+**YouTube Trends:** kalau memakai HasData, nanti kita bisa menambahkan provider YouTube; alternatifnya Trends MCP yang memang sudah mendukung Google Search + YouTube. ([GitHub][2])
+
+**Sinkronisasi GKP ↔ YouTube:** **bukan berdasarkan exact keyword**, tetapi melalui **canonical topic → intent → platform-specific query expansion**.
+
+Dan menurut saya, ini justru fondasi paling penting sebelum kita coding MCP-nya. Kalau kita salah di bagian **data model/topical normalization**, nanti MCP-nya memang bisa mengambil ribuan keyword, tapi hasil risetnya berantakan.
+
+Kalau kita lanjut membangun, saya akan mulai dari **desain database/schema `Topic → Keyword → Query → Intent → Platform → Competitor → Citation`**, baru setelah itu menentukan MCP mana yang dipanggil untuk mengisi masing-masing field.
+
+[1]: https://github.com/HasData/google-trends-mcp?utm_source=chatgpt.com "GitHub - HasData/google-trends-mcp: Google Trends MCP server by HasData: interest over time, by region, and related queries and topics, as JSON. · GitHub"
+[2]: https://github.com/trendsmcp-ai/google-trends-mcp?utm_source=chatgpt.com "GitHub - trendsmcp-ai/google-trends-mcp: MCP server for live Google Trends data. Query search volume, breakout keywords, and 5-year history from Claude, Cursor, VS Code and more. · GitHub"
+[3]: https://github.com/den-indance/google-trends-mcp/?utm_source=chatgpt.com "GitHub - den-indance/google-trends-mcp: MCP server for Google Trends with proxy rotation and auto-retry on Google blocks connects agents to live keyword interest, related queries, and regional popularity. · GitHub"
+[4]: https://support.google.com/google-ads/answer/7337243?hl=id&utm_source=chatgpt.com "Menggunakan Keyword Planner - Bantuan Google Ads"

@@ -284,30 +284,44 @@ class YouTubeConnector(BaseConnector):
                 "Official YouTube 'Altered or synthetic content' disclosure badge.",
             )
 
-        # 2. Check title & channel name for AI tool keywords
+        # 2. Check title & channel name for AI tool keywords via Regex word boundary
         text_to_check = f"{title} {channel}".lower()
-        ai_keywords = [
+
+        # Direct AI tool patterns
+        ai_tools_regex = (
+            r"\b(ai|chatgpt|gemini|veo|sora|runway|midjourney|elevenlabs|kling|flux|"
+            r"luma|pika|haiper|leonardo|heygen|synthesia|d-id|tts|text to speech|"
+            r"faceless|tanpa wajah|deepfake|flow|seedance)\b"
+        )
+        match_tool = re.search(ai_tools_regex, text_to_check)
+        if match_tool:
+            tool_found = match_tool.group(1).upper()
+            return (
+                True,
+                "🤖 Altered / AI Video",
+                f"Video menggunakan atau membahas teknologi AI ('{tool_found}').",
+            )
+
+        # Indonesian AI phrases
+        ai_phrases = [
             "#ai",
-            " ai ",
-            "midjourney",
-            "veo",
-            "sora",
-            "elevenlabs",
-            "runway",
-            "kling",
-            "flux",
-            "chatgpt",
             "dibuat dengan ai",
-            "ai animation",
-            "ai story",
+            "bikin video ai",
+            "buat video ai",
+            "animasi ai",
+            "suara ai",
+            "voice over ai",
+            "ai voice",
             "google flow",
+            "ai tools",
+            "ai animation",
         ]
-        for kw in ai_keywords:
-            if kw in text_to_check:
+        for phrase in ai_phrases:
+            if phrase in text_to_check:
                 return (
                     True,
                     "🤖 Altered / AI Video",
-                    f"Creator disclosed or referenced AI tooling ('{kw.strip()}').",
+                    f"Kreator menyertakan referensi AI ('{phrase}').",
                 )
 
         return (

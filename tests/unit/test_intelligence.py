@@ -88,3 +88,35 @@ def test_generate_flow_shotlist():
     assert len(shotlist["flow_batch_prompts_txt"].split("\n")) == 4
     assert "autoflowcut_manifest" in shotlist
     assert "veo_mcp_payload" in shotlist
+
+
+def test_parse_views_str():
+    assert SearchIntelligence.parse_views_str("79K views") == 79000
+    assert SearchIntelligence.parse_views_str("1.2M views") == 1200000
+    assert SearchIntelligence.parse_views_str("500 views") == 500
+    assert SearchIntelligence.parse_views_str(15000) == 15000
+
+
+def test_estimate_keyword_metrics_differentiation():
+    # Keyword A: High view competition
+    comp_a = [
+        {"views": "1.5M views", "title": "Saham Pemula 2026", "upload_age": "2 tahun lalu"},
+        {"views": "800K views", "title": "Panduan Saham Lengkap", "upload_age": "1 tahun lalu"},
+    ]
+    metrics_a = SearchIntelligence.estimate_keyword_metrics("saham pemula", comp_a)
+
+    # Keyword B: Niche low view competition
+    comp_b = [
+        {"views": "3.5K views", "title": "Beli Bibit Anggrek", "upload_age": "2 bulan lalu"},
+        {
+            "views": "1.2K views",
+            "title": "Cara Merawat Anggrek Bulan",
+            "upload_age": "3 minggu lalu",
+        },
+    ]
+    metrics_b = SearchIntelligence.estimate_keyword_metrics("budidaya bibit anggrek hitam", comp_b)
+
+    # Metrics MUST be dynamically differentiated, not identical!
+    assert metrics_a["search_volume"] > metrics_b["search_volume"]
+    assert metrics_a["competition_score"] > metrics_b["competition_score"]
+    assert metrics_a["opportunity_score"] != metrics_b["opportunity_score"]

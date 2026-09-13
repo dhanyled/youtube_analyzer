@@ -169,9 +169,13 @@ if keyword_input:
     # 🎯 EXECUTIVE STRATEGIC DECISION CARD (Traffic Light Verdict)
     # -------------------------------------------------------------
     rpm_data = SearchIntelligence.estimate_rpm(keyword_input)
-    opp_score = SearchIntelligence.calculate_opportunity_score(
-        search_volume=5000, competition_score=30.0
-    )
+    kw_metrics = SearchIntelligence.estimate_keyword_metrics(keyword_input, competitors)
+    opp_score = kw_metrics["opportunity_score"]
+    search_vol = kw_metrics["search_volume"]
+    comp_score = kw_metrics["competition_score"]
+
+    # AI Competitor Presence Analysis
+    ai_presence = SearchIntelligence.analyze_ai_competitor_presence(competitors)
 
     # Determine recommended format based on top competitor format
     comp_format = top_comp.get("format", "LANDSCAPE") if top_comp else "LANDSCAPE"
@@ -181,43 +185,49 @@ if keyword_input:
         st.success(
             f"### 🟢 KEPUTUSAN STRATEGIS: SANGAT LAYAK DIBUAT (Skor Peluang: {opp_score}/100)\n"
             f"**Format yang Direkomendasikan:** **🎬 {comp_format}**  \n"
-            f"**Alasan:** Kompetitor ranking teratas berhasil menarik penonton dengan format **{comp_format}**. "
-            f"Niche **{rpm_data['detected_niche'].upper()}** memiliki estimasi monetisasi tinggi **{rpm_data['rpm_range_usd']} per 1.000 views**."
+            f"**Volume Pencarian:** ~{search_vol:,}/bulan | **Tingkat Persaingan:** {comp_score}/100  \n"
+            f"**Analisis Niche ({rpm_data['detected_niche'].upper()}):** Estimasi monetisasi **{rpm_data['rpm_range_usd']} per 1.000 views** "
+            f"dengan potensi cuan {rpm_data['potential_earnings_per_100k_views']} per 100k views."
         )
     elif opp_score >= 45:
         st.warning(
             f"### 🟡 KEPUTUSAN STRATEGIS: POTENSIAL DENGAN DIFERENSIASI (Skor Peluang: {opp_score}/100)\n"
             f"**Format yang Direkomendasikan:** **🎬 {comp_format}**  \n"
-            f"Persaingan cukup ketat. Wajib gunakan hook judul baru (update tahun 2026) dan thumbnail berbeda dari kompetitor #1."
+            f"**Volume Pencarian:** ~{search_vol:,}/bulan | **Tingkat Persaingan:** {comp_score}/100  \n"
+            f"Persaingan cukup ketat di niche **{rpm_data['detected_niche'].upper()}**. Wajib gunakan hook judul 2026 dan thumbnail berbeda dari kompetitor teratas."
         )
     else:
         st.error(
-            f"### 🔴 KEPUTUSAN STRATEGIS: SULIT / PERSAINGAN JENUH (Skor Peluang: {opp_score}/100)\n"
+            f"### 🔴 KEPUTUSAN STRATEGIS: PERSAINGAN TINGGI / VOLUME RENDAH (Skor Peluang: {opp_score}/100)\n"
+            f"**Volume Pencarian:** ~{search_vol:,}/bulan | **Tingkat Persaingan:** {comp_score}/100  \n"
             f"Disarankan membidik keyword turunan (*long-tail*) yang lebih spesifik."
         )
 
-    # AI Competitor Presence Analysis
-    ai_presence = SearchIntelligence.analyze_ai_competitor_presence(competitors)
-
-    # 4 Baris Metrik Ringkas
+    # 4 Baris Metrik Ringkas yang Dinamis
     m1, m2, m3, m4 = st.columns(4)
     m1.metric(
         "Skor Peluang (VidIQ / TubeBuddy)",
         f"{opp_score} / 100",
-        "High Potential" if opp_score >= 65 else "Moderate",
+        f"Peringkat: {kw_metrics['rating']}",
     )
     m2.metric(
         "Adopsi Video AI di SERP",
         f"{ai_presence['ai_count']} / {ai_presence['total_competitors']} Video",
-        f"{ai_presence['ai_percentage']}% AI Ratio",
+        (
+            f"{ai_presence['ai_percentage']}% AI Ratio"
+            if ai_presence["ai_count"] > 0
+            else "100% Kreator Manusia"
+        ),
     )
     m3.metric(
-        "Estimasi RPM AdSense (NexLev)",
-        f"${rpm_data['avg_rpm_usd']:.2f}",
-        f"Range: {rpm_data['rpm_range_usd']}",
+        "Estimasi Pencarian & Persaingan",
+        f"~{search_vol:,} /bln",
+        f"Tingkat Persaingan: {comp_score}/100",
     )
     m4.metric(
-        "Proyeksi Cuan / 100k Views", rpm_data["potential_earnings_per_100k_views"], "AdSense"
+        f"Estimasi RPM ({rpm_data['detected_niche'].upper()})",
+        f"${rpm_data['avg_rpm_usd']:.2f}",
+        f"Range: {rpm_data['rpm_range_usd']}",
     )
 
     st.markdown("---")

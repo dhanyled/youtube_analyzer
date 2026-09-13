@@ -19,11 +19,64 @@ class SearchIntelligence:
         "finance": {"low": 15.0, "avg": 24.0, "high": 40.0},
         "advertising": {"low": 12.0, "avg": 20.0, "high": 35.0},
         "tech": {"low": 7.0, "avg": 12.0, "high": 22.0},
-        "business": {"low": 10.0, "avg": 18.0, "high": 30.0},
+        "business": {"low": 8.0, "avg": 15.0, "high": 28.0},
+        "health_fitness": {"low": 5.0, "avg": 10.0, "high": 18.0},
+        "automotive": {"low": 4.5, "avg": 9.0, "high": 16.0},
         "education": {"low": 4.0, "avg": 8.0, "high": 15.0},
+        "travel": {"low": 3.0, "avg": 6.0, "high": 11.0},
+        "culinary": {"low": 2.5, "avg": 4.8, "high": 8.5},
+        "lifestyle": {"low": 2.0, "avg": 4.0, "high": 7.5},
         "gaming": {"low": 1.5, "avg": 2.8, "high": 5.0},
         "entertainment": {"low": 1.2, "avg": 2.5, "high": 4.5},
+        "general": {"low": 2.0, "avg": 4.5, "high": 8.0},
     }
+
+    @staticmethod
+    def parse_views_str(views_str: str | int | float) -> int:
+        """
+        Parse YouTube view string into integer.
+        Handles both English ('79K views', '1.2M views', '1,464,073 views')
+        and Indonesian ('1.464.073 x ditonton', '79 rb x ditonton', '1,2 jt x ditonton').
+        """
+        if isinstance(views_str, (int, float)):
+            return int(views_str)
+        if not views_str:
+            return 0
+
+        clean = str(views_str).upper()
+        clean = clean.replace("VIEWS", "").replace("DITONTON", "").replace("X", "").strip()
+
+        import re
+
+        has_billion = any(b in clean for b in ["B", "MILYAR", "MLY"])
+        has_million = any(m in clean for m in ["M", "JT", "JUTA"])
+        has_thousand = any(k in clean for k in ["K", "RB", "RIBU"])
+
+        if has_billion or has_million or has_thousand:
+            num_match = re.search(r"([\d]+(?:[.,]\d+)?)", clean)
+            if not num_match:
+                return 0
+            val_str = num_match.group(1).replace(",", ".")
+            try:
+                val = float(val_str)
+                if has_billion:
+                    return int(val * 1_000_000_000)
+                elif has_million:
+                    return int(val * 1_000_000)
+                elif has_thousand:
+                    return int(val * 1_000)
+            except ValueError:
+                return 0
+        else:
+            # Plain numbers with separators: e.g. 1.464.073 or 1,464,073 or 450
+            digits_only = re.sub(r"[^\d]", "", clean)
+            if digits_only:
+                try:
+                    return int(digits_only)
+                except ValueError:
+                    return 0
+
+        return 0
 
     @staticmethod
     def calculate_opportunity_score(search_volume: int, competition_score: float) -> float:
@@ -32,7 +85,6 @@ class SearchIntelligence:
         - search_volume: Estimated monthly searches
         - competition_score: 0 (no competition) to 100 (saturated)
         """
-        # Normalize search volume using logarithmic scale (10 to 100,000+)
         import math
 
         if search_volume <= 0:
@@ -80,26 +132,395 @@ class SearchIntelligence:
         }
 
     @classmethod
+    def estimate_keyword_metrics(
+        cls, seed: str, competitors: list[dict[str, Any]] | None = None
+    ) -> dict[str, Any]:
+        """
+        Dynamically estimate monthly search volume, competition difficulty (0-100),
+        and overall opportunity score (0-100) based on seed keyword and live competitor metrics.
+        VidIQ & TubeBuddy dynamic calculation.
+        """
+        clean_seed = seed.strip().lower()
+        seed_words = [w for w in clean_seed.split() if len(w) > 2]
+
+        # 1. Base Volume from Competitor Views
+        views_list: list[int] = []
+        if competitors:
+            for c in competitors:
+                raw_views = c.get("views_count") or c.get("views") or 0
+                parsed = cls.parse_views_str(raw_views)
+                if parsed > 0:
+                    views_list.append(parsed)
+
+        if views_list:
+            avg_comp_views = sum(views_list) / len(views_list)
+            max_comp_views = max(views_list)
+        else:
+            avg_comp_views = 25000
+            max_comp_views = 50000
+
+        # Correlate search volume with competitor view velocity
+        if avg_comp_views >= 500000:
+            base_vol = 75000 + int((avg_comp_views - 500000) * 0.05)
+        elif avg_comp_views >= 100000:
+            base_vol = 25000 + int((avg_comp_views - 100000) * 0.12)
+        elif avg_comp_views >= 20000:
+            base_vol = 6000 + int((avg_comp_views - 20000) * 0.23)
+        elif avg_comp_views >= 5000:
+            base_vol = 1800 + int((avg_comp_views - 5000) * 0.28)
+        else:
+            base_vol = max(350, int(avg_comp_views * 0.4))
+
+        # Query length modifier (short keywords have broader search demand than long-tails)
+        word_count = len(seed_words)
+        if word_count <= 2:
+            vol_multiplier = 1.35
+        elif word_count == 3:
+            vol_multiplier = 1.0
+        else:
+            vol_multiplier = max(0.45, 1.0 - (word_count - 3) * 0.15)
+
+        search_volume = int(base_vol * vol_multiplier)
+
+        # 2. Dynamic Competition Score (0 - 100)
+        # Factor A: Exact / Partial keyword match in competitor titles
+        matched_titles_count = 0
+        if competitors:
+            for c in competitors:
+                c_title = c.get("title", "").lower()
+                if any(w in c_title for w in seed_words):
+                    matched_titles_count += 1
+            comp_density = (matched_titles_count / max(len(competitors), 1)) * 35.0
+        else:
+            comp_density = 20.0
+
+        # Factor B: Incumbent authority (max views barrier)
+        if max_comp_views >= 500000:
+            authority_barrier = 35.0
+        elif max_comp_views >= 100000:
+            authority_barrier = 25.0
+        elif max_comp_views >= 20000:
+            authority_barrier = 15.0
+        else:
+            authority_barrier = 8.0
+
+        # Factor C: Freshness / New entrant feasibility
+        # If videos uploaded within 6 months are ranking, competition is fresher / easier
+        freshness_discount = 0.0
+        if competitors:
+            for c in competitors[:3]:
+                age = str(c.get("upload_age", "")).lower()
+                if any(
+                    x in age
+                    for x in [
+                        "hari",
+                        "minggu",
+                        "bulan",
+                        "day",
+                        "week",
+                        "month",
+                        "recent",
+                        "1 bulan",
+                    ]
+                ):
+                    if not any(x in age for x in ["tahun", "year"]):
+                        freshness_discount += 5.0
+        freshness_discount = min(15.0, freshness_discount)
+
+        # Factor D: Base topic hardness
+        base_hardness = 20.0
+
+        raw_comp = base_hardness + comp_density + authority_barrier - freshness_discount
+        competition_score = round(max(15.0, min(92.0, raw_comp)), 1)
+
+        # 3. Calculate Overall Opportunity Score
+        opportunity_score = cls.calculate_opportunity_score(search_volume, competition_score)
+
+        if opportunity_score >= 68.0:
+            rating = "HIGH_POTENTIAL"
+        elif opportunity_score >= 48.0:
+            rating = "MODERATE"
+        else:
+            rating = "COMPETITIVE"
+
+        return {
+            "search_volume": search_volume,
+            "competition_score": competition_score,
+            "opportunity_score": opportunity_score,
+            "rating": rating,
+            "avg_competitor_views": int(avg_comp_views),
+            "max_competitor_views": int(max_comp_views),
+        }
+
+    @classmethod
     def estimate_rpm(cls, topic_name: str) -> dict[str, Any]:
         """
         Estimate YouTube AdSense RPM (USD) based on topic keywords.
-        NexLev-style monetization projection.
+        NexLev-style monetization projection across 12 distinct niches.
         """
         lowered = topic_name.lower()
-        matched_niche = "business"
 
-        if any(k in lowered for k in ["ads", "iklan", "marketing", "seo"]):
-            matched_niche = "advertising"
-        elif any(k in lowered for k in ["saham", "crypto", "keuangan", "finance", "investasi"]):
+        # Rule-based regex and keyword matching for accurate niche detection
+        if any(
+            k in lowered
+            for k in [
+                "saham",
+                "crypto",
+                "bitcoin",
+                "reksadana",
+                "investasi",
+                "trading",
+                "bank",
+                "pinjol",
+                "kredit",
+                "uang",
+                "rupiah",
+                "dollar",
+                "obligasi",
+                "asuransi",
+                "financial",
+                "kpr",
+                "dividen",
+                "forex",
+                "pajak",
+            ]
+        ):
             matched_niche = "finance"
-        elif any(k in lowered for k in ["coding", "python", "software", "tech", "gadget"]):
+        elif any(
+            k in lowered
+            for k in [
+                "ads",
+                "iklan",
+                "marketing",
+                "seo",
+                "sem",
+                "affiliate",
+                "digital marketing",
+                "endorse",
+                "copywriting",
+                "funnel",
+                "cpc",
+                "roas",
+            ]
+        ):
+            matched_niche = "advertising"
+        elif any(
+            k in lowered
+            for k in [
+                "coding",
+                "python",
+                "javascript",
+                "ai",
+                "prompt",
+                "software",
+                "web",
+                "programmer",
+                "komputer",
+                "laptop",
+                "gadget",
+                "review hp",
+                "iphone",
+                "android",
+                "developer",
+                "bot",
+                "data science",
+                "excel",
+                "teknologi",
+                "flow",
+                "veo",
+                "chatgpt",
+                "gemini",
+            ]
+        ):
             matched_niche = "tech"
-        elif any(k in lowered for k in ["game", "gaming", "play"]):
+        elif any(
+            k in lowered
+            for k in [
+                "sehat",
+                "kesehatan",
+                "diet",
+                "gym",
+                "fitness",
+                "obat",
+                "dokter",
+                "penyakit",
+                "workout",
+                "kalori",
+                "kurus",
+                "otot",
+                "skincare",
+                "kecantikan",
+                "glowing",
+                "jerawat",
+                "herbal",
+            ]
+        ):
+            matched_niche = "health_fitness"
+        elif any(
+            k in lowered
+            for k in [
+                "mobil",
+                "motor",
+                "brio",
+                "avanza",
+                "vespa",
+                "modifikasi",
+                "servis",
+                "balap",
+                "otomotif",
+                "kendaraan",
+                "bensin",
+                "ev",
+                "mobil listrik",
+            ]
+        ):
+            matched_niche = "automotive"
+        elif any(
+            k in lowered
+            for k in [
+                "bisnis",
+                "umkm",
+                "usaha",
+                "jualan",
+                "modal",
+                "cuan",
+                "franchise",
+                "wirausaha",
+                "reseller",
+                "dropship",
+                "toko",
+                "omset",
+                "pabrik",
+                "suplier",
+                "ekspor",
+                "impor",
+                "freelance",
+            ]
+        ):
+            matched_niche = "business"
+        elif any(
+            k in lowered
+            for k in [
+                "belajar",
+                "tutorial",
+                "kursus",
+                "skripsi",
+                "kuliah",
+                "beasiswa",
+                "bahasa inggris",
+                "toefl",
+                "sejarah",
+                "rumus",
+                "matematika",
+                "ujian",
+                "pns",
+                "cpns",
+                "sekolah",
+            ]
+        ):
+            matched_niche = "education"
+        elif any(
+            k in lowered
+            for k in [
+                "wisata",
+                "liburan",
+                "hotel",
+                "tiket",
+                "villa",
+                "traveling",
+                "pantai",
+                "gunung",
+                "jepang",
+                "eropa",
+                "bali",
+                "jogja",
+                "staycation",
+            ]
+        ):
+            matched_niche = "travel"
+        elif any(
+            k in lowered
+            for k in [
+                "masak",
+                "resep",
+                "kuliner",
+                "makanan",
+                "dapur",
+                "kue",
+                "jajan",
+                "ayam",
+                "pedas",
+                "bumbu",
+                "cafe",
+                "restoran",
+                "mukbang",
+            ]
+        ):
+            matched_niche = "culinary"
+        elif any(
+            k in lowered
+            for k in [
+                "vlog",
+                "rumah",
+                "dekorasi",
+                "fashion",
+                "baju",
+                "outfit",
+                "makeup",
+                "diy",
+                "kerajinan",
+                "kucing",
+                "hewan",
+                "anjing",
+                "hobi",
+            ]
+        ):
+            matched_niche = "lifestyle"
+        elif any(
+            k in lowered
+            for k in [
+                "game",
+                "gaming",
+                "gameplay",
+                "play",
+                "mobile legends",
+                "ff",
+                "free fire",
+                "roblox",
+                "gta",
+                "genshin",
+                "valorant",
+                "minecraft",
+                "ps5",
+                "streamer",
+            ]
+        ):
             matched_niche = "gaming"
+        elif any(
+            k in lowered
+            for k in [
+                "lucu",
+                "komedi",
+                "meme",
+                "hiburan",
+                "film",
+                "movie",
+                "drama",
+                "anime",
+                "lagu",
+                "musik",
+                "gitar",
+                "lirik",
+                "gosip",
+                "seleb",
+                "alur cerita",
+            ]
+        ):
+            matched_niche = "entertainment"
+        else:
+            matched_niche = "general"
 
-        benchmark = cls.NICHE_RPM_BENCHMARKS.get(
-            matched_niche, cls.NICHE_RPM_BENCHMARKS["business"]
-        )
+        benchmark = cls.NICHE_RPM_BENCHMARKS.get(matched_niche, cls.NICHE_RPM_BENCHMARKS["general"])
         return {
             "detected_niche": matched_niche,
             "rpm_range_usd": f"${benchmark['low']:.2f} - ${benchmark['high']:.2f}",

@@ -156,27 +156,45 @@ def get_topic_summary(canonical_id: str) -> str:
 
 
 @mcp.tool()
-def analyze_keyword_opportunity(
+async def analyze_keyword_opportunity(
     keyword: str,
-    search_volume: int = 2500,
-    competition_score: float = 35.0,
+    search_volume: int | None = None,
+    competition_score: float | None = None,
 ) -> str:
     """
     Analyze keyword search demand vs competition (VidIQ / TubeBuddy style).
-    Includes RPM estimate and potential earnings (NexLev style).
+    If volume/competition are omitted, dynamically estimates them from live YouTube competitor metrics.
+    Includes RPM estimate across 12 niches (NexLev style).
     """
-    opp_score = SearchIntelligence.calculate_opportunity_score(search_volume, competition_score)
+    if search_volume is None or competition_score is None:
+        connector = YouTubeConnector()
+        competitors = await connector.get_top_competitors(keyword, limit=5)
+        kw_metrics = SearchIntelligence.estimate_keyword_metrics(keyword, competitors)
+        final_vol = kw_metrics["search_volume"] if search_volume is None else search_volume
+        final_comp = (
+            kw_metrics["competition_score"] if competition_score is None else competition_score
+        )
+        opp_score = SearchIntelligence.calculate_opportunity_score(final_vol, final_comp)
+        rating = kw_metrics["rating"]
+    else:
+        final_vol = search_volume
+        final_comp = competition_score
+        opp_score = SearchIntelligence.calculate_opportunity_score(final_vol, final_comp)
+        rating = (
+            "HIGH_POTENTIAL"
+            if opp_score >= 68.0
+            else ("MODERATE" if opp_score >= 48.0 else "COMPETITIVE")
+        )
+
     rpm_data = SearchIntelligence.estimate_rpm(keyword)
 
     return json.dumps(
         {
             "keyword": keyword,
             "opportunity_score": opp_score,
-            "rating": "HIGH_POTENTIAL"
-            if opp_score >= 65
-            else ("MODERATE" if opp_score >= 45 else "LOW"),
-            "search_volume": search_volume,
-            "competition_score": competition_score,
+            "rating": rating,
+            "search_volume": final_vol,
+            "competition_score": final_comp,
             "monetization": rpm_data,
         },
         indent=2,

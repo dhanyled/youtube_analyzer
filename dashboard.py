@@ -47,15 +47,22 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-init_db()
+try:
+    init_db()
+except Exception as e:
+    print(f"Database init notice: {e}")
 
 
 # -------------------------------------------------------------
 # Helper Functions
 # -------------------------------------------------------------
 def get_all_topics():
-    with Session(engine) as session:
-        return session.exec(select(Topic).order_by(Topic.created_at.desc())).all()
+    try:
+        with Session(engine) as session:
+            return session.exec(select(Topic).order_by(Topic.created_at.desc())).all()
+    except Exception as e:
+        print(f"Notice: unable to fetch topics: {e}")
+        return []
 
 
 def save_or_get_topic(seed_keyword: str):

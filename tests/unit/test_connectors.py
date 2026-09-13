@@ -10,9 +10,22 @@ from youtube_analyzer.core.models import PlatformEnum
 @pytest.mark.asyncio
 async def test_hasdata_trends_offline_mock():
     connector = HasDataTrendsConnector(api_key=None)
-    results = await connector.search(query="Google Ads UMKM")
-    assert len(results) > 0
-    assert any("tutorial" in r["query"] or "pemula" in r["query"] for r in results)
+    web_results = await connector.search(query="Google Ads UMKM", property_type="web")
+    assert len(web_results) > 0
+    assert any("jasa" in r["query"] or "biaya" in r["query"] for r in web_results)
+
+    yt_results = await connector.get_youtube_trends(query="Google Ads UMKM")
+    assert len(yt_results) > 0
+    assert any("cara" in r["query"] or "tutorial" in r["query"] for r in yt_results)
+
+
+@pytest.mark.asyncio
+async def test_compare_google_vs_youtube():
+    connector = HasDataTrendsConnector(api_key=None)
+    comparison = await connector.compare_google_vs_youtube(query="Google Ads UMKM")
+    assert "google_web_trends" in comparison
+    assert "youtube_trends" in comparison
+    assert len(comparison["youtube_trends"]) > 0
 
 
 @pytest.mark.asyncio

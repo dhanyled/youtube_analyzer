@@ -13,6 +13,7 @@ except ImportError:
 
 from sqlmodel import Session, select
 
+from youtube_analyzer.connectors.hasdata_trends import HasDataTrendsConnector
 from youtube_analyzer.core.intelligence import SearchIntelligence
 from youtube_analyzer.core.models import (
     IntentCluster,
@@ -223,6 +224,21 @@ def generate_video_ideas(
         },
         indent=2,
     )
+
+
+@mcp.tool()
+async def compare_google_vs_youtube_trends(
+    keyword: str,
+    geo: str = "ID",
+) -> str:
+    """
+    Compare Google Web Search Trends vs YouTube Search Trends for a keyword.
+    Identifies whether search interest is predominantly on YouTube (Tutorial/How-to)
+    or Google Web (Commercial/Service).
+    """
+    connector = HasDataTrendsConnector()
+    comparison = await connector.compare_google_vs_youtube(keyword, geo)
+    return json.dumps(comparison, indent=2)
 
 
 if __name__ == "__main__":

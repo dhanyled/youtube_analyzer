@@ -23,6 +23,7 @@ if SRC_DIR not in sys.path:
 
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 from sqlmodel import Session, select
 
 from youtube_analyzer.connectors.hasdata_trends import HasDataTrendsConnector
@@ -45,6 +46,68 @@ st.set_page_config(
     page_icon="🚀",
     layout="wide",
     initial_sidebar_state="expanded",
+)
+
+# Sembunyikan toolbar atas (Tombol Fork & Logo GitHub), menu utama, dan footer
+st.markdown(
+    """
+    <style>
+    /* Sembunyikan toolbar actions atas: Logo GitHub & Tombol Fork */
+    [data-testid="stToolbarActions"], [data-testid="stToolbarActionButton"], .stAppToolbarActions {
+        display: none !important;
+        visibility: hidden !important;
+    }
+    /* Sembunyikan Main Menu 3-titik & Footer */
+    #MainMenu {
+        visibility: hidden !important;
+    }
+    footer {
+        display: none !important;
+        visibility: hidden !important;
+    }
+    /* Bersihkan styling header agar menyatu mulus */
+    header[data-testid="stHeader"] {
+        background: transparent !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+# Injeksi script ke parent container Streamlit Cloud untuk menyembunyikan badge & link profile
+components.html(
+    """
+    <script>
+    function hideParentBadges() {
+        try {
+            const pdoc = window.parent.document;
+            if (!pdoc) return;
+            const styleId = "hide-github-streamlit-badges";
+            if (!pdoc.getElementById(styleId)) {
+                const s = pdoc.createElement("style");
+                s.id = styleId;
+                s.innerHTML = `
+                    ._viewerBadge_1j65n_23,
+                    ._profileContainer_gzau3_53,
+                    a[href*="streamlit.io/cloud"],
+                    a[href*="share.streamlit.io"],
+                    a[href*="github.com"] {
+                        display: none !important;
+                        visibility: hidden !important;
+                    }
+                `;
+                pdoc.head.appendChild(s);
+            }
+        } catch (e) {
+            // cross-origin fallback
+        }
+    }
+    hideParentBadges();
+    setInterval(hideParentBadges, 1000);
+    </script>
+    """,
+    height=0,
+    width=0,
 )
 
 try:
@@ -708,13 +771,13 @@ if keyword_input:
         with st.expander("🛠️ Panduan Integrasi Tools AI Video Rekomendasi:"):
             st.markdown(
                 """
-                - **[kodelyx/flow-agent](https://github.com/kodelyx/flow-agent)**:
+                - **Flow-Agent (Autonomous Video Creator)**:
                   Menggunakan sesi login Google Flow yang sudah aktif di Chrome via extension. Tidak butuh API key, mendukung batch 16 klip sekaligus & upscaler 1080p/4K gratis.
-                - **[touchizen/AutoFlowCut](https://github.com/touchizen/AutoFlowCut)**:
+                - **AutoFlowCut (Timeline Synchronizer)**:
                   Aplikasi desktop Electron yang menggabungkan Google Flow/Veo dengan CapCut/Premiere. Impor prompt dari tools ini, visual digenerate, langsung masuk timeline CapCut lengkap dengan subtitle & timeline audio!
-                - **[Generative-AI-Strategy-B-V/veo-mcp](https://github.com/Generative-AI-Strategy-B-V/veo-mcp)**:
+                - **Veo MCP Studio**:
                   MCP server resmi untuk Veo 3.1 via Google AI Studio API token-efficient.
-                - **[ffroliva/gflow-cli](https://github.com/ffroliva/gflow-cli)**:
+                - **GFlow CLI (Scene Chaining Automation)**:
                   CLI Python untuk scene chaining & pembuatan video multi-scene yang konsisten di Google Flow.
                 """
             )

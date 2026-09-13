@@ -6,6 +6,8 @@ Incorporates proven algorithms inspired by:
 - NexLev: Outlier Detection (Viral Breakout multiplier) & Niche RPM Economics
 """
 
+import math
+from datetime import UTC, datetime
 from typing import Any
 
 from youtube_analyzer.core.models import IntentEnum
@@ -32,9 +34,6 @@ class SearchIntelligence:
         - search_volume: Estimated monthly searches
         - competition_score: 0 (no competition) to 100 (saturated)
         """
-        # Normalize search volume using logarithmic scale (10 to 100,000+)
-        import math
-
         if search_volume <= 0:
             vol_score = 10.0
         else:
@@ -114,10 +113,11 @@ class SearchIntelligence:
         tailored to the target intent.
         """
         clean = seed.strip().title()
+        year = datetime.now(UTC).year
 
         if intent_type == IntentEnum.TUTORIAL:
             return [
-                f"Cara {clean} dari Nol untuk Pemula (Step-by-Step 2026)",
+                f"Cara {clean} dari Nol untuk Pemula (Step-by-Step {year})",
                 f"Tutorial {clean} Paling Lengkap & Mudah Dipahami",
                 f"Rahasia Setting {clean} yang Jarang Diketahui Orang",
                 f"Hentikan Kesalahan Ini Saat Memulai {clean}!",
@@ -130,12 +130,12 @@ class SearchIntelligence:
             ]
         elif intent_type == IntentEnum.COMPARISON:
             return [
-                f"{clean}: Mana yang Lebih Menguntungkan di 2026?",
+                f"{clean}: Mana yang Lebih Menguntungkan di {year}?",
                 f"Perbandingan Jujur {clean} Setelah 30 Hari Penggunaan",
             ]
         else:
             return [
-                f"Apakah {clean} Masih Efektif di 2026? Data Membuktikannya",
+                f"Apakah {clean} Masih Efektif di {year}? Data Membuktikannya",
                 f"Semua yang Wajib Anda Tahu Tentang {clean}",
                 f"5 Fakta Mengejutkan Seputar {clean}",
             ]

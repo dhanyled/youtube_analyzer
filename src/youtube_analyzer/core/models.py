@@ -34,6 +34,7 @@ def utc_now() -> datetime:
 
 class Topic(SQLModel, table=True):
     __tablename__ = "topics"
+    __table_args__ = {"extend_existing": True}
 
     id: int | None = Field(default=None, primary_key=True)
     canonical_id: str = Field(index=True, unique=True, description="Human-readable ID, e.g. GA-001")
@@ -55,6 +56,7 @@ class Topic(SQLModel, table=True):
 
 class Keyword(SQLModel, table=True):
     __tablename__ = "keywords"
+    __table_args__ = {"extend_existing": True}
 
     id: int | None = Field(default=None, primary_key=True)
     topic_id: int = Field(foreign_key="topics.id", index=True)
@@ -76,6 +78,7 @@ class Keyword(SQLModel, table=True):
 
 class Query(SQLModel, table=True):
     __tablename__ = "queries"
+    __table_args__ = {"extend_existing": True}
 
     id: int | None = Field(default=None, primary_key=True)
     topic_id: int = Field(foreign_key="topics.id", index=True)
@@ -91,6 +94,7 @@ class Query(SQLModel, table=True):
 
 class IntentCluster(SQLModel, table=True):
     __tablename__ = "intent_clusters"
+    __table_args__ = {"extend_existing": True}
 
     id: int | None = Field(default=None, primary_key=True)
     topic_id: int = Field(foreign_key="topics.id", index=True)
@@ -106,6 +110,7 @@ class IntentCluster(SQLModel, table=True):
 
 class Competitor(SQLModel, table=True):
     __tablename__ = "competitors"
+    __table_args__ = {"extend_existing": True}
 
     id: int | None = Field(default=None, primary_key=True)
     topic_id: int = Field(foreign_key="topics.id", index=True)
@@ -127,6 +132,7 @@ class Competitor(SQLModel, table=True):
 
 class Citation(SQLModel, table=True):
     __tablename__ = "citations"
+    __table_args__ = {"extend_existing": True}
 
     id: int | None = Field(default=None, primary_key=True)
     topic_id: int = Field(foreign_key="topics.id", index=True)
@@ -142,6 +148,7 @@ class Citation(SQLModel, table=True):
 
 class ContentOpportunity(SQLModel, table=True):
     __tablename__ = "content_opportunities"
+    __table_args__ = {"extend_existing": True}
 
     id: int | None = Field(default=None, primary_key=True)
     topic_id: int = Field(foreign_key="topics.id", index=True)

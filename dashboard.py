@@ -13,6 +13,13 @@ Run locally:
 """
 
 import asyncio
+import os
+import sys
+
+# Ensure src/ is in sys.path for Streamlit Cloud and remote deployment
+SRC_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "src"))
+if SRC_DIR not in sys.path:
+    sys.path.insert(0, SRC_DIR)
 
 import pandas as pd
 import streamlit as st

@@ -1,9 +1,9 @@
 """Search Intelligence & YouTube Opportunity Engine.
 
-Incorporates proven algorithms inspired by:
-- VidIQ: Opportunity Score (Volume vs Competition), Video SEO Formulas
-- TubeBuddy: Search Rank & Keyword Explorer Scoring
-- NexLev: Outlier Detection (Viral Breakout multiplier) & Niche RPM Economics
+Incorporates proven algorithms for:
+- Opportunity Score (Search Volume vs Competition) & Video SEO Formulas
+- Intent Clustering & Search Rank Optimization
+- Outlier Detection (Viral Breakout multiplier) & Niche RPM Economics
 """
 
 from typing import Any
@@ -81,7 +81,7 @@ class SearchIntelligence:
     @staticmethod
     def calculate_opportunity_score(search_volume: int, competition_score: float) -> float:
         """
-        Calculate VidIQ / TubeBuddy style overall opportunity score (0 - 100).
+        Calculate algorithmic overall opportunity score (0 - 100).
         - search_volume: Estimated monthly searches
         - competition_score: 0 (no competition) to 100 (saturated)
         """
@@ -102,7 +102,7 @@ class SearchIntelligence:
     @staticmethod
     def calculate_outlier_score(views: int, channel_median_views: int) -> dict[str, Any]:
         """
-        Calculate NexLev / VidIQ style Outlier Multiplier.
+        Calculate viral Outlier Multiplier.
         Identifies videos that dramatically outperform channel baseline.
         """
         safe_views = max(0, views)
@@ -138,7 +138,7 @@ class SearchIntelligence:
         """
         Dynamically estimate monthly search volume, competition difficulty (0-100),
         and overall opportunity score (0-100) based on seed keyword and live competitor metrics.
-        VidIQ & TubeBuddy dynamic calculation.
+        Dynamic search demand & competition calculation.
         """
         clean_seed = seed.strip().lower()
         seed_words = [w for w in clean_seed.split() if len(w) > 2]
@@ -256,7 +256,7 @@ class SearchIntelligence:
     def estimate_rpm(cls, topic_name: str) -> dict[str, Any]:
         """
         Estimate YouTube AdSense RPM (USD) based on topic keywords.
-        NexLev-style monetization projection across 12 distinct niches.
+        Monetization projection across 12 distinct niches.
         """
         lowered = topic_name.lower()
 
@@ -531,7 +531,7 @@ class SearchIntelligence:
     @staticmethod
     def generate_high_ctr_titles(seed: str, intent_type: IntentEnum) -> list[str]:
         """
-        Generate high-CTR title formulas (VidIQ / TubeBuddy style)
+        Generate high-CTR title formulas
         tailored to the target intent.
         """
         clean = seed.strip().title()
@@ -952,7 +952,7 @@ class SearchIntelligence:
         cls, competitors: list[dict[str, Any]]
     ) -> dict[str, Any]:
         """
-        NexLev-inspired Outlier Analysis.
+        Viral Outlier Multiplier Analysis.
         Calculates median views across top ranking videos and finds viral breakout outliers.
         """
         if not competitors:
@@ -1024,7 +1024,7 @@ class SearchIntelligence:
         cls, seed: str, rpm_info: dict[str, Any]
     ) -> dict[str, Any]:
         """
-        NexLev Faceless Niche Finder Replica.
+        Faceless Niche Opportunity Analysis.
         Evaluates AI / Faceless viability, scripting automation, and B-roll feasibility.
         """
         niche = rpm_info.get("detected_niche", "general").lower()
@@ -1084,7 +1084,7 @@ class SearchIntelligence:
         cls, topic: str, title: str, duration: str = "15:00"
     ) -> list[dict[str, Any]]:
         """
-        VidIQ AI Clipping / Viral Highlights Replica.
+        AI Shorts Clipping & Viral Highlights Generator.
         Deconstructs a long-form video topic into 3-4 viral Short clips with hooks and timestamps.
         """
         clean = topic.strip().title()

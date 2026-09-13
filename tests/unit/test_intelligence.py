@@ -1,4 +1,4 @@
-"""Unit tests for VidIQ, TubeBuddy, and NexLev intelligence features."""
+"""Unit tests for Search Intelligence, Opportunity Score, and Outlier Engine features."""
 
 from youtube_analyzer.core.intelligence import SearchIntelligence
 from youtube_analyzer.core.models import IntentEnum

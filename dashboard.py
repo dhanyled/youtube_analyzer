@@ -256,7 +256,7 @@ if keyword_input:
     # 4 Baris Metrik Ringkas yang Dinamis
     m1, m2, m3, m4 = st.columns(4)
     m1.metric(
-        "Skor Peluang (VidIQ / TubeBuddy)",
+        "Skor Peluang Algoritma (SERP Score)",
         f"{opp_score} / 100",
         f"Peringkat: {kw_metrics['rating']}",
     )
@@ -490,14 +490,14 @@ if keyword_input:
         st.caption(
             "Replikasi resmi tab **Riset (Research)** di YouTube Studio, "
             "lengkap dengan indikator **🏷️ Content Gap (Kesenjangan Konten)**, "
-            "analisis Outlier ala **NexLev**, dan AI Clipping ala **VidIQ**."
+            "analisis Outlier Multiplier, dan AI Shorts Clipping & Highlights."
         )
 
         res_tab1, res_tab2, res_tab3 = st.tabs(
             [
                 "🏷️ Kesenjangan Konten (Content Gap)",
-                "💥 NexLev Outlier & Faceless Niche",
-                "✂️ VidIQ AI Clipping & Highlights",
+                "💥 Outlier Multiplier & Faceless Niche",
+                "✂️ AI Shorts Clipping & Highlights",
             ]
         )
 
@@ -540,7 +540,7 @@ if keyword_input:
                 st.caption(f"Strategi Eksekusi: {g['recommended_action']}")
 
         with res_tab2:
-            st.markdown("#### 💥 NexLev Outlier Multiplier & Channel Audit")
+            st.markdown("#### 💥 Outlier Multiplier & Channel Audit")
             st.caption(
                 "Mendeteksi video kompetitor yang meledak (*Breakout Outlier*) "
                 "jauh di atas rata-rata channel mereka. Video outlier inilah bukti nyata topik organik yang disukai algoritma!"
@@ -573,7 +573,7 @@ if keyword_input:
             st.dataframe(pd.DataFrame(outlier_analysis["outlier_items"]), use_container_width=True)
 
             st.markdown("---")
-            st.markdown("#### 🤖 NexLev Faceless Niche Finder")
+            st.markdown("#### 🤖 Faceless Niche Finder")
             st.caption(
                 "Evaluasi kelayakan pembuatan channel YouTube tanpa wajah (Faceless AI Channel) untuk topik ini."
             )
@@ -594,7 +594,7 @@ if keyword_input:
                 st.markdown(f"- {step}")
 
         with res_tab3:
-            st.markdown("#### ✂️ VidIQ AI Clipping & Highlights Generator")
+            st.markdown("#### ✂️ AI Shorts Clipping & Highlights Generator")
             st.caption(
                 "Pecah topik video panjang Anda menjadi 3 video Shorts berpotensi viral tinggi (45 detik). "
                 "Dilengkapi hook 3 detik pembuka dan Call-to-Action (CTA)."

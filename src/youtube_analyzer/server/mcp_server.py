@@ -162,9 +162,9 @@ async def analyze_keyword_opportunity(
     competition_score: float | None = None,
 ) -> str:
     """
-    Analyze keyword search demand vs competition (VidIQ / TubeBuddy style).
+    Analyze keyword search demand vs competition score (0-100).
     If volume/competition are omitted, dynamically estimates them from live YouTube competitor metrics.
-    Includes RPM estimate across 12 niches (NexLev style).
+    Includes RPM monetization estimate across 12 distinct niches.
     """
     if search_volume is None or competition_score is None:
         connector = YouTubeConnector()
@@ -208,8 +208,8 @@ def detect_outlier_opportunity(
     channel_median_views: int,
 ) -> str:
     """
-    Detect viral outlier videos and breakout topics (NexLev / VidIQ style).
-    Checks if a video outperforms the creator's channel median.
+    Detect viral outlier videos and breakout topics.
+    Checks if a video outperforms the creator's channel median views.
     """
     outlier = SearchIntelligence.calculate_outlier_score(views, channel_median_views)
     return json.dumps(
@@ -232,7 +232,7 @@ def generate_video_ideas(
     intent_type: str = "tutorial",
 ) -> str:
     """
-    Generate high-CTR title formulas and hooks based on intent (VidIQ / TubeBuddy style).
+    Generate high-CTR title formulas and hooks based on search intent.
     """
     try:
         intent = IntentEnum(intent_type.lower())
@@ -381,7 +381,7 @@ async def detect_youtube_studio_content_gaps(seed_keyword: str) -> str:
 @mcp.tool()
 async def analyze_competitor_outliers(seed_keyword: str) -> str:
     """
-    NexLev-inspired Outlier Multiplier Inspector.
+    Viral Outlier Multiplier Inspector.
     Calculates median views across top ranking videos and finds viral breakout videos (2.5x - 50x median).
     """
     connector = YouTubeConnector()
@@ -393,7 +393,7 @@ async def analyze_competitor_outliers(seed_keyword: str) -> str:
 @mcp.tool()
 async def analyze_faceless_niche_viability(seed_keyword: str) -> str:
     """
-    NexLev-inspired Faceless Niche Finder.
+    Faceless Niche Opportunity Finder.
     Evaluates suitability for AI Faceless channel creation (Google Flow, Veo 3.1, ElevenLabs).
     """
     rpm_info = SearchIntelligence.estimate_rpm(seed_keyword)
@@ -409,9 +409,9 @@ async def analyze_faceless_niche_viability(seed_keyword: str) -> str:
 
 
 @mcp.tool()
-async def generate_vidiq_clipping_ideas(topic: str, title: str = "") -> str:
+async def generate_shorts_clipping_ideas(topic: str, title: str = "") -> str:
     """
-    VidIQ-inspired AI Clipping & Viral Highlights Finder.
+    AI Shorts Clipping & Viral Highlights Finder.
     Deconstructs a long-form video topic into 3-4 viral Short clips with hooks and timestamps.
     """
     clips = SearchIntelligence.generate_clipping_opportunities(topic, title or topic)

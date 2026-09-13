@@ -64,10 +64,10 @@ class Keyword(SQLModel, table=True):
     cpc: float | None = Field(default=None)
     competition_level: str | None = Field(default=None)
     opportunity_score: float | None = Field(
-        default=None, description="VidIQ/TubeBuddy style opportunity score (0-100)"
+        default=None, description="Algorithmic opportunity score (0-100)"
     )
     estimated_rpm: float | None = Field(
-        default=None, description="NexLev style RPM estimate in USD"
+        default=None, description="Estimated AdSense RPM in USD"
     )
     created_at: datetime = Field(default_factory=utc_now)
 
@@ -117,7 +117,7 @@ class Competitor(SQLModel, table=True):
     views: int | None = Field(default=None)
     channel_median_views: int | None = Field(default=None)
     outlier_score: float | None = Field(
-        default=None, description="NexLev/VidIQ style outlier multiplier (views / median)"
+        default=None, description="Viral outlier multiplier (views / median)"
     )
     vph: float | None = Field(default=None, description="Views Per Hour velocity")
     created_at: datetime = Field(default_factory=utc_now)

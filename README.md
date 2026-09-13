@@ -2,23 +2,23 @@
 
 An intelligent search orchestrator and MCP server that unifies **Google (GKP, SERP, Trends)**, **YouTube Search/SERP**, and **AI/AEO Prompts** into a synchronized **Canonical Topic & Intent Universe**.
 
-Powered by algorithms and tool designs inspired by industry leaders:
-* **VidIQ**: Keyword Opportunity Score (Search Volume vs. Competition) & SEO Title Formulas.
-* **TubeBuddy**: Intent Clustering & Search Rank Intelligence.
-* **NexLev & NexLev MCP**: Outlier Video Multipliers (Breakout Viral Topics) & Niche RPM Economics.
+Powered by algorithmic search intelligence formulas:
+* **Keyword Opportunity Score Engine**: Search Volume vs. Competition Difficulty & High-CTR Title Formulas.
+* **Intent Clustering & SERP Intelligence**: Search Rank Optimization across Google & YouTube surfaces.
+* **Outlier Video Multiplier Engine**: Breakout Viral Topic Identification & Niche AdSense RPM Economics.
 
 ---
 
-## 🎯 Core Features (VidIQ + TubeBuddy + NexLev + MCP)
+## 🎯 Core Features
 
-| Feature | Inspired By | Description |
+| Feature | Engine | Description |
 | :--- | :--- | :--- |
 | **Cross-Surface Canonical Topics** | Blueprint Core | 1 Seed topic expands to native Google terms, YouTube tutorial queries, and AI conversational prompts. |
-| **Keyword Opportunity Score (0-100)** | VidIQ / TubeBuddy | Logarithmic search volume weighted against competition density (`vol * 0.55 + (100 - comp) * 0.45`). |
-| **Outlier Breakout Multiplier** | NexLev / VidIQ | Identifies 5x–10x breakout videos (`views / channel_median_views`) to spot viral topics before saturation. |
-| **Niche RPM & Earnings Projections** | NexLev MCP | Benchmark AdSense RPM ranges ($15-$35 for finance/ads, $8-$18 for tech, etc.) and earnings per 100k views. |
-| **High-CTR Psychological Titles** | VidIQ AI / TubeBuddy | Generates intent-specific title hooks (Step-by-Step, Curiosity Gaps, Budget Revelations, 2026 recency). |
-| **Global MCP Ecosystem Integration** | Claude / Gemini MCP | Seamlessly bridges to global `google-ads-mcp` (`generate_keyword_ideas`) and `playwright-mcp` for live SERP scraping. |
+| **Keyword Opportunity Score (0-100)** | Opportunity Engine | Logarithmic search volume weighted against competition density (`vol * 0.55 + (100 - comp) * 0.45`). |
+| **Outlier Breakout Multiplier** | Outlier Engine | Identifies 5x–10x breakout videos (`views / channel_median_views`) to spot viral topics before saturation. |
+| **Niche RPM & Earnings Projections** | Monetization Engine | Benchmark AdSense RPM ranges ($15-$35 for finance/ads, $8-$18 for tech, etc.) and earnings per 100k views across 12 niches. |
+| **High-CTR Psychological Titles** | Title Generator | Generates intent-specific title hooks (Step-by-Step, Curiosity Gaps, Budget Revelations, 2026 recency). |
+| **Global MCP Ecosystem Integration** | MCP Orchestrator | Seamlessly bridges to global `google-ads-mcp` (`generate_keyword_ideas`) and `google-trends-mcp` for live SERP analysis. |
 
 ---
 
@@ -46,7 +46,7 @@ When connected to Claude, Gemini, or Antigravity via Model Context Protocol:
 2. **`get_topic_summary(canonical_id)`**:
    Retrieves all queries, intent clusters, and competitor gaps for a topic.
 3. **`analyze_keyword_opportunity(keyword, search_volume, competition_score)`**:
-   Calculates 0-100 VidIQ/TubeBuddy opportunity score and NexLev estimated RPM economics.
+   Calculates 0-100 algorithmic opportunity score and estimated RPM economics across 12 distinct niches.
 4. **`detect_outlier_opportunity(video_title, views, channel_median_views)`**:
    Detects if a competitor's video is a breakout outlier (5x+ multiplier) to replicate.
 5. **`generate_video_ideas(seed_keyword, intent_type)`**:

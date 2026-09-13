@@ -8,10 +8,12 @@ dependencies = [
     "alembic>=1.20.0",
     "httpx>=0.28.1",
     "mcp>=1.0.0",
+    "pandas>=3.0.5",
     "pydantic>=2.13.5",
     "python-dotenv>=1.2.3",
     "sqlalchemy>=2.0.52",
     "sqlmodel>=0.0.42",
+    "streamlit>=1.63.0",
 ]
 
 [build-system]

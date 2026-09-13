@@ -51,9 +51,7 @@ jobs:
         run: uv python install 3.12
 
       - name: Audit Dependencies for Known Vulnerabilities
-        run: |
-          uv pip install pip-audit
-          uv run pip-audit
+        run: uvx pip-audit
 
   test:
     name: Unit & Integration Tests

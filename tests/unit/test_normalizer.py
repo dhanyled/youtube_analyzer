@@ -70,3 +70,28 @@ def test_create_intent_clusters():
 
     tutorial_cluster = next(c for c in clusters if c.cluster_name == "Tutorial")
     assert tutorial_cluster.intent_type == IntentEnum.TUTORIAL
+
+
+def test_create_intent_clusters_all_intents():
+    google_terms = ["google ads vs facebook ads", "beli voucher google ads"]
+    youtube_terms = ["review google ads vs tiktok ads", "order jasa google ads"]
+    aeo_queries = ["perbandingan google ads dan fb ads", "diskon promo google ads"]
+
+    clusters = TopicNormalizer.create_intent_clusters(
+        topic_id=1,
+        google_terms=google_terms,
+        youtube_terms=youtube_terms,
+        aeo_queries=aeo_queries,
+    )
+
+    cluster_names = [c.cluster_name for c in clusters]
+    assert "Evaluasi & Review" in cluster_names
+    assert "Transaksi & Pembelian" in cluster_names
+
+    comp_cluster = next(c for c in clusters if c.cluster_name == "Evaluasi & Review")
+    assert comp_cluster.intent_type == IntentEnum.COMPARISON
+    assert comp_cluster.google_term_sample is not None
+
+    tx_cluster = next(c for c in clusters if c.cluster_name == "Transaksi & Pembelian")
+    assert tx_cluster.intent_type == IntentEnum.TRANSACTIONAL
+    assert tx_cluster.google_term_sample is not None

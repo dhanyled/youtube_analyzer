@@ -31,14 +31,37 @@ mcp = FastMCP("youtube-analyzer")
 
 
 @mcp.tool()
-def research_topic(seed_keyword: str) -> str:
+async def research_topic(seed_keyword: str) -> str:
     """
     Research a seed topic across Google, YouTube, and AI/AEO surfaces.
-    Generates a Canonical Topic ID and intent clusters.
+    Generates a Canonical Topic ID, fetches surface queries (via connectors fallback/live),
+    and creates intent clusters.
     """
     init_db()
     canonical_id = TopicNormalizer.generate_canonical_id(seed_keyword)
     surfaces = TopicNormalizer.expand_seed_surfaces(seed_keyword)
+
+    # Enhance YouTube surface variants using YouTubeConnector autocomplete
+    try:
+        yt_connector = YouTubeConnector()
+        yt_suggestions = await yt_connector.get_autocomplete(seed_keyword)
+        if yt_suggestions:
+            existing_yt = surfaces[PlatformEnum.YOUTUBE_SEARCH]
+            combined_yt = list(dict.fromkeys(existing_yt + yt_suggestions))
+            surfaces[PlatformEnum.YOUTUBE_SEARCH] = combined_yt
+    except Exception:
+        pass
+
+    # Enhance Google Search surface variants using HasDataTrendsConnector fallback/live
+    try:
+        trends_connector = HasDataTrendsConnector()
+        web_trends = await trends_connector.search(seed_keyword, property_type="web")
+        if web_trends:
+            trend_queries = [item["query"] for item in web_trends if "query" in item]
+            existing_g = surfaces[PlatformEnum.GOOGLE_SEARCH]
+            surfaces[PlatformEnum.GOOGLE_SEARCH] = list(dict.fromkeys(existing_g + trend_queries))
+    except Exception:
+        pass
 
     with Session(engine) as session:
         # Check if topic already exists
@@ -96,7 +119,7 @@ def research_topic(seed_keyword: str) -> str:
         for cluster in clusters:
             existing_cluster = session.exec(
                 select(IntentCluster).where(
-                    IntentCluster.topic_id == topic.id,
+                    IntentCluster.topic_id == topic_id,
                     IntentCluster.cluster_name == cluster.cluster_name,
                 )
             ).first()

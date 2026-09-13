@@ -5,6 +5,7 @@ and clusters search results back into unified intent buckets.
 """
 
 import re
+from typing import Any
 
 from youtube_analyzer.core.models import IntentCluster, IntentEnum, PlatformEnum
 
@@ -147,53 +148,48 @@ class TopicNormalizer:
     ) -> list[IntentCluster]:
         """
         Group cross-surface terms into unified intent clusters.
-        Produces synchronized clusters (e.g. Tutorial, Biaya/Commercial, Pemula).
+        Produces synchronized clusters (e.g. Tutorial, Commercial, Informational, Comparison, Transactional).
         """
-        buckets: dict[str, dict[str, str]] = {
-            "Tutorial": {"intent": IntentEnum.TUTORIAL},
-            "Biaya & Jasa": {"intent": IntentEnum.COMMERCIAL},
-            "Pemula & Edukasi": {"intent": IntentEnum.INFORMATIONAL},
-            "Evaluasi & Review": {"intent": IntentEnum.COMPARISON},
+        bucket_definitions: list[tuple[str, IntentEnum]] = [
+            ("Tutorial", IntentEnum.TUTORIAL),
+            ("Biaya & Jasa", IntentEnum.COMMERCIAL),
+            ("Transaksi & Pembelian", IntentEnum.TRANSACTIONAL),
+            ("Evaluasi & Review", IntentEnum.COMPARISON),
+            ("Pemula & Edukasi", IntentEnum.INFORMATIONAL),
+        ]
+
+        clusters_map: dict[IntentEnum, dict[str, Any]] = {
+            intent: {
+                "name": name,
+                "google": None,
+                "youtube": None,
+                "aeo": None,
+            }
+            for name, intent in bucket_definitions
         }
 
-        # Populate samples
-        for term in google_terms:
-            intent = cls.classify_intent(term)
-            if intent == IntentEnum.TUTORIAL and "google" not in buckets["Tutorial"]:
-                buckets["Tutorial"]["google"] = term
-            elif intent == IntentEnum.COMMERCIAL and "google" not in buckets["Biaya & Jasa"]:
-                buckets["Biaya & Jasa"]["google"] = term
-            elif "google" not in buckets["Pemula & Edukasi"]:
-                buckets["Pemula & Edukasi"]["google"] = term
+        def populate_samples(terms: list[str], surface_key: str) -> None:
+            for term in terms:
+                intent = cls.classify_intent(term)
+                if intent in clusters_map and clusters_map[intent][surface_key] is None:
+                    clusters_map[intent][surface_key] = term
 
-        for term in youtube_terms:
-            intent = cls.classify_intent(term)
-            if intent == IntentEnum.TUTORIAL and "youtube" not in buckets["Tutorial"]:
-                buckets["Tutorial"]["youtube"] = term
-            elif intent == IntentEnum.COMMERCIAL and "youtube" not in buckets["Biaya & Jasa"]:
-                buckets["Biaya & Jasa"]["youtube"] = term
-            elif "youtube" not in buckets["Pemula & Edukasi"]:
-                buckets["Pemula & Edukasi"]["youtube"] = term
-
-        for query in aeo_queries:
-            intent = cls.classify_intent(query)
-            if intent == IntentEnum.TUTORIAL and "aeo" not in buckets["Tutorial"]:
-                buckets["Tutorial"]["aeo"] = query
-            elif intent == IntentEnum.COMMERCIAL and "aeo" not in buckets["Biaya & Jasa"]:
-                buckets["Biaya & Jasa"]["aeo"] = query
-            elif "aeo" not in buckets["Pemula & Edukasi"]:
-                buckets["Pemula & Edukasi"]["aeo"] = query
+        populate_samples(google_terms, "google")
+        populate_samples(youtube_terms, "youtube")
+        populate_samples(aeo_queries, "aeo")
 
         clusters: list[IntentCluster] = []
-        for cluster_name, data in buckets.items():
-            clusters.append(
-                IntentCluster(
-                    topic_id=topic_id,
-                    cluster_name=cluster_name,
-                    intent_type=data["intent"],
-                    google_term_sample=data.get("google"),
-                    youtube_term_sample=data.get("youtube"),
-                    aeo_query_sample=data.get("aeo"),
+        for intent, data in clusters_map.items():
+            # Include cluster if at least one surface sample exists
+            if any([data["google"], data["youtube"], data["aeo"]]):
+                clusters.append(
+                    IntentCluster(
+                        topic_id=topic_id,
+                        cluster_name=data["name"],
+                        intent_type=intent,
+                        google_term_sample=data["google"],
+                        youtube_term_sample=data["youtube"],
+                        aeo_query_sample=data["aeo"],
+                    )
                 )
-            )
         return clusters

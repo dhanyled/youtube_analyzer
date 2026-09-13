@@ -1,22 +1,31 @@
-import sys
+import argparse
+import asyncio
+import json
 
-from youtube_analyzer.core.normalizer import TopicNormalizer
+from youtube_analyzer.server.mcp_server import mcp, research_topic
 
 
 def main():
-    seed = sys.argv[1] if len(sys.argv) > 1 else "Google Ads untuk UMKM"
-    canonical_id = TopicNormalizer.generate_canonical_id(seed)
-    surfaces = TopicNormalizer.expand_seed_surfaces(seed)
+    parser = argparse.ArgumentParser(description="Search Intelligence & YouTube Analyzer CLI")
+    parser.add_argument(
+        "topic", nargs="?", default="Google Ads untuk UMKM", help="Seed topic to research"
+    )
+    parser.add_argument("--serve", action="store_true", help="Start the FastMCP server")
+    args = parser.parse_args()
 
+    if args.serve:
+        print("Starting YouTube Analyzer MCP Server...")
+        mcp.run()
+        return
+
+    seed = args.topic
     print("=" * 60)
-    print(f"Topic       : {seed}")
-    print(f"Canonical ID: {canonical_id}")
+    print(f"Researching Topic: {seed}")
     print("=" * 60)
-    for platform, terms in surfaces.items():
-        print(f"\n[{platform.value.upper()}]")
-        for t in terms:
-            intent = TopicNormalizer.classify_intent(t)
-            print(f"  * {t:<40} -> [Intent: {intent.value}]")
+
+    result_json = asyncio.run(research_topic(seed))
+    result = json.loads(result_json)
+    print(json.dumps(result, indent=2))
 
 
 if __name__ == "__main__":

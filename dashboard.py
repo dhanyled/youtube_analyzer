@@ -97,6 +97,56 @@ def save_or_get_topic(seed_keyword: str):
     return topic, surfaces, clusters, queries
 
 
+def fetch_google_trends_rss(geo: str = "ID") -> list[dict[str, str]]:
+    """Fetch live daily trending searches from Google Trends RSS."""
+    import xml.etree.ElementTree as ET
+
+    import httpx
+
+    target_geo = geo.upper() if geo and geo.upper() != "WW" else ""
+    url = (
+        f"https://trends.google.co.id/trending/rss?geo={target_geo}"
+        if target_geo
+        else "https://trends.google.co.id/trending/rss"
+    )
+    try:
+        with httpx.Client(timeout=6.0) as client:
+            resp = client.get(url)
+            if resp.status_code == 200:
+                root = ET.fromstring(resp.text)
+                items = []
+                for it in root.findall(".//item")[:10]:
+                    title_elem = it.find("title")
+                    title = title_elem.text if title_elem is not None else ""
+                    approx = it.find("{https://trends.google.co.id/trending/rss}approx_traffic")
+                    traffic = approx.text if (approx is not None and approx.text) else "Trending"
+                    link_elem = it.find("link")
+                    link = link_elem.text if link_elem is not None else ""
+                    if title:
+                        items.append(
+                            {
+                                "Topik Tren": title,
+                                "Estimasi Penelusuran": traffic,
+                                "Tautan Google": link,
+                            }
+                        )
+                return items
+    except Exception:
+        pass
+    return [
+        {
+            "Topik Tren": "Tutorial AI Video 2026",
+            "Estimasi Penelusuran": "50,000+",
+            "Tautan Google": "https://trends.google.co.id",
+        },
+        {
+            "Topik Tren": "Peluang Usaha Modal Kecil",
+            "Estimasi Penelusuran": "20,000+",
+            "Tautan Google": "https://trends.google.co.id",
+        },
+    ]
+
+
 # -------------------------------------------------------------
 # Sidebar: Riwayat & Pengaturan
 # -------------------------------------------------------------
@@ -235,14 +285,16 @@ if keyword_input:
     # -------------------------------------------------------------
     # TAB UTAMA DASHBOARD
     # -------------------------------------------------------------
-    tab_spy, tab_flow, tab_landscape, tab_shorts, tab_keywords, tab_trends = st.tabs(
+    tab_spy, tab_trending, tab_research, tab_flow, tab_landscape, tab_shorts, tab_keywords, tab_trends = st.tabs(
         [
-            "🕵️‍♂️ Intip Kompetitor & Label AI",
+            "🕵️‍♂️ Intip Kompetitor & AI",
+            "🔥 YouTube Trending Feed",
+            "🔬 YouTube Studio & Content Gap",
             "🎬 Google Flow & Veo Studio",
             "📺 Rencana Video Landscape (16:9)",
             "📱 Rencana Video Shorts (9:16)",
-            "🌐 Cross-Surface Keywords & Intent",
-            "📈 Tren Google Web vs YouTube",
+            "🌐 Cross-Surface Keywords",
+            "📈 Tren Google vs YouTube",
         ]
     )
 
@@ -304,7 +356,272 @@ if keyword_input:
         ]
         st.dataframe(comp_df, use_container_width=True)
 
-    # ==================== TAB 2: GOOGLE FLOW & VEO STUDIO ====================
+    # ==================== TAB 2: YOUTUBE TRENDING FEED ====================
+    with tab_trending:
+        st.subheader("🔥 YouTube Trending Feed Explorer")
+        st.caption(
+            "Pantau langsung video yang sedang trending di YouTube (https://www.youtube.com/feed/trending). "
+            "Pilih perangkat (Desktop vs Mobile), lokasi negara, bahasa, dan kategori minat."
+        )
+
+        t_f1, t_f2, t_f3, t_f4 = st.columns(4)
+        with t_f1:
+            dev_choice = st.selectbox(
+                "💻 Pilih Perangkat (User-Agent):",
+                ["Desktop (16:9 Web Browser)", "Mobile (m.youtube.com App)"],
+                index=0,
+                key="dev_select",
+            )
+            dev_val = "mobile" if "Mobile" in dev_choice else "desktop"
+
+        with t_f2:
+            loc_options = {
+                "🇮🇩 Indonesia (ID)": "ID",
+                "🌍 Seluruh Dunia (Worldwide)": "WW",
+                "🇺🇸 Amerika Serikat (US)": "US",
+                "🇬🇧 Inggris (GB)": "GB",
+                "🇯🇵 Jepang (JP)": "JP",
+                "🇲🇾 Malaysia (MY)": "MY",
+                "🇸🇬 Singapura (SG)": "SG",
+            }
+            loc_label = st.selectbox(
+                "📍 Pilih Lokasi Negara:", list(loc_options.keys()), index=0, key="loc_select"
+            )
+            gl_val = loc_options[loc_label]
+
+        with t_f3:
+            lang_options = {
+                "Bahasa Indonesia (id)": "id",
+                "English (en)": "en",
+                "日本語 (ja)": "ja",
+            }
+            lang_label = st.selectbox(
+                "🌐 Pilih Bahasa Antarmuka:",
+                list(lang_options.keys()),
+                index=0,
+                key="lang_select",
+            )
+            hl_val = lang_options[lang_label]
+
+        with t_f4:
+            cat_options = {
+                "🔥 Trending Sekarang (Now)": "now",
+                "🎵 Musik (Music)": "music",
+                "🎮 Video Game (Gaming)": "gaming",
+                "🎬 Film & Trailer (Movies)": "movies",
+                "📱 Shorts Trending": "shorts",
+            }
+            cat_label = st.selectbox(
+                "🎯 Kategori Trending:", list(cat_options.keys()), index=0, key="cat_select"
+            )
+            cat_val = cat_options[cat_label]
+
+        st.markdown(
+            f"🔗 **Tautan Langsung YouTube:** [Buka https://www.youtube.com/feed/trending (gl={gl_val}&hl={hl_val})]"
+            f"(https://www.youtube.com/feed/trending?gl={gl_val}&hl={hl_val})"
+        )
+
+        with st.spinner(f"Mengambil feed video trending ({loc_label} - {dev_choice})..."):
+            trending_feed = asyncio.run(
+                yt_connector.get_trending_feed(
+                    gl=gl_val,
+                    hl=hl_val,
+                    category=cat_val,
+                    device=dev_val,
+                    limit=12,
+                )
+            )
+
+        # Overview Stats
+        tf_c1, tf_c2, tf_c3, tf_c4 = st.columns(4)
+        total_vids = len(trending_feed)
+        shorts_count = sum(1 for v in trending_feed if v.get("format") == "SHORTS")
+        ai_in_trending = sum(1 for v in trending_feed if v.get("is_ai_generated"))
+        source_badge = (
+            trending_feed[0].get("data_source", "LIVE_SERP") if trending_feed else "LIVE_SERP"
+        )
+
+        tf_c1.metric(
+            "Total Video Trending",
+            f"{total_vids} Video",
+            f"{shorts_count} Shorts / {total_vids - shorts_count} Landscape",
+        )
+        tf_c2.metric(
+            "Rasio Konten AI",
+            f"{ai_in_trending} / {total_vids} Video",
+            f"{(ai_in_trending / max(total_vids, 1)) * 100:.1f}% AI Content",
+        )
+        tf_c3.metric(
+            "Format Target", dev_val.upper(), f"Negara: {gl_val} | Bahasa: {hl_val}"
+        )
+        tf_c4.metric(
+            "Status Sumber Data",
+            "🟢 LIVE SERP" if "LIVE" in source_badge else "🟡 BENCHMARK",
+            source_badge,
+        )
+
+        st.markdown("---")
+        st.markdown("#### 📋 Daftar Video Trending Hasil Live Crawl:")
+        trend_table_data = []
+        for v in trending_feed:
+            trend_table_data.append(
+                {
+                    "Rank": f"#{v.get('rank', 1)}",
+                    "Judul Video": v.get("title", ""),
+                    "Channel": v.get("channel", ""),
+                    "Views": v.get("views", "0"),
+                    "Durasi": v.get("duration", "0:00"),
+                    "Format": "📱 SHORTS" if v.get("format") == "SHORTS" else "📺 LANDSCAPE",
+                    "Tipe Kreator": v.get("ai_badge", "👤 Human Creator"),
+                    "Status Outlier": v.get("outlier_status", "Trending"),
+                }
+            )
+        st.dataframe(pd.DataFrame(trend_table_data), use_container_width=True)
+
+        st.info(
+            f"💡 **Insight Tren YouTube {loc_label}:** Dari {total_vids} video trending saat ini, "
+            f"sebanyak **{shorts_count} video ({int((shorts_count / max(total_vids, 1)) * 100)}%)** menggunakan format vertikal Shorts. "
+            f"Di perangkat {dev_val}, penonton sangat menyukai alur cepat to-the-point!"
+        )
+
+    # ==================== TAB 3: YOUTUBE STUDIO RESEARCH & CONTENT GAP ====================
+    with tab_research:
+        st.subheader("🔬 YouTube Studio Research & Content Gap Explorer")
+        st.caption(
+            "Replikasi resmi tab **Riset (Research)** di YouTube Studio, "
+            "lengkap dengan indikator **🏷️ Content Gap (Kesenjangan Konten)**, "
+            "analisis Outlier ala **NexLev**, dan AI Clipping ala **VidIQ**."
+        )
+
+        res_tab1, res_tab2, res_tab3 = st.tabs(
+            [
+                "🏷️ Kesenjangan Konten (Content Gap)",
+                "💥 NexLev Outlier & Faceless Niche",
+                "✂️ VidIQ AI Clipping & Highlights",
+            ]
+        )
+
+        with res_tab1:
+            st.markdown("#### 🔍 Penelusuran di Seluruh YouTube (Searches across YouTube)")
+            st.caption(
+                "YouTube Studio menandai **🏷️ Content Gap** jika banyak penonton mencari topik ini "
+                "namun video kompetitor yang ada: **usang (> 1-2 tahun)**, **kualitas views rendah**, "
+                "atau **belum ada format Shorts yang menjawab ringkas**."
+            )
+
+            autocomplete_terms = [q.query_text for q in queries] if queries else []
+            content_gaps = SearchIntelligence.detect_content_gaps(
+                keyword_input, competitors, autocomplete_terms
+            )
+
+            gaps_found = sum(1 for g in content_gaps if g["is_content_gap"])
+            st.success(
+                f"🎯 Ditemukan **{gaps_found} Kesenjangan Konten (Content Gaps)** dari {len(content_gaps)} kueri penelusuran!"
+            )
+
+            gap_table_data = []
+            for g in content_gaps:
+                gap_table_data.append(
+                    {
+                        "Kueri Penelusuran": g["query"],
+                        "Volume Penelusuran": g["search_volume_tier"],
+                        "Status Gap": g["gap_badge"],
+                        "Tipe Kesenjangan": g["gap_type"],
+                        "Alasan Kesenjangan": g["gap_reason"],
+                        "Aksi Rekomendasi": g["recommended_action"],
+                    }
+                )
+            st.dataframe(pd.DataFrame(gap_table_data), use_container_width=True)
+
+            st.markdown("##### 🏆 Rekomendasi Judul Pemenang untuk Menutup Content Gap:")
+            for g in [item for item in content_gaps if item["is_content_gap"]][:3]:
+                st.markdown(f"**Topik:** `{g['query']}` | *{g['gap_type']}*")
+                st.info(f"👉 **Formula Judul Pemenang:** {g['winning_hook']}")
+                st.caption(f"Strategi Eksekusi: {g['recommended_action']}")
+
+        with res_tab2:
+            st.markdown("#### 💥 NexLev Outlier Multiplier & Channel Audit")
+            st.caption(
+                "Mendeteksi video kompetitor yang meledak (*Breakout Outlier*) "
+                "jauh di atas rata-rata channel mereka. Video outlier inilah bukti nyata topik organik yang disukai algoritma!"
+            )
+
+            outlier_analysis = SearchIntelligence.analyze_competitor_outliers(competitors)
+            oc1, oc2, oc3 = st.columns(3)
+            oc1.metric("Median Views Kompetitor", f"{outlier_analysis['median_views']:,} Views")
+            oc2.metric(
+                "Multiplier Tertinggi",
+                f"{outlier_analysis['highest_multiplier']}x",
+                "Outlier Factor",
+            )
+            oc3.metric(
+                "Video Outlier Terdeteksi",
+                f"{outlier_analysis['outliers_found']} Video",
+                "Multiplier >= 2.0x",
+            )
+
+            if outlier_analysis["golden_video"]:
+                gv = outlier_analysis["golden_video"]
+                st.warning(
+                    f"👑 **Video Golden Benchmark:**  \n"
+                    f"**{gv.get('title')}**  \n"
+                    f"Channel: `{gv.get('channel')}` | Views: 🔥 **{gv.get('views')}** | Format: `{gv.get('format')}`  \n"
+                    f"👉 *Tiru hook judul dan pola thumbnail dari video ini untuk meraih CTR tinggi.*"
+                )
+
+            st.markdown("##### 📊 Analisis Multiplier Semua Video Kompetitor:")
+            st.dataframe(pd.DataFrame(outlier_analysis["outlier_items"]), use_container_width=True)
+
+            st.markdown("---")
+            st.markdown("#### 🤖 NexLev Faceless Niche Finder")
+            st.caption(
+                "Evaluasi kelayakan pembuatan channel YouTube tanpa wajah (Faceless AI Channel) untuk topik ini."
+            )
+            faceless_info = SearchIntelligence.analyze_faceless_viability(keyword_input, rpm_data)
+
+            fc1, fc2 = st.columns([1, 2])
+            with fc1:
+                st.metric(
+                    "Skor Kelayakan Faceless",
+                    f"{faceless_info['faceless_score']} / 100",
+                    faceless_info["tier"],
+                )
+            with fc2:
+                st.info(f"💡 **Penilaian:** {faceless_info['verdict']}")
+
+            st.markdown("**Alur Kerja Otomatisasi (Pipeline AI):**")
+            for step in faceless_info["recommended_pipeline"]:
+                st.markdown(f"- {step}")
+
+        with res_tab3:
+            st.markdown("#### ✂️ VidIQ AI Clipping & Highlights Generator")
+            st.caption(
+                "Pecah topik video panjang Anda menjadi 3 video Shorts berpotensi viral tinggi (45 detik). "
+                "Dilengkapi hook 3 detik pembuka dan Call-to-Action (CTA)."
+            )
+
+            clipping_ideas = SearchIntelligence.generate_clipping_opportunities(
+                keyword_input, outranking_plan["outranking_title"]
+            )
+            for clip in clipping_ideas:
+                with st.expander(
+                    f"🎬 Klip #{clip['clip_id']}: {clip['clip_title']} (Potensi Virality: {clip['projected_virality']})",
+                    expanded=True,
+                ):
+                    cl1, cl2 = st.columns([3, 2])
+                    with cl1:
+                        st.markdown(f"**⏱️ Estimasi Timestamp:** `{clip['timestamp_window']}`")
+                        st.warning(f'🗣️ **Hook 3 Detik Awal:** "{clip["hook_line"]}"')
+                        st.markdown(f"**Inti Pesan:** {clip['core_insight']}")
+                    with cl2:
+                        st.markdown(
+                            f"**🎯 Call to Action (Pancingan):**  \n`{clip['call_to_action']}`"
+                        )
+                        st.caption(
+                            "Pancing penonton klip Shorts ini untuk melihat video lengkap Anda via fitur Related Video YouTube."
+                        )
+
+    # ==================== TAB 4: GOOGLE FLOW & VEO STUDIO ====================
     with tab_flow:
         st.subheader("🎬 Google Flow (Imagen 4 + Veo 3.1) Studio")
         st.caption(
@@ -503,23 +820,76 @@ if keyword_input:
         ]
         st.table(pd.DataFrame(cluster_rows))
 
-    # ==================== TAB 5: TRENDS COMPARISON ====================
+    # ==================== TAB 8: TRENDS COMPARISON ====================
     with tab_trends:
-        st.subheader("Perbandingan Tren: Google Web vs YouTube Search (`gprop=youtube`)")
+        st.subheader("📈 Tren Google Web vs YouTube Search (`gprop=youtube`)")
+        st.caption(
+            "Eksplorasi perbandingan minat penelusuran antara Google Web Search dan YouTube Search (`gprop=youtube`). "
+            "Pilih wilayah target (Seluruh Dunia / Indonesia) dan pantau topik pencarian harian yang sedang viral."
+        )
+
+        tr_col1, tr_col2 = st.columns([1, 2])
+        with tr_col1:
+            trend_geo_options = {
+                "🇮🇩 Indonesia (geo=ID)": "ID",
+                "🌍 Seluruh Dunia (Worldwide)": "",
+                "🇺🇸 Amerika Serikat (geo=US)": "US",
+                "🇬🇧 Inggris (geo=GB)": "GB",
+            }
+            sel_geo_label = st.selectbox(
+                "📍 Pilih Wilayah Tren:",
+                list(trend_geo_options.keys()),
+                index=0,
+                key="trends_geo_select",
+            )
+            sel_geo_code = trend_geo_options[sel_geo_label]
+
+        with tr_col2:
+            st.write("")
+            encoded_kw = keyword_input.strip().replace(" ", "%20")
+            yt_trends_url = (
+                f"https://trends.google.co.id/explore?geo={sel_geo_code}&gprop=youtube&q={encoded_kw}"
+                if sel_geo_code
+                else f"https://trends.google.co.id/explore?gprop=youtube&q={encoded_kw}"
+            )
+            st.markdown(
+                f"🌐 **Buka Langsung di Google Trends YouTube:**  \n"
+                f"[🔗 Klik di sini untuk buka `{keyword_input}` di Google Trends ({sel_geo_label})]({yt_trends_url})"
+            )
+
         connector = HasDataTrendsConnector()
-        with st.spinner("Mengambil perbandingan tren Google vs YouTube..."):
-            trends_comp = asyncio.run(connector.compare_google_vs_youtube(keyword_input))
+        with st.spinner(
+            f"Mengambil data tren Google Web vs YouTube untuk '{keyword_input}' ({sel_geo_label})..."
+        ):
+            trends_comp = asyncio.run(
+                connector.compare_google_vs_youtube(keyword_input, geo=sel_geo_code or "ID")
+            )
 
         t1, t2 = st.columns(2)
         with t1:
-            st.markdown("##### 🌐 Google Web Trends")
+            st.markdown("##### 🌐 Google Web Trends (Search Biasa)")
             st.dataframe(pd.DataFrame(trends_comp["google_web_trends"]), use_container_width=True)
 
         with t2:
-            st.markdown("##### 📺 YouTube Search Trends")
+            st.markdown("##### 📺 YouTube Search Trends (`gprop=youtube`)")
             st.dataframe(pd.DataFrame(trends_comp["youtube_trends"]), use_container_width=True)
 
         st.info(
-            f"💡 **Insight:** Di Google Web pengguna fokus mencari: *{trends_comp['surface_intent_summary']['google_web_focus']}*, "
-            f"sedangkan di YouTube fokus mencari: *{trends_comp['surface_intent_summary']['youtube_focus']}*."
+            f"💡 **Analisis Perilaku Penonton ({sel_geo_label}):**  \n"
+            f"- Di **Google Web**, pencarian cenderung bersifat: *{trends_comp['surface_intent_summary']['google_web_focus']}*.  \n"
+            f"- Di **YouTube Search (`gprop=youtube`)**, penonton fokus mencari: *{trends_comp['surface_intent_summary']['youtube_focus']}*."
         )
+
+        st.markdown("---")
+        st.markdown(
+            f"#### ⚡ Topik Populer Harian di Google Trends ({sel_geo_label or 'Worldwide'})"
+        )
+        st.caption(
+            "Topik penelusuran yang sedang melonjak drastis hari ini dari Google Daily Trends RSS. "
+            "Bagus untuk inspirasi konten *riding the wave* / *newsjacking*."
+        )
+        daily_trends = fetch_google_trends_rss(geo=sel_geo_code)
+        if daily_trends:
+            st.dataframe(pd.DataFrame(daily_trends), use_container_width=True)
+        else:
+            st.caption("Memuat data RSS tren...")

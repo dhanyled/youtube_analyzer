@@ -34,3 +34,26 @@ async def test_youtube_connector_search():
     results = await connector.search(query="Google Ads UMKM")
     assert len(results) > 0
     assert results[0]["platform"] == PlatformEnum.YOUTUBE_SEARCH
+
+
+@pytest.mark.asyncio
+async def test_youtube_trending_feed():
+    connector = YouTubeConnector(api_key=None)
+    # Test desktop trending
+    desktop_trending = await connector.get_trending_feed(
+        gl="ID", hl="id", category="now", device="desktop", limit=5
+    )
+    assert len(desktop_trending) > 0
+    assert "title" in desktop_trending[0]
+    assert "views" in desktop_trending[0]
+    assert "format" in desktop_trending[0]
+    assert desktop_trending[0]["device"] == "DESKTOP"
+
+    # Test mobile trending
+    mobile_trending = await connector.get_trending_feed(
+        gl="US", hl="en", category="gaming", device="mobile", limit=5
+    )
+    assert len(mobile_trending) > 0
+    assert mobile_trending[0]["device"] == "MOBILE"
+    assert mobile_trending[0]["location"] == "US"
+

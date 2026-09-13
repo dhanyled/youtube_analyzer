@@ -325,5 +325,105 @@ async def generate_flow_shotlist(
     return json.dumps(shotlist, indent=2)
 
 
+@mcp.tool()
+async def get_youtube_trending(
+    gl: str = "ID",
+    hl: str = "id",
+    category: str = "now",
+    device: str = "desktop",
+    limit: int = 10,
+) -> str:
+    """
+    Fetch live YouTube Trending Feed (https://www.youtube.com/feed/trending).
+    - gl: Country code ('ID', 'US', 'GB', 'JP', 'MY', 'SG', 'WW')
+    - hl: Interface language ('id', 'en', 'ja')
+    - category: 'now' (General), 'music', 'gaming', 'movies', 'shorts'
+    - device: 'desktop' or 'mobile'
+    """
+    connector = YouTubeConnector()
+    items = await connector.get_trending_feed(
+        gl=gl, hl=hl, category=category, device=device, limit=limit
+    )
+    return json.dumps(
+        {
+            "gl": gl,
+            "hl": hl,
+            "category": category,
+            "device": device,
+            "total_items": len(items),
+            "trending_videos": items,
+        },
+        indent=2,
+    )
+
+
+@mcp.tool()
+async def detect_youtube_studio_content_gaps(seed_keyword: str) -> str:
+    """
+    Replicates YouTube Studio 'Research' -> 'Content Gaps' feature.
+    Finds search queries with high viewer demand but weak, outdated (> 1-2 years old),
+    or missing Shorts format from competitors.
+    """
+    connector = YouTubeConnector()
+    competitors = await connector.get_top_competitors(seed_keyword, limit=5)
+    autocomplete = await connector.get_autocomplete(seed_keyword)
+    gaps = SearchIntelligence.detect_content_gaps(seed_keyword, competitors, autocomplete)
+    return json.dumps(
+        {
+            "seed_keyword": seed_keyword,
+            "total_queries_analyzed": len(gaps),
+            "content_gaps": gaps,
+        },
+        indent=2,
+    )
+
+
+@mcp.tool()
+async def analyze_competitor_outliers(seed_keyword: str) -> str:
+    """
+    NexLev-inspired Outlier Multiplier Inspector.
+    Calculates median views across top ranking videos and finds viral breakout videos (2.5x - 50x median).
+    """
+    connector = YouTubeConnector()
+    competitors = await connector.get_top_competitors(seed_keyword, limit=5)
+    outliers = SearchIntelligence.analyze_competitor_outliers(competitors)
+    return json.dumps(outliers, indent=2)
+
+
+@mcp.tool()
+async def analyze_faceless_niche_viability(seed_keyword: str) -> str:
+    """
+    NexLev-inspired Faceless Niche Finder.
+    Evaluates suitability for AI Faceless channel creation (Google Flow, Veo 3.1, ElevenLabs).
+    """
+    rpm_info = SearchIntelligence.estimate_rpm(seed_keyword)
+    viability = SearchIntelligence.analyze_faceless_viability(seed_keyword, rpm_info)
+    return json.dumps(
+        {
+            "seed_keyword": seed_keyword,
+            "rpm_info": rpm_info,
+            "faceless_viability": viability,
+        },
+        indent=2,
+    )
+
+
+@mcp.tool()
+async def generate_vidiq_clipping_ideas(topic: str, title: str = "") -> str:
+    """
+    VidIQ-inspired AI Clipping & Viral Highlights Finder.
+    Deconstructs a long-form video topic into 3-4 viral Short clips with hooks and timestamps.
+    """
+    clips = SearchIntelligence.generate_clipping_opportunities(topic, title or topic)
+    return json.dumps(
+        {
+            "topic": topic,
+            "suggested_clips": clips,
+        },
+        indent=2,
+    )
+
+
 if __name__ == "__main__":
     mcp.run()
+

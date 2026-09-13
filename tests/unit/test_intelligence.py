@@ -120,3 +120,51 @@ def test_estimate_keyword_metrics_differentiation():
     assert metrics_a["search_volume"] > metrics_b["search_volume"]
     assert metrics_a["competition_score"] > metrics_b["competition_score"]
     assert metrics_a["opportunity_score"] != metrics_b["opportunity_score"]
+
+
+def test_detect_content_gaps():
+    sample_comps = [
+        {"upload_age": "3 tahun lalu", "format": "LANDSCAPE", "views": "15K views"},
+        {"upload_age": "2 tahun lalu", "format": "LANDSCAPE", "views": "8K views"},
+    ]
+    gaps = SearchIntelligence.detect_content_gaps("google ads pemula", sample_comps)
+    assert len(gaps) > 0
+    # Should identify at least one gap due to outdated competitor videos
+    assert any(g["is_content_gap"] for g in gaps)
+    assert any(g["search_volume_tier"] in ["High", "Medium"] for g in gaps)
+    assert any("CONTENT GAP" in g["gap_badge"] for g in gaps)
+
+
+def test_analyze_competitor_outliers():
+    sample_comps = [
+        {"rank": 1, "title": "Viral 10x Breakout", "channel": "Ch A", "views": "250K views"},
+        {"rank": 2, "title": "Normal Video 1", "channel": "Ch B", "views": "20K views"},
+        {"rank": 3, "title": "Normal Video 2", "channel": "Ch C", "views": "15K views"},
+    ]
+    analysis = SearchIntelligence.analyze_competitor_outliers(sample_comps)
+    assert analysis["median_views"] > 0
+    assert analysis["highest_multiplier"] > 5.0
+    assert analysis["outliers_found"] >= 1
+    assert analysis["golden_video"] is not None
+    assert analysis["golden_video"]["title"] == "Viral 10x Breakout"
+
+
+def test_analyze_faceless_viability():
+    rpm_info = {"detected_niche": "advertising", "avg_rpm_usd": 20.0}
+    faceless = SearchIntelligence.analyze_faceless_viability("Google Ads Tutorial", rpm_info)
+    assert faceless["faceless_score"] >= 80
+    assert "IDEAL" in faceless["tier"]
+    assert len(faceless["recommended_pipeline"]) == 5
+
+
+def test_generate_clipping_opportunities():
+    clips = SearchIntelligence.generate_clipping_opportunities(
+        "Google Ads UMKM", "Tutorial Google Ads 2026"
+    )
+    assert len(clips) == 3
+    for c in clips:
+        assert "clip_title" in c
+        assert "timestamp_window" in c
+        assert "hook_line" in c
+        assert "call_to_action" in c
+

@@ -53,8 +53,10 @@ class SearchIntelligence:
         Calculate NexLev / VidIQ style Outlier Multiplier.
         Identifies videos that dramatically outperform channel baseline.
         """
-        median = max(channel_median_views, 1)
-        multiplier = round(views / median, 2)
+        safe_views = max(0, views)
+        safe_median_views = max(0, channel_median_views)
+        median = max(safe_median_views, 1)
+        multiplier = round(safe_views / median, 2)
 
         if multiplier >= 5.0:
             classification = "🔥 VIRAL_BREAKOUT (5x+)"

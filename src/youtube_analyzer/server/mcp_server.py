@@ -55,12 +55,17 @@ def research_topic(seed_keyword: str) -> str:
             session.commit()
             session.refresh(topic)
 
+        if topic.id is None:
+            raise ValueError("Topic ID cannot be None")
+
+        topic_id: int = topic.id
+
         # Save queries
         for platform, query_list in surfaces.items():
             for q_text in query_list:
                 existing = session.exec(
                     select(Query).where(
-                        Query.topic_id == topic.id,
+                        Query.topic_id == topic_id,
                         Query.query_text == q_text,
                         Query.platform == platform,
                     )
@@ -68,7 +73,7 @@ def research_topic(seed_keyword: str) -> str:
                 if not existing:
                     session.add(
                         Query(
-                            topic_id=topic.id,
+                            topic_id=topic_id,
                             query_text=q_text,
                             platform=platform,
                             query_type="seed_expansion",
@@ -81,7 +86,7 @@ def research_topic(seed_keyword: str) -> str:
         aeo_queries = surfaces[PlatformEnum.AI_SEARCH]
 
         clusters = TopicNormalizer.create_intent_clusters(
-            topic_id=topic.id,
+            topic_id=topic_id,
             google_terms=google_terms,
             youtube_terms=youtube_terms,
             aeo_queries=aeo_queries,

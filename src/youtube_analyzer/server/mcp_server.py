@@ -287,5 +287,25 @@ async def generate_outranking_plan(
     return json.dumps(plan, indent=2)
 
 
+@mcp.tool()
+async def generate_flow_shotlist(
+    seed_keyword: str,
+    format_type: str = "LANDSCAPE",
+    num_scenes: int = 5,
+) -> str:
+    """
+    Generate Google Flow (Imagen 4 + Veo 3.1) Storyboard & Shotlist.
+    Exports prompt batch format for flow-agent / gflow-cli, AutoFlowCut manifest, and veo-mcp payload.
+    - format_type: 'LANDSCAPE' (16:9) or 'SHORTS' (9:16)
+    - num_scenes: Number of scenes (default 5)
+    """
+    shotlist = SearchIntelligence.generate_flow_shotlist(
+        seed=seed_keyword,
+        format_type=format_type,
+        num_scenes=num_scenes,
+    )
+    return json.dumps(shotlist, indent=2)
+
+
 if __name__ == "__main__":
     mcp.run()

@@ -223,3 +223,208 @@ class SearchIntelligence:
             "hashtags": hashtags,
             "shorts_package": shorts_package,
         }
+
+    @staticmethod
+    def analyze_ai_competitor_presence(competitors: list[dict[str, Any]]) -> dict[str, Any]:
+        """
+        Analyze whether AI/Synthetic videos are already ranking in the top SERP.
+        Provides strategic best practices for competing with AI content.
+        """
+        if not competitors:
+            return {
+                "total_competitors": 0,
+                "ai_count": 0,
+                "human_count": 0,
+                "ai_percentage": 0.0,
+                "verdict": "Belum ada data kompetitor",
+                "ranking_feasibility": "HIGH",
+                "best_practices": [],
+            }
+
+        total = len(competitors)
+        ai_count = sum(1 for c in competitors if c.get("is_ai_generated", False))
+        human_count = total - ai_count
+        ai_pct = round((ai_count / total) * 100, 1)
+
+        if ai_pct >= 40.0:
+            verdict = f"🤖 AI Adopsi Tinggi ({ai_pct}% kompetitor adalah video AI/Synthetic)"
+            feasibility = (
+                "Sangat memungkinkan bersaing dengan video AI! YouTube merekomendasikan "
+                "kombinasi visual b-roll AI yang tajam dengan narasi berkarakter kuat."
+            )
+        elif ai_pct > 0:
+            verdict = f"⚡ Hybrid Market ({ai_pct}% video AI terdeteksi di Top SERP)"
+            feasibility = (
+                "Format hybrid (AI B-roll + Real/Expressive Narration) memiliki celah "
+                "besar untuk mengalahkan video manusia yang produksinya lambat."
+            )
+        else:
+            verdict = "👤 Human Dominant (100% video saat ini dibuat konvensional)"
+            feasibility = (
+                "Peluang emas first-mover! Anda bisa menyajikan konten berkualitas tinggi "
+                "menggunakan Google Flow/Veo dengan kecepatan produksi 5x lebih cepat."
+            )
+
+        best_practices = [
+            "1. Centang Wajib Disclosure: Selalu beri tanda 'Altered or synthetic content' saat upload di YouTube Studio agar bebas resiko penalti.",
+            "2. Hook 3 Detik Pertama: Algoritma YouTube memprioritaskan Watch Time & Retention, bukan menghukum label AI. Pastikan visual pembuka langsung to-the-point.",
+            "3. Pacing B-Roll Cepat: Gunakan klip video Google Flow berdurasi 4-6 detik per scene agar penonton tidak bosan.",
+            "4. Expressive Audio: Gabungkan visual Google Flow dengan voiceover bernada emosional (ElevenLabs / human voice), hindari suara robotik flat.",
+            "5. Hindari Mass Low-Effort Spam: YouTube memblokir monetisasi video 'reused/programmatic spam' yang tidak memiliki nilai tambah.",
+        ]
+
+        return {
+            "total_competitors": total,
+            "ai_count": ai_count,
+            "human_count": human_count,
+            "ai_percentage": ai_pct,
+            "verdict": verdict,
+            "ranking_feasibility": feasibility,
+            "best_practices": best_practices,
+        }
+
+    @classmethod
+    def generate_flow_shotlist(
+        cls,
+        seed: str,
+        format_type: str = "LANDSCAPE",
+        num_scenes: int = 5,
+    ) -> dict[str, Any]:
+        """
+        Generate a production-ready Google Flow (Imagen 4 + Veo 3.1) Storyboard & Shotlist.
+        Compatible with:
+        - flow-agent / gflow-cli (prompts.txt batch format)
+        - AutoFlowCut (CapCut / Premiere scene JSON)
+        - veo-mcp (Direct Veo 3.1 API payload)
+        """
+        clean = seed.strip().title()
+        aspect = "16:9" if format_type.upper() == "LANDSCAPE" else "9:16"
+        aspect_name = "landscape" if aspect == "16:9" else "portrait"
+
+        # 5 Structured Core Scenes for a high-retention video
+        scene_templates = [
+            {
+                "scene_num": 1,
+                "role": "Hook (00-05s)",
+                "duration": 4,
+                "action": f"Close-up intense shot of a modern creator analyzing {clean} on a glowing holographic workstation, shocked expression, subtle cinematic lighting",
+                "camera": "Slow cinematic push-in to eye level, 35mm anamorphic lens",
+                "audio_script": f"Jangan pernah coba {clean} sebelum kamu tahu rahasia penting ini!",
+            },
+            {
+                "scene_num": 2,
+                "role": "The Problem (05-12s)",
+                "duration": 6,
+                "action": "Dramatic overhead view of scattered business charts and messy ad dashboard showing budget loss with red indicators, cinematic contrast",
+                "camera": "High-angle slow tilt down, moody corporate lighting",
+                "audio_script": f"Banyak pemula boncos jutaan rupiah karena melewatkan 1 setting krusial di {clean}.",
+            },
+            {
+                "scene_num": 3,
+                "role": "The Discovery / Solution (12-20s)",
+                "duration": 6,
+                "action": "Futuristic clean minimalist office, smiling entrepreneur pointing at a green skyrocketing growth graph on a transparent glass monitor",
+                "camera": "Smooth horizontal track left to right, golden hour natural light",
+                "audio_script": "Padahal solusinya sederhana kalau kamu paham alur langkah demi langkahnya.",
+            },
+            {
+                "scene_num": 4,
+                "role": "Execution Breakdown (20-28s)",
+                "duration": 8,
+                "action": f"Hyper-detailed macro shot of hands clicking a futuristic luminous keyboard, screen displaying step-by-step verified workflow for {clean}",
+                "camera": "Macro dolly zoom, vibrant cyber accents, depth of field",
+                "audio_script": "Cukup ikuti 3 tahapan ini dan sistem akan bekerja secara otomatis untuk bisnismu.",
+            },
+            {
+                "scene_num": 5,
+                "role": "Call to Action / Outro (28-35s)",
+                "duration": 6,
+                "action": "Wide panoramic shot of an inspiring modern skyline at sunrise, clean minimalist logo placeholder hovering gently",
+                "camera": "Epic slow drone pull-back, cinematic 8k, warm morning sunlight",
+                "audio_script": "Ketik 'MAU' di komentar atau klik link di deskripsi untuk dapatkan blueprint lengkapnya sekarang!",
+            },
+        ]
+
+        scenes = []
+        batch_prompts_txt_lines = []
+        autoflowcut_scenes = []
+        veo_mcp_jobs = []
+
+        for item in scene_templates[:num_scenes]:
+            prompt = (
+                f"{item['action']}, {item['camera']}, 8k photorealistic, photoreal cinematic, "
+                f"volumetric lighting, award-winning cinematography --aspect {aspect_name} --duration {item['duration']}"
+            )
+
+            scenes.append(
+                {
+                    "scene_id": f"Scene {item['scene_num']}",
+                    "timing": item["role"],
+                    "duration_seconds": item["duration"],
+                    "aspect_ratio": aspect,
+                    "visual_action": item["action"],
+                    "camera_motion": item["camera"],
+                    "flow_prompt": prompt,
+                    "audio_script": item["audio_script"],
+                }
+            )
+
+            batch_prompts_txt_lines.append(prompt)
+
+            autoflowcut_scenes.append(
+                {
+                    "id": f"scene_{item['scene_num']}",
+                    "name": item["role"],
+                    "duration": item["duration"],
+                    "aspectRatio": aspect,
+                    "prompt": prompt,
+                    "voiceoverText": item["audio_script"],
+                }
+            )
+
+            veo_mcp_jobs.append(
+                {
+                    "key": f"scene_{item['scene_num']}",
+                    "request": {
+                        "prompt": prompt,
+                        "durationSeconds": item["duration"],
+                        "aspectRatio": aspect,
+                        "resolution": "1080p",
+                    },
+                }
+            )
+
+        return {
+            "seed_keyword": seed,
+            "format_type": format_type,
+            "aspect_ratio": aspect,
+            "scenes_count": len(scenes),
+            "scenes": scenes,
+            "flow_batch_prompts_txt": "\n".join(batch_prompts_txt_lines),
+            "autoflowcut_manifest": {
+                "projectName": f"Video_{clean.replace(' ', '_')}",
+                "aspectRatio": aspect,
+                "scenes": autoflowcut_scenes,
+            },
+            "veo_mcp_payload": {
+                "jobs": veo_mcp_jobs,
+                "concurrency": 2,
+            },
+            "recommended_tools": [
+                {
+                    "tool": "kodelyx/flow-agent",
+                    "command": f"flow batch flow_prompts_{clean.replace(' ', '_').lower()}.txt --type video --aspect {aspect_name}",
+                    "best_for": "Akun Google Flow gratis/berlangganan via Chrome extension bridge.",
+                },
+                {
+                    "tool": "AutoFlowCut",
+                    "command": "Import manifest JSON -> Auto-generate visuals -> Export 1-klik ke CapCut / Premiere Pro",
+                    "best_for": "Editing cepat langsung ke timeline video editor (CapCut/Premiere).",
+                },
+                {
+                    "tool": "veo-mcp",
+                    "command": "start_batch_video_generation(jobs, concurrency=2)",
+                    "best_for": "Direct Google AI Studio API via MCP agent.",
+                },
+            ],
+        }

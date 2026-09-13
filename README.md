@@ -57,6 +57,8 @@ When connected to Claude, Gemini, or Antigravity via Model Context Protocol:
    Produces a ready-to-use outranking package: psychological title hook, full SEO description with auto-timestamps, and dedicated Landscape vs Shorts content blueprint.
 8. **`compare_google_vs_youtube_trends(keyword)`**:
    Compares relative search velocity on Google Web Search vs YouTube Search.
+9. **`generate_flow_shotlist(seed_keyword, format_type, num_scenes)`**:
+   Generates a scene-by-scene storyboard and prompt batch for Google Flow (Imagen 4 + Veo 3.1) with camera motions, durations, and audio scripts. Exports ready-to-run manifests for `flow-agent`, `AutoFlowCut`, and `veo-mcp`.
 
 ---
 
@@ -71,12 +73,13 @@ python run_dashboard.py
 run.bat
 ```
 Visit `http://localhost:8501` to access:
-* **Strategic Verdict Card**: Executive decision (Opportunity Score, Estimated RPM, Landscape vs Shorts verdict).
-* **Tab 1: 👑 Intip Kompetitor Ranking #1**: Live competitor spy, outranking title generator, and 1-click copyable full SEO description with chapters.
-* **Tab 2: 🎬 Rencana Video Landscape**: 16:9 Long-form blueprint, psychological hook formula, and chapter breakdown for maximum retention.
-* **Tab 3: 📱 Rencana Video Shorts**: 9:16 vertical hook, 45-second retention script, and Related Video funnel strategy.
-* **Tab 4: 🌐 Cross-Surface Intent Matrix**: Google vs YouTube vs AI query mapping.
-* **Tab 5: 📈 Realtime Trends Comparison**: Google vs YouTube momentum graph.
+* **Strategic Verdict Card**: Executive decision (Opportunity Score, AI Adoption Ratio in SERP, Estimated RPM, Landscape vs Shorts verdict).
+* **Tab 1: 🕵️‍♂️ Intip Kompetitor & Label AI**: Live competitor spy with YouTube Altered/Synthetic content badge detection and best practice compliance rules.
+* **Tab 2: 🎬 Google Flow & Veo Studio**: Scene-by-scene AI video storyboard generator, copyable `prompts.txt` batch for `flow-agent` / `gflow-cli`, and CapCut manifest for `AutoFlowCut`.
+* **Tab 3: 📺 Rencana Video Landscape**: 16:9 Long-form blueprint, psychological hook formula, and chapter breakdown for maximum retention.
+* **Tab 4: 📱 Rencana Video Shorts**: 9:16 vertical hook, 45-second retention script, and Related Video funnel strategy.
+* **Tab 5: 🌐 Cross-Surface Intent Matrix**: Google vs YouTube vs AI query mapping.
+* **Tab 6: 📈 Realtime Trends Comparison**: Google vs YouTube momentum graph.
 
 ### Prerequisites
 * Python 3.12+

@@ -196,6 +196,9 @@ if keyword_input:
             f"Disarankan membidik keyword turunan (*long-tail*) yang lebih spesifik."
         )
 
+    # AI Competitor Presence Analysis
+    ai_presence = SearchIntelligence.analyze_ai_competitor_presence(competitors)
+
     # 4 Baris Metrik Ringkas
     m1, m2, m3, m4 = st.columns(4)
     m1.metric(
@@ -203,7 +206,11 @@ if keyword_input:
         f"{opp_score} / 100",
         "High Potential" if opp_score >= 65 else "Moderate",
     )
-    m2.metric("Kategori Niche Terdeteksi", rpm_data["detected_niche"].upper(), "Audience Tertarget")
+    m2.metric(
+        "Adopsi Video AI di SERP",
+        f"{ai_presence['ai_count']} / {ai_presence['total_competitors']} Video",
+        f"{ai_presence['ai_percentage']}% AI Ratio",
+    )
     m3.metric(
         "Estimasi RPM AdSense (NexLev)",
         f"${rpm_data['avg_rpm_usd']:.2f}",
@@ -218,31 +225,44 @@ if keyword_input:
     # -------------------------------------------------------------
     # TAB UTAMA DASHBOARD
     # -------------------------------------------------------------
-    tab_spy, tab_landscape, tab_shorts, tab_keywords, tab_trends = st.tabs(
+    tab_spy, tab_flow, tab_landscape, tab_shorts, tab_keywords, tab_trends = st.tabs(
         [
-            "🕵️‍♂️ Intip Kompetitor Ranking #1",
-            "🎬 Rencana Video Landscape (16:9)",
+            "🕵️‍♂️ Intip Kompetitor & Label AI",
+            "🎬 Google Flow & Veo Studio",
+            "📺 Rencana Video Landscape (16:9)",
             "📱 Rencana Video Shorts (9:16)",
             "🌐 Cross-Surface Keywords & Intent",
             "📈 Tren Google Web vs YouTube",
         ]
     )
 
-    # ==================== TAB 1: COMPETITOR SPY ====================
+    # ==================== TAB 1: COMPETITOR SPY & AI LABEL ====================
     with tab_spy:
-        st.subheader("👑 Video yang Sedang Ranking #1 di YouTube Saat Ini")
-        st.caption("Data live hasil pencarian YouTube untuk kata kunci yang Anda masukkan.")
+        st.subheader("👑 Video yang Sedang Ranking di YouTube Saat Ini")
+        st.caption(
+            "Data live hasil pencarian YouTube dilengkapi deteksi label AI / Altered Content."
+        )
 
         if top_comp:
             c_info1, c_info2, c_info3, c_info4 = st.columns(4)
-            c_info1.markdown(f"**Judul Kompetitor:**  \n{top_comp['title']}")
+            c_info1.markdown(f"**Judul Kompetitor #1:**  \n{top_comp['title']}")
             c_info2.markdown(f"**Channel:**  \n{top_comp['channel']}")
             c_info3.markdown(
                 f"**Jumlah Views:**  \n🔥 **{top_comp['views']}** ({top_comp.get('upload_age', '')})"
             )
             c_info4.markdown(
-                f"**Format & Durasi:**  \n`{top_comp['format']}` ({top_comp.get('duration', '')})"
+                f"**Tipe Pembuat Konten:**  \n`{top_comp.get('ai_badge', '👤 Human Creator')}`"
             )
+
+        # AI Presence Alert Box
+        st.info(
+            f"🤖 **Status Persaingan Konten AI:** {ai_presence['verdict']}.  \n"
+            f"💡 **Analisis Kelayakan:** {ai_presence['ranking_feasibility']}"
+        )
+
+        with st.expander("📖 Aturan Resmi YouTube & Best Practice Agar Video AI Tetap Ranking:"):
+            for bp in ai_presence["best_practices"]:
+                st.markdown(f"- {bp}")
 
         st.markdown("#### 🎯 Formula Judul Tandingan untuk Mengalahkan Video #1:")
         st.info(f"👉 **{outranking_plan['outranking_title']}**")
@@ -256,16 +276,109 @@ if keyword_input:
             "Tinggal salin dan tempel ke YouTube Studio Anda. 2 baris awal dibuat khusus untuk memikat klik penonton."
         )
         st.text_area(
-            "Deskripsi YouTube Siap Pakai:", value=outranking_plan["seo_description"], height=240
+            "Deskripsi YouTube Siap Pakai:", value=outranking_plan["seo_description"], height=220
         )
 
-        st.markdown("#### 📊 Daftar Semua Kompetitor Halaman 1 YouTube:")
+        st.markdown("#### 📊 Daftar Semua Kompetitor Halaman 1 YouTube (Human vs AI):")
         comp_df = pd.DataFrame(competitors)[
-            ["rank", "title", "channel", "views", "duration", "format", "outlier_status"]
+            [
+                "rank",
+                "title",
+                "channel",
+                "views",
+                "duration",
+                "format",
+                "ai_badge",
+                "outlier_status",
+            ]
         ]
         st.dataframe(comp_df, use_container_width=True)
 
-    # ==================== TAB 2: RENCANA VIDEO LANDSCAPE ====================
+    # ==================== TAB 2: GOOGLE FLOW & VEO STUDIO ====================
+    with tab_flow:
+        st.subheader("🎬 Google Flow (Imagen 4 + Veo 3.1) Studio")
+        st.caption(
+            "Storyboard & shotlist terstruktur siap ekspor ke tools otomatisasi: "
+            "**flow-agent**, **AutoFlowCut**, **gflow-cli**, atau **veo-mcp**."
+        )
+
+        f_col1, f_col2 = st.columns([2, 1])
+        with f_col1:
+            flow_format = st.radio(
+                "Pilih Format Target Video AI:",
+                options=["LANDSCAPE (16:9)", "SHORTS (9:16)"],
+                horizontal=True,
+                index=0 if comp_format == "LANDSCAPE" else 1,
+            )
+        with f_col2:
+            num_scenes = st.slider("Jumlah Scene:", min_value=3, max_value=5, value=5)
+
+        target_format_code = "LANDSCAPE" if "16:9" in flow_format else "SHORTS"
+        flow_shotlist = SearchIntelligence.generate_flow_shotlist(
+            seed=keyword_input,
+            format_type=target_format_code,
+            num_scenes=num_scenes,
+        )
+
+        st.markdown(
+            f"#### 📋 Storyboard Scene-by-Scene ({len(flow_shotlist['scenes'])} Scenes - Rasio {flow_shotlist['aspect_ratio']}):"
+        )
+
+        for sc in flow_shotlist["scenes"]:
+            with st.expander(
+                f"🎞️ {sc['scene_id']} - {sc['timing']} ({sc['duration_seconds']} Detik) - Rasio {sc['aspect_ratio']}",
+                expanded=True,
+            ):
+                sc_c1, sc_c2 = st.columns([3, 2])
+                with sc_c1:
+                    st.markdown("**Prompt Visual (Google Flow / Veo):**")
+                    st.code(sc["flow_prompt"], language="text")
+                    st.caption(f"🎥 Pergerakan Kamera: *{sc['camera_motion']}*")
+                with sc_c2:
+                    st.markdown("**🎙️ Naskah Narasi / Audio (ElevenLabs / Voiceover):**")
+                    st.info(f'"{sc["audio_script"]}"')
+
+        st.markdown("---")
+        st.markdown("### 🚀 Ekspor Siap Pakai untuk Ekosistem Tools Video AI:")
+
+        e1, e2 = st.columns(2)
+        with e1:
+            st.markdown("##### 1️⃣ Format Batch `prompts.txt` (untuk `flow-agent` / `gflow-cli`):")
+            st.caption("1 baris per scene video. Langsung copy atau download file txt.")
+            st.text_area(
+                "Batch Prompts TXT:",
+                value=flow_shotlist["flow_batch_prompts_txt"],
+                height=140,
+                key="flow_txt_box",
+            )
+            st.download_button(
+                "💾 Download prompts.txt",
+                data=flow_shotlist["flow_batch_prompts_txt"],
+                file_name=f"flow_prompts_{keyword_input.replace(' ', '_').lower()}.txt",
+                mime="text/plain",
+            )
+            st.caption("Perintah di terminal: `flow batch prompts.txt --type video`")
+
+        with e2:
+            st.markdown("##### 2️⃣ Manifest JSON (untuk `AutoFlowCut` / CapCut & Premiere):")
+            st.caption("Import ke AutoFlowCut untuk generate visual lalu ekspor 1-klik ke CapCut.")
+            st.json(flow_shotlist["autoflowcut_manifest"], expanded=False)
+
+        with st.expander("🛠️ Panduan Integrasi Tools AI Video Rekomendasi:"):
+            st.markdown(
+                """
+                - **[kodelyx/flow-agent](https://github.com/kodelyx/flow-agent)**:
+                  Menggunakan sesi login Google Flow yang sudah aktif di Chrome via extension. Tidak butuh API key, mendukung batch 16 klip sekaligus & upscaler 1080p/4K gratis.
+                - **[touchizen/AutoFlowCut](https://github.com/touchizen/AutoFlowCut)**:
+                  Aplikasi desktop Electron yang menggabungkan Google Flow/Veo dengan CapCut/Premiere. Impor prompt dari tools ini, visual digenerate, langsung masuk timeline CapCut lengkap dengan subtitle & timeline audio!
+                - **[Generative-AI-Strategy-B-V/veo-mcp](https://github.com/Generative-AI-Strategy-B-V/veo-mcp)**:
+                  MCP server resmi untuk Veo 3.1 via Google AI Studio API token-efficient.
+                - **[ffroliva/gflow-cli](https://github.com/ffroliva/gflow-cli)**:
+                  CLI Python untuk scene chaining & pembuatan video multi-scene yang konsisten di Google Flow.
+                """
+            )
+
+    # ==================== TAB 3: RENCANA VIDEO LANDSCAPE ====================
     with tab_landscape:
         st.subheader("🎬 Blueprint Video Landscape (16:9 Panjang)")
         st.write(

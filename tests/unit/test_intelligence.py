@@ -58,3 +58,33 @@ def test_generate_outranking_plan():
     assert "shorts_package" in plan
     assert len(plan["timestamps"]) >= 3
     assert plan["recommended_format"] in ["LANDSCAPE", "SHORTS"]
+
+
+def test_analyze_ai_competitor_presence():
+    sample_competitors = [
+        {"rank": 1, "is_ai_generated": False, "ai_badge": "👤 Human"},
+        {"rank": 2, "is_ai_generated": True, "ai_badge": "🤖 AI"},
+        {"rank": 3, "is_ai_generated": False, "ai_badge": "👤 Human"},
+        {"rank": 4, "is_ai_generated": True, "ai_badge": "🤖 AI"},
+        {"rank": 5, "is_ai_generated": False, "ai_badge": "👤 Human"},
+    ]
+    analysis = SearchIntelligence.analyze_ai_competitor_presence(sample_competitors)
+    assert analysis["total_competitors"] == 5
+    assert analysis["ai_count"] == 2
+    assert analysis["human_count"] == 3
+    assert analysis["ai_percentage"] == 40.0
+    assert len(analysis["best_practices"]) >= 4
+
+
+def test_generate_flow_shotlist():
+    shotlist = SearchIntelligence.generate_flow_shotlist(
+        seed="Google Ads Pemula",
+        format_type="LANDSCAPE",
+        num_scenes=4,
+    )
+    assert shotlist["scenes_count"] == 4
+    assert shotlist["aspect_ratio"] == "16:9"
+    assert "flow_batch_prompts_txt" in shotlist
+    assert len(shotlist["flow_batch_prompts_txt"].split("\n")) == 4
+    assert "autoflowcut_manifest" in shotlist
+    assert "veo_mcp_payload" in shotlist

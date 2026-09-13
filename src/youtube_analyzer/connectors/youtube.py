@@ -96,6 +96,9 @@ class YouTubeConnector(BaseConnector):
                 "format": "LANDSCAPE",
                 "url": "https://www.youtube.com/watch?v=sample1",
                 "outlier_status": "🔥 VIRAL_BREAKOUT (9.8x)",
+                "is_ai_generated": False,
+                "ai_badge": "👤 Human Creator",
+                "ai_label_reason": "Real human facecam, live screen recording, natural dynamic speech.",
             },
             {
                 "rank": 2,
@@ -107,17 +110,51 @@ class YouTubeConnector(BaseConnector):
                 "duration": "14:30",
                 "format": "LANDSCAPE",
                 "outlier_status": "⭐ STRONG_OUTLIER (3.2x)",
+                "is_ai_generated": False,
+                "ai_badge": "👤 Human Creator",
+                "ai_label_reason": "Human narration, custom company portfolio.",
             },
             {
                 "rank": 3,
-                "title": f"1 Tombol Rahasia {clean} Biar Gak Rugi! #shorts",
-                "channel": "Tips Cepat Jualan",
+                "title": f"1 Tombol Rahasia {clean} Biar Gak Rugi! #shorts #ai",
+                "channel": "Tips Cepat Jualan AI",
                 "views": "150K views",
                 "views_count": 150000,
                 "upload_age": "2 bulan lalu",
                 "duration": "0:45",
                 "format": "SHORTS",
                 "outlier_status": "🔥 VIRAL_BREAKOUT (12.5x)",
+                "is_ai_generated": True,
+                "ai_badge": "🤖 Altered / AI Video",
+                "ai_label_reason": "Hashtag #ai, AI voiceover (ElevenLabs), Google Flow/Veo B-roll cuts.",
+            },
+            {
+                "rank": 4,
+                "title": f"Rahasia {clean} yang Disembunyikan Agensi Besar",
+                "channel": "Digital Growth ID",
+                "views": "42K views",
+                "views_count": 42000,
+                "upload_age": "3 bulan lalu",
+                "duration": "11:20",
+                "format": "LANDSCAPE",
+                "outlier_status": "📈 ABOVE_AVERAGE (2.1x)",
+                "is_ai_generated": False,
+                "ai_badge": "👤 Human Creator",
+                "ai_label_reason": "Live whiteboard demonstration.",
+            },
+            {
+                "rank": 5,
+                "title": f"Simulasi Cepat {clean} dalam 30 Detik! #shorts",
+                "channel": "AI Tools Daily",
+                "views": "88K views",
+                "views_count": 88000,
+                "upload_age": "1 bulan lalu",
+                "duration": "0:30",
+                "format": "SHORTS",
+                "outlier_status": "🔥 VIRAL_BREAKOUT (6.4x)",
+                "is_ai_generated": True,
+                "ai_badge": "🤖 Altered / AI Video",
+                "ai_label_reason": "YouTube synthetic content disclosure label, AI avatar/faceless narration.",
             },
         ]
 
@@ -197,6 +234,9 @@ class YouTubeConnector(BaseConnector):
                     )
                     format_type = "SHORTS" if is_shorts else "LANDSCAPE"
 
+                    # Check AI keywords in title or channel
+                    is_ai, ai_badge, ai_reason = self._detect_ai_content(v, title, channel)
+
                     competitors.append(
                         {
                             "rank": rank,
@@ -210,12 +250,71 @@ class YouTubeConnector(BaseConnector):
                             "outlier_status": (
                                 "👑 RANKING #1" if rank == 1 else f"Top #{rank} Competitor"
                             ),
+                            "is_ai_generated": is_ai,
+                            "ai_badge": ai_badge,
+                            "ai_label_reason": ai_reason,
                         }
                     )
                 rank += 1
             return competitors
         except Exception:
             return []
+
+    def _detect_ai_content(
+        self, v: dict[str, Any], title: str, channel: str
+    ) -> tuple[bool, str, str]:
+        """Detect if video has YouTube Altered/Synthetic content badge or AI indicators."""
+        # 1. Inspect badges & disclosure renderers
+        badges = v.get("badges", [])
+        badge_texts = []
+        for b in badges:
+            mb = b.get("metadataBadgeRenderer", {})
+            label = mb.get("label", "")
+            tooltip = mb.get("tooltip", "")
+            badge_texts.extend([label.lower(), tooltip.lower()])
+
+        all_badge_text = " ".join(badge_texts)
+        if any(
+            k in all_badge_text
+            for k in ["synthetic", "altered", "sintetis", "diubah", "generative ai"]
+        ):
+            return (
+                True,
+                "🤖 Altered / Synthetic (Official Label)",
+                "Official YouTube 'Altered or synthetic content' disclosure badge.",
+            )
+
+        # 2. Check title & channel name for AI tool keywords
+        text_to_check = f"{title} {channel}".lower()
+        ai_keywords = [
+            "#ai",
+            " ai ",
+            "midjourney",
+            "veo",
+            "sora",
+            "elevenlabs",
+            "runway",
+            "kling",
+            "flux",
+            "chatgpt",
+            "dibuat dengan ai",
+            "ai animation",
+            "ai story",
+            "google flow",
+        ]
+        for kw in ai_keywords:
+            if kw in text_to_check:
+                return (
+                    True,
+                    "🤖 Altered / AI Video",
+                    f"Creator disclosed or referenced AI tooling ('{kw.strip()}').",
+                )
+
+        return (
+            False,
+            "👤 Human Creator",
+            "Standard human-authored video presentation.",
+        )
 
     async def search(self, query: str, **kwargs: Any) -> list[dict[str, Any]]:
         """Fetch search queries / video results."""

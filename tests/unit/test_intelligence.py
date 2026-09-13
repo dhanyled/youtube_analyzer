@@ -48,3 +48,13 @@ def test_generate_high_ctr_titles():
         "Google Ads UMKM", IntentEnum.COMMERCIAL
     )
     assert any("Biaya" in t or "Review" in t for t in commercial_titles)
+
+
+def test_generate_outranking_plan():
+    plan = SearchIntelligence.generate_outranking_plan("Google Ads UMKM")
+    assert "outranking_title" in plan
+    assert "seo_description" in plan
+    assert "timestamps" in plan
+    assert "shorts_package" in plan
+    assert len(plan["timestamps"]) >= 3
+    assert plan["recommended_format"] in ["LANDSCAPE", "SHORTS"]

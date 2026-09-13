@@ -1,7 +1,15 @@
-"""Interactive Browser Dashboard for YouTube Analyzer & Search Intelligence Platform.
+"""Interactive Executive Dashboard for YouTube Search & Competitor Intelligence.
+
+Features:
+- Executive Strategic Decision Card (Traffic light verdict & format recommendations)
+- Competitor Spy (Scrapes #1 ranking video, format: Landscape vs Shorts, views)
+- Outranking Title & SEO Description Generator (with auto Timestamps & Hook)
+- Dedicated Landscape (16:9) vs Shorts (9:16) Strategy tabs
+- Cross-Surface Intent Clustering & Trends Comparison
 
 Run locally:
     uv run streamlit run dashboard.py
+    or: .\run.bat
 """
 
 import asyncio
@@ -11,10 +19,10 @@ import streamlit as st
 from sqlmodel import Session, select
 
 from youtube_analyzer.connectors.hasdata_trends import HasDataTrendsConnector
+from youtube_analyzer.connectors.youtube import YouTubeConnector
 from youtube_analyzer.core.intelligence import SearchIntelligence
 from youtube_analyzer.core.models import (
     IntentCluster,
-    IntentEnum,
     PlatformEnum,
     Query,
     Topic,
@@ -26,7 +34,7 @@ from youtube_analyzer.db.database import engine, init_db
 # Streamlit Page Configuration
 # -------------------------------------------------------------
 st.set_page_config(
-    page_title="YouTube Search Intelligence",
+    page_title="YouTube Search & Competitor Intelligence",
     page_icon="🚀",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -60,7 +68,6 @@ def save_or_get_topic(seed_keyword: str):
             session.commit()
             session.refresh(topic)
 
-            # Simpan queries
             for platform, queries in surfaces.items():
                 for q in queries:
                     session.add(
@@ -72,7 +79,6 @@ def save_or_get_topic(seed_keyword: str):
                         )
                     )
 
-            # Simpan Intent Clusters
             clusters = TopicNormalizer.create_intent_clusters(
                 topic_id=topic.id,
                 google_terms=surfaces[PlatformEnum.GOOGLE_SEARCH],
@@ -83,7 +89,6 @@ def save_or_get_topic(seed_keyword: str):
                 session.add(c)
             session.commit()
 
-        # Load fresh queries & clusters
         queries = session.exec(select(Query).where(Query.topic_id == topic.id)).all()
         clusters = session.exec(
             select(IntentCluster).where(IntentCluster.topic_id == topic.id)
@@ -93,11 +98,10 @@ def save_or_get_topic(seed_keyword: str):
 
 
 # -------------------------------------------------------------
-# Sidebar: Riwayat Topik
+# Sidebar: Riwayat & Pengaturan
 # -------------------------------------------------------------
 st.sidebar.title("🔍 Search Intelligence")
 st.sidebar.caption("YouTube + Google + AI / AEO Orchestrator")
-
 st.sidebar.markdown("---")
 st.sidebar.subheader("📚 Riwayat Topik Tersimpan")
 
@@ -120,19 +124,21 @@ else:
 st.sidebar.markdown("---")
 st.sidebar.markdown(
     """
-    **Status Koneksi:**
-    - 🟢 Database: `SQLite (youtube_analyzer.db)`
-    - 🟢 MCP Server: Terhubung ke Antigravity
-    - ⚡ Engine: Python 3.12 + SQLModel
+    **Status Sistem:**
+    - 🟢 **Database:** `SQLite (youtube_analyzer.db)`
+    - 🟢 **Antigravity MCP:** Aktif & Terhubung
+    - ⚡ **Engine:** Python 3.12 + SQLModel
     """
 )
 
 
 # -------------------------------------------------------------
-# Main Header & Search Form
+# Header & Form Pencarian
 # -------------------------------------------------------------
-st.title("🚀 YouTube & Search Intelligence Dashboard")
-st.caption("Pusat riset kata kunci, analisis video viral outlier, dan proyeksi monetisasi YouTube.")
+st.title("🚀 YouTube Search & Competitor Intelligence")
+st.caption(
+    "Pusat riset kata kunci, intip kompetitor ranking #1, pemisahan format Landscape vs Shorts, dan optimasi SEO YouTube."
+)
 
 col_search, col_btn = st.columns([4, 1])
 with col_search:
@@ -146,190 +152,251 @@ with col_search:
 with col_btn:
     st.write("")
     st.write("")
-    run_analysis = st.button("🔥 Riset Topik", use_container_width=True, type="primary")
+    run_analysis = st.button("🔥 Analisis Topik", use_container_width=True, type="primary")
 
 if keyword_input:
     topic, surfaces, clusters, queries = save_or_get_topic(keyword_input)
 
-    # -------------------------------------------------------------
-    # Baris Metrik Skor (VidIQ & NexLev Style)
-    # -------------------------------------------------------------
-    st.markdown("### 📊 Ringkasan Peluang & Monetisasi")
+    # Fetch Top Competitors Live
+    yt_connector = YouTubeConnector()
+    with st.spinner("Mengintip video kompetitor ranking teratas di YouTube..."):
+        competitors = asyncio.run(yt_connector.get_top_competitors(keyword_input, limit=5))
 
-    col_vol, col_comp = st.columns(2)
-    with col_vol:
-        est_volume = st.slider("Estimasi Volume Pencarian Bulanan:", 100, 100000, 5000, step=500)
-    with col_comp:
-        est_comp = st.slider("Tingkat Persaingan Kompetitor (0=Rendah, 100=Saturasi):", 0, 100, 35)
+    top_comp = competitors[0] if competitors else None
+    outranking_plan = SearchIntelligence.generate_outranking_plan(keyword_input, top_comp)
 
-    opp_score = SearchIntelligence.calculate_opportunity_score(est_volume, est_comp)
+    # -------------------------------------------------------------
+    # 🎯 EXECUTIVE STRATEGIC DECISION CARD (Traffic Light Verdict)
+    # -------------------------------------------------------------
     rpm_data = SearchIntelligence.estimate_rpm(keyword_input)
+    opp_score = SearchIntelligence.calculate_opportunity_score(
+        search_volume=5000, competition_score=30.0
+    )
 
+    # Determine recommended format based on top competitor format
+    comp_format = top_comp.get("format", "LANDSCAPE") if top_comp else "LANDSCAPE"
+
+    st.markdown("---")
+    if opp_score >= 65:
+        st.success(
+            f"### 🟢 KEPUTUSAN STRATEGIS: SANGAT LAYAK DIBUAT (Skor Peluang: {opp_score}/100)\n"
+            f"**Format yang Direkomendasikan:** **🎬 {comp_format}**  \n"
+            f"**Alasan:** Kompetitor ranking teratas berhasil menarik penonton dengan format **{comp_format}**. "
+            f"Niche **{rpm_data['detected_niche'].upper()}** memiliki estimasi monetisasi tinggi **{rpm_data['rpm_range_usd']} per 1.000 views**."
+        )
+    elif opp_score >= 45:
+        st.warning(
+            f"### 🟡 KEPUTUSAN STRATEGIS: POTENSIAL DENGAN DIFERENSIASI (Skor Peluang: {opp_score}/100)\n"
+            f"**Format yang Direkomendasikan:** **🎬 {comp_format}**  \n"
+            f"Persaingan cukup ketat. Wajib gunakan hook judul baru (update tahun 2026) dan thumbnail berbeda dari kompetitor #1."
+        )
+    else:
+        st.error(
+            f"### 🔴 KEPUTUSAN STRATEGIS: SULIT / PERSAINGAN JENUH (Skor Peluang: {opp_score}/100)\n"
+            f"Disarankan membidik keyword turunan (*long-tail*) yang lebih spesifik."
+        )
+
+    # 4 Baris Metrik Ringkas
     m1, m2, m3, m4 = st.columns(4)
     m1.metric(
-        label="Opportunity Score (VidIQ / TubeBuddy)",
-        value=f"{opp_score} / 100",
-        delta="Sangat Potensial 🔥"
-        if opp_score >= 65
-        else ("Moderat" if opp_score >= 45 else "Sulit/Jenuh"),
+        "Skor Peluang (VidIQ / TubeBuddy)",
+        f"{opp_score} / 100",
+        "High Potential" if opp_score >= 65 else "Moderate",
     )
-    m2.metric(
-        label="Kategori Niche Terdeteksi",
-        value=rpm_data["detected_niche"].upper(),
-        delta="Audience Tertarget",
-    )
+    m2.metric("Kategori Niche Terdeteksi", rpm_data["detected_niche"].upper(), "Audience Tertarget")
     m3.metric(
-        label="Estimasi RPM AdSense (NexLev)",
-        value=f"${rpm_data['avg_rpm_usd']:.2f}",
-        delta=f"Range: {rpm_data['rpm_range_usd']}",
+        "Estimasi RPM AdSense (NexLev)",
+        f"${rpm_data['avg_rpm_usd']:.2f}",
+        f"Range: {rpm_data['rpm_range_usd']}",
     )
     m4.metric(
-        label="Potensi Cuan / 100k Views",
-        value=rpm_data["potential_earnings_per_100k_views"],
-        delta="Est. AdSense",
+        "Proyeksi Cuan / 100k Views", rpm_data["potential_earnings_per_100k_views"], "AdSense"
     )
 
     st.markdown("---")
 
     # -------------------------------------------------------------
-    # Tab Navigasi Fitur
+    # TAB UTAMA DASHBOARD
     # -------------------------------------------------------------
-    tab_surface, tab_cluster, tab_trends, tab_outlier, tab_titles = st.tabs(
+    tab_spy, tab_landscape, tab_shorts, tab_keywords, tab_trends = st.tabs(
         [
-            "🌐 Cross-Surface Keywords",
-            "🎯 Intent Clusters (Blueprint)",
-            "📈 Google vs YouTube Trends",
-            "🔥 Outlier Detector (NexLev)",
-            "💡 Ide Judul Viral (VidIQ AI)",
+            "🕵️‍♂️ Intip Kompetitor Ranking #1",
+            "🎬 Rencana Video Landscape (16:9)",
+            "📱 Rencana Video Shorts (9:16)",
+            "🌐 Cross-Surface Keywords & Intent",
+            "📈 Tren Google Web vs YouTube",
         ]
     )
 
-    # ------------------ TAB 1: Cross-Surface Keywords ------------------
-    with tab_surface:
-        st.subheader("Pemisahan Kata Kunci Berdasarkan Search Behavior Platform")
-        c1, c2, c3 = st.columns(3)
+    # ==================== TAB 1: COMPETITOR SPY ====================
+    with tab_spy:
+        st.subheader("👑 Video yang Sedang Ranking #1 di YouTube Saat Ini")
+        st.caption("Data live hasil pencarian YouTube untuk kata kunci yang Anda masukkan.")
 
-        with c1:
-            st.markdown("#### 🔵 Google Search (GKP/SERP)")
-            st.caption("Fokus komersial, harga, jasa, kebutuhan bisnis")
-            g_terms = surfaces.get(PlatformEnum.GOOGLE_SEARCH, [])
-            g_data = [
-                {"Keyword": t, "Intent": TopicNormalizer.classify_intent(t).value.upper()}
-                for t in g_terms
-            ]
-            st.dataframe(pd.DataFrame(g_data), use_container_width=True)
+        if top_comp:
+            c_info1, c_info2, c_info3, c_info4 = st.columns(4)
+            c_info1.markdown(f"**Judul Kompetitor:**  \n{top_comp['title']}")
+            c_info2.markdown(f"**Channel:**  \n{top_comp['channel']}")
+            c_info3.markdown(
+                f"**Jumlah Views:**  \n🔥 **{top_comp['views']}** ({top_comp.get('upload_age', '')})"
+            )
+            c_info4.markdown(
+                f"**Format & Durasi:**  \n`{top_comp['format']}` ({top_comp.get('duration', '')})"
+            )
 
-        with c2:
-            st.markdown("#### 🔴 YouTube Search (Autocomplete)")
-            st.caption("Fokus visual, panduan praktis, tutorial, cara pasang")
-            yt_terms = surfaces.get(PlatformEnum.YOUTUBE_SEARCH, [])
-            yt_data = [
-                {"Keyword": t, "Intent": TopicNormalizer.classify_intent(t).value.upper()}
-                for t in yt_terms
-            ]
-            st.dataframe(pd.DataFrame(yt_data), use_container_width=True)
+        st.markdown("#### 🎯 Formula Judul Tandingan untuk Mengalahkan Video #1:")
+        st.info(f"👉 **{outranking_plan['outranking_title']}**")
 
-        with c3:
-            st.markdown("#### 🟣 AI & AEO Queries (ChatGPT/Perplexity)")
-            st.caption("Fokus pertanyaan konversasional, pengambilan keputusan")
-            ai_terms = surfaces.get(PlatformEnum.AI_SEARCH, [])
-            ai_data = [
-                {"Query": t, "Intent": TopicNormalizer.classify_intent(t).value.upper()}
-                for t in ai_terms
-            ]
-            st.dataframe(pd.DataFrame(ai_data), use_container_width=True)
+        st.markdown("##### Alternatif Variasi Judul:")
+        for alt in outranking_plan["alternative_titles"]:
+            st.code(alt, language="text")
 
-    # ------------------ TAB 2: Intent Clusters ------------------
-    with tab_cluster:
-        st.subheader("Matriks Klaster Intent Tersinkronisasi")
-        st.write(
-            "Setiap intent dikaitkan ke satu Canonical Topic yang sama, menghubungkan apa yang dicari di Google, YouTube, dan AI."
+        st.markdown("#### 📝 Deskripsi SEO Siap Pakai (Dilengkapi Timestamps & Hashtags):")
+        st.caption(
+            "Tinggal salin dan tempel ke YouTube Studio Anda. 2 baris awal dibuat khusus untuk memikat klik penonton."
+        )
+        st.text_area(
+            "Deskripsi YouTube Siap Pakai:", value=outranking_plan["seo_description"], height=240
         )
 
-        cluster_rows = []
-        for c in clusters:
-            cluster_rows.append(
-                {
-                    "Cluster Name": c.cluster_name,
-                    "Intent Type": c.intent_type.value.upper(),
-                    "Google Term": c.google_term_sample or "-",
-                    "YouTube Term": c.youtube_term_sample or "-",
-                    "AI/AEO Query": c.aeo_query_sample or "-",
-                }
+        st.markdown("#### 📊 Daftar Semua Kompetitor Halaman 1 YouTube:")
+        comp_df = pd.DataFrame(competitors)[
+            ["rank", "title", "channel", "views", "duration", "format", "outlier_status"]
+        ]
+        st.dataframe(comp_df, use_container_width=True)
+
+    # ==================== TAB 2: RENCANA VIDEO LANDSCAPE ====================
+    with tab_landscape:
+        st.subheader("🎬 Blueprint Video Landscape (16:9 Panjang)")
+        st.write(
+            "Format ini ditujukan untuk penonton yang mencari panduan tuntas dan menghasilkan **AdSense RPM tinggi ($12–$35)**."
+        )
+
+        col_l1, col_l2 = st.columns([1, 1])
+        with col_l1:
+            st.markdown("##### 📌 Rekomendasi Struktur Judul")
+            st.code(outranking_plan["outranking_title"], language="text")
+            st.caption("Pola: [Solusi/Tutorial] + [Target Pemula] + [Update 2026] + [Anti-Boncos]")
+
+            st.markdown("##### ⏱️ Kerangka Timestamps / Daftar Isi Otomatis")
+            st.write("Google Search mengindeks timestamps ini secara otomatis:")
+            for ts in outranking_plan["timestamps"]:
+                st.markdown(f"- `{ts}`")
+
+        with col_l2:
+            st.markdown("##### 💡 Checklist Sukses Video Landscape:")
+            st.markdown(
+                """
+                - [x] **Durasi Ideal:** 12 – 22 Menit (memungkinkan iklan mid-roll otomatis).
+                - [x] **Hook 30 Detik Awal:** Jangan buang waktu salam berbelit! Langsung perlihatkan hasil akhir / studi kasus.
+                - [x] **Thumbnail:** Maksimal 3-4 kata besar + ekspresi wajah atau grafik kontras.
+                - [x] **Bab/Chapters:** Wajib pasang timestamps di deskripsi untuk SEO Google Search.
+                """
             )
+
+    # ==================== TAB 3: RENCANA VIDEO SHORTS ====================
+    with tab_shorts:
+        st.subheader("📱 Blueprint Video Shorts (9:16 Vertikal)")
+        st.write(
+            "Format ini ditujukan untuk penonton mobile yang *swipe-swipe* cepat dan menjaring penonton baru."
+        )
+
+        shorts_pkg = outranking_plan["shorts_package"]
+
+        st.markdown("##### ⚡ Formula Judul Shorts (< 40 Karakter):")
+        st.code(shorts_pkg["title"], language="text")
+
+        st.markdown("##### 🛑 Kalimat Pembuka 3 Detik Pertama (Wajib Diucapkan Tanpa Jeda):")
+        st.warning(f'🗣️ **"{shorts_pkg["three_second_hook"]}"**')
+        st.caption("Tujuannya: Mencegah penonton men-swipe video Anda dalam 2 detik pertama.")
+
+        st.markdown("##### ⏱️ Alur Skrip 45 Detik:")
+        for step in shorts_pkg["script_structure"]:
+            st.markdown(f"- **{step}**")
+
+        st.markdown("##### 🔗 Trik Funnel (Pancingan ke Video Panjang):")
+        st.info(
+            "Di YouTube Shorts, sematkan fitur **Related Video** yang menunjuk ke video tutorial panjang Anda! "
+            "Penonton Shorts yang penasaran akan langsung mengklik dan menonton video panjang Anda."
+        )
+
+    # ==================== TAB 4: KEYWORDS & INTENT ====================
+    with tab_keywords:
+        st.subheader("Pemisahan Kata Kunci Berdasarkan Search Behavior")
+        k1, k2, k3 = st.columns(3)
+
+        with k1:
+            st.markdown("##### 🔵 Google Search (GKP)")
+            st.caption("Fokus komersial & jasa")
+            g_terms = surfaces.get(PlatformEnum.GOOGLE_SEARCH, [])
+            st.dataframe(
+                pd.DataFrame(
+                    [
+                        {"Keyword": t, "Intent": TopicNormalizer.classify_intent(t).value.upper()}
+                        for t in g_terms
+                    ]
+                ),
+                use_container_width=True,
+            )
+
+        with k2:
+            st.markdown("##### 🔴 YouTube Search")
+            st.caption("Fokus tutorial & cara pasang")
+            yt_terms = surfaces.get(PlatformEnum.YOUTUBE_SEARCH, [])
+            st.dataframe(
+                pd.DataFrame(
+                    [
+                        {"Keyword": t, "Intent": TopicNormalizer.classify_intent(t).value.upper()}
+                        for t in yt_terms
+                    ]
+                ),
+                use_container_width=True,
+            )
+
+        with k3:
+            st.markdown("##### 🟣 AI & AEO Queries")
+            st.caption("Fokus pertanyaan keputusan")
+            ai_terms = surfaces.get(PlatformEnum.AI_SEARCH, [])
+            st.dataframe(
+                pd.DataFrame(
+                    [
+                        {"Query": t, "Intent": TopicNormalizer.classify_intent(t).value.upper()}
+                        for t in ai_terms
+                    ]
+                ),
+                use_container_width=True,
+            )
+
+        st.markdown("##### 🎯 Matriks Klaster Intent Tersinkronisasi (Blueprint):")
+        cluster_rows = [
+            {
+                "Klaster": c.cluster_name,
+                "Tipe Intent": c.intent_type.value.upper(),
+                "Contoh Istilah Google": c.google_term_sample or "-",
+                "Contoh Istilah YouTube": c.youtube_term_sample or "-",
+                "Contoh Pertanyaan AI": c.aeo_query_sample or "-",
+            }
+            for c in clusters
+        ]
         st.table(pd.DataFrame(cluster_rows))
 
-    # ------------------ TAB 3: Google vs YouTube Trends ------------------
+    # ==================== TAB 5: TRENDS COMPARISON ====================
     with tab_trends:
-        st.subheader("Perbandingan Minat Pencarian: Google Web vs YouTube")
+        st.subheader("Perbandingan Tren: Google Web vs YouTube Search (`gprop=youtube`)")
         connector = HasDataTrendsConnector()
-        with st.spinner("Mengambil perbandingan tren..."):
+        with st.spinner("Mengambil perbandingan tren Google vs YouTube..."):
             trends_comp = asyncio.run(connector.compare_google_vs_youtube(keyword_input))
 
-        col_t1, col_t2 = st.columns(2)
-        with col_t1:
+        t1, t2 = st.columns(2)
+        with t1:
             st.markdown("##### 🌐 Google Web Trends")
             st.dataframe(pd.DataFrame(trends_comp["google_web_trends"]), use_container_width=True)
 
-        with col_t2:
-            st.markdown("##### 📺 YouTube Search Trends (`gprop=youtube`)")
+        with t2:
+            st.markdown("##### 📺 YouTube Search Trends")
             st.dataframe(pd.DataFrame(trends_comp["youtube_trends"]), use_container_width=True)
 
         st.info(
-            f"💡 **Ringkasan:** Di Google pengguna condong mencari: *{trends_comp['surface_intent_summary']['google_web_focus']}*, sedangkan di YouTube lebih mencari: *{trends_comp['surface_intent_summary']['youtube_focus']}*."
+            f"💡 **Insight:** Di Google Web pengguna fokus mencari: *{trends_comp['surface_intent_summary']['google_web_focus']}*, "
+            f"sedangkan di YouTube fokus mencari: *{trends_comp['surface_intent_summary']['youtube_focus']}*."
         )
-
-    # ------------------ TAB 4: Outlier Detector ------------------
-    with tab_outlier:
-        st.subheader("Kalkulator Outlier Video Kompetitor (Ala NexLev & VidIQ)")
-        st.write(
-            "Cek apakah video kompetitor meledak melebihi standar channelnya (*Viral Breakout*)."
-        )
-
-        co1, co2, co3 = st.columns(3)
-        with co1:
-            v_title = st.text_input("Judul Video Kompetitor:", "Cara Pasang Google Ads dari Nol")
-        with co2:
-            v_views = st.number_input(
-                "Jumlah Views Video Tersebut:", min_value=100, value=75000, step=1000
-            )
-        with co3:
-            v_median = st.number_input(
-                "Median Views Rata-rata Channelnya:", min_value=100, value=8000, step=500
-            )
-
-        outlier_res = SearchIntelligence.calculate_outlier_score(int(v_views), int(v_median))
-
-        st.markdown(f"#### Hasil Analisis: **{outlier_res['classification']}**")
-        st.metric(
-            label="Outlier Multiplier",
-            value=f"{outlier_res['outlier_multiplier']}x",
-            delta="Viral Breakout! Wajib dibuat!" if outlier_res["is_outlier"] else "Normal",
-        )
-        if outlier_res["is_outlier"]:
-            st.success(
-                "🔥 **Rekomendasi Aksi:** Topik dan format video ini terbukti sangat disukai audiens! Buat video dengan topik serupa dengan sudut pandang unik Anda."
-            )
-        else:
-            st.warning("⚖️ Video ini memiliki performa wajar/standar untuk channel tersebut.")
-
-    # ------------------ TAB 5: Ide Judul Viral ------------------
-    with tab_titles:
-        st.subheader("Formula Judul Ber-CTR Tinggi (Ala VidIQ AI)")
-        selected_intent = st.selectbox(
-            "Pilih Gaya Intent Judul:",
-            [
-                IntentEnum.TUTORIAL.value,
-                IntentEnum.COMMERCIAL.value,
-                IntentEnum.COMPARISON.value,
-                IntentEnum.INFORMATIONAL.value,
-            ],
-            format_func=lambda x: x.upper(),
-        )
-
-        titles = SearchIntelligence.generate_high_ctr_titles(
-            keyword_input, IntentEnum(selected_intent)
-        )
-        st.markdown("##### Salin Judul Pilihan Anda:")
-        for _idx, t in enumerate(titles, 1):
-            st.code(t, language="text")

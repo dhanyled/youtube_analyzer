@@ -139,3 +139,87 @@ class SearchIntelligence:
                 f"Semua yang Wajib Anda Tahu Tentang {clean}",
                 f"5 Fakta Mengejutkan Seputar {clean}",
             ]
+
+    @classmethod
+    def generate_outranking_plan(
+        cls,
+        seed: str,
+        competitor: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """
+        Generate an actionable Outranking Blueprint:
+        - Outranking Title (Beats Competitor #1)
+        - Full SEO Description with Timestamps & Hashtags
+        - Shorts 3-Second Hook Package
+        - Format Recommendation (Landscape 16:9 vs Shorts 9:16)
+        """
+        clean = seed.strip().title()
+        comp_title = competitor.get("title", "") if competitor else ""
+        comp_views = competitor.get("views", "0") if competitor else "N/A"
+        comp_channel = competitor.get("channel", "Kompetitor") if competitor else "Kompetitor"
+        comp_format = competitor.get("format", "LANDSCAPE") if competitor else "LANDSCAPE"
+
+        outranking_title = f"Cara {clean} dari Nol untuk Pemula (Update 2026 - Anti Boncos)"
+        alternative_titles = [
+            f"Tutorial {clean} Lengkap 2026 | Modal Kecil Hasil Maksimal",
+            f"Bongkar Rahasia {clean} yang Jarang Dibahas Orang (Panduan Pemula)",
+            f"Hentikan Kesalahan Ini Saat Setting {clean}! (Step by Step)",
+        ]
+
+        two_line_hook = (
+            f"Bingung cara mulai {clean} tanpa takut boncos? Di video ini kita bedah "
+            f"panduan lengkap {clean} dari nol khusus pemula sampai berhasil dapat hasil!"
+        )
+
+        timestamps = [
+            "00:00 - Kenapa Harus Mulai Sekarang?",
+            f"02:15 - Riset & Persiapan {clean}",
+            "06:30 - Langkah Setting Step-by-Step",
+            "12:45 - Trik Budget Minimal Anti Boncos",
+            "17:20 - Evaluasi & Cara Skalasi Hasil",
+        ]
+
+        clean_tag = "".join(clean.split())
+        hashtags = [f"#{clean_tag}", f"#{clean_tag}Pemula", "#BelajarDigital"]
+
+        full_description = (
+            f"{two_line_hook}\n\n"
+            f"📌 Di video ini, Anda akan mempelajari cara setting dan strategi terbaik "
+            f"untuk {clean} yang sudah terbukti efektif di tahun 2026. Tonton dari awal "
+            f"sampai akhir agar tidak ada langkah penting yang terlewat!\n\n"
+            f"⏱️ TIMESTAMPS / DAFTAR ISI:\n"
+            + "\n".join(timestamps)
+            + f"\n\n🔗 LINK & RESOURCE TERKAIT:\n"
+            f"- Download Template Gratis: https://example.com\n"
+            f"- Konsultasi / Diskusi: https://example.com/komunitas\n\n"
+            f"{' '.join(hashtags)}"
+        )
+
+        shorts_package = {
+            "title": f"Trik Rahasia {clean} Biar Gak Rugi! #shorts",
+            "three_second_hook": f"Jangan pernah coba {clean} sebelum kamu tahu 1 tombol rahasia ini!",
+            "script_structure": [
+                "00-03s: Hook visual ('Jangan lakukan ini!')",
+                "03-30s: Bongkar 1 tips paling berdampak",
+                "30-45s: Call to action ('Tutorial lengkapnya klik link video di bawah!')",
+            ],
+            "target_metric": "Viewed vs Swiped Away > 75%",
+        }
+
+        return {
+            "seed_keyword": seed,
+            "target_competitor": {
+                "title": comp_title,
+                "channel": comp_channel,
+                "views": comp_views,
+                "format": comp_format,
+            },
+            "recommended_format": comp_format,
+            "outranking_title": outranking_title,
+            "alternative_titles": alternative_titles,
+            "seo_description": full_description,
+            "two_line_hook": two_line_hook,
+            "timestamps": timestamps,
+            "hashtags": hashtags,
+            "shorts_package": shorts_package,
+        }

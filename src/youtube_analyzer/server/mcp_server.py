@@ -14,6 +14,7 @@ except ImportError:
 from sqlmodel import Session, select
 
 from youtube_analyzer.connectors.hasdata_trends import HasDataTrendsConnector
+from youtube_analyzer.connectors.youtube import YouTubeConnector
 from youtube_analyzer.core.intelligence import SearchIntelligence
 from youtube_analyzer.core.models import (
     IntentCluster,
@@ -244,6 +245,46 @@ async def compare_google_vs_youtube_trends(
     connector = HasDataTrendsConnector()
     comparison = await connector.compare_google_vs_youtube(keyword, geo)
     return json.dumps(comparison, indent=2)
+
+
+@mcp.tool()
+async def inspect_top_competitors(
+    query: str,
+    limit: int = 5,
+) -> str:
+    """
+    Spy on live top ranking competitor videos on YouTube.
+    Detects video title, channel, views, upload age, duration, and format (Landscape vs Shorts).
+    """
+    connector = YouTubeConnector()
+    competitors = await connector.get_top_competitors(query, limit=limit)
+    return json.dumps(
+        {
+            "query": query,
+            "total_competitors": len(competitors),
+            "top_competitors": competitors,
+        },
+        indent=2,
+    )
+
+
+@mcp.tool()
+async def generate_outranking_plan(
+    seed_keyword: str,
+) -> str:
+    """
+    Generate an actionable blueprint to outrank the #1 competitor on YouTube:
+    - Outranking Title Formula
+    - Full SEO Description with Timestamps & Hashtags
+    - YouTube Shorts 3-Second Hook Package
+    - Landscape (16:9) vs Shorts (9:16) format recommendation
+    """
+    connector = YouTubeConnector()
+    competitors = await connector.get_top_competitors(seed_keyword, limit=1)
+    top_comp = competitors[0] if competitors else None
+
+    plan = SearchIntelligence.generate_outranking_plan(seed_keyword, top_comp)
+    return json.dumps(plan, indent=2)
 
 
 if __name__ == "__main__":

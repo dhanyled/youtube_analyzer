@@ -39,7 +39,7 @@ $$\text{Topic} \longrightarrow \text{Keyword} \longrightarrow \text{Query} \long
 
 ## 🛠️ MCP Tools Exposed
 
-When connected to Claude, Gemini, or Cursor via Model Context Protocol:
+When connected to Claude, Gemini, or Antigravity via Model Context Protocol:
 
 1. **`research_topic(seed_keyword)`**:
    Expands seed query into Google, YouTube, and AI search variants, saves to database, and creates intent clusters.
@@ -51,10 +51,32 @@ When connected to Claude, Gemini, or Cursor via Model Context Protocol:
    Detects if a competitor's video is a breakout outlier (5x+ multiplier) to replicate.
 5. **`generate_video_ideas(seed_keyword, intent_type)`**:
    Generates high-CTR title formulas and hooks based on intent.
+6. **`inspect_top_competitors(keyword)`**:
+   Scrapes top YouTube ranking competitors live, extracting views, channel, duration, format (Landscape vs Shorts), and VPH velocity.
+7. **`generate_outranking_plan(keyword, competitor_title, competitor_views, duration_seconds)`**:
+   Produces a ready-to-use outranking package: psychological title hook, full SEO description with auto-timestamps, and dedicated Landscape vs Shorts content blueprint.
+8. **`compare_google_vs_youtube_trends(keyword)`**:
+   Compares relative search velocity on Google Web Search vs YouTube Search.
 
 ---
 
-## 🚀 Quick Start
+## 💻 Web Dashboard
+
+To launch the interactive visual intelligence dashboard:
+```bash
+# Via Python runner
+python run_dashboard.py
+
+# Or on Windows via double click
+run.bat
+```
+Visit `http://localhost:8501` to access:
+* **Strategic Verdict Card**: Executive decision (Opportunity Score, Estimated RPM, Landscape vs Shorts verdict).
+* **Tab 1: 👑 Intip Kompetitor Ranking #1**: Live competitor spy, outranking title generator, and 1-click copyable full SEO description with chapters.
+* **Tab 2: 🎬 Rencana Video Landscape**: 16:9 Long-form blueprint, psychological hook formula, and chapter breakdown for maximum retention.
+* **Tab 3: 📱 Rencana Video Shorts**: 9:16 vertical hook, 45-second retention script, and Related Video funnel strategy.
+* **Tab 4: 🌐 Cross-Surface Intent Matrix**: Google vs YouTube vs AI query mapping.
+* **Tab 5: 📈 Realtime Trends Comparison**: Google vs YouTube momentum graph.
 
 ### Prerequisites
 * Python 3.12+

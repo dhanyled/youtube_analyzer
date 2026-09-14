@@ -64,7 +64,9 @@ def test_hasdata_interest_by_region():
 
 def test_hasdata_top_and_rising_queries_50():
     connector = HasDataTrendsConnector(api_key=None)
-    queries = connector.get_top_and_rising_queries("Google Ads UMKM", geo="ID", property_type="youtube")
+    queries = connector.get_top_and_rising_queries(
+        "Google Ads UMKM", geo="ID", property_type="youtube"
+    )
     assert len(queries["top"]) == 50
     assert len(queries["rising"]) == 50
     assert queries["top"][0]["Rank"] == 1
@@ -120,4 +122,3 @@ async def test_youtube_trending_feed_10():
     assert len(trending) == 10
     assert trending[0]["rank"] == 1
     assert trending[9]["rank"] == 10
-

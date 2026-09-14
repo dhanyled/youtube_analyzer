@@ -295,8 +295,6 @@ else:
     st.sidebar.caption("Topik yang Anda cari pada sesi ini akan tersimpan otomatis di sini.")
 
 
-
-
 # -------------------------------------------------------------
 # Header & Form Pencarian
 # -------------------------------------------------------------
@@ -799,7 +797,9 @@ if keyword_input:
         e1, e2 = st.columns(2)
         with e1:
             st.markdown("##### 1️⃣ Format Batch `prompts.txt` (Universal AI Video Generators):")
-            st.caption("1 baris per scene video. Langsung salin atau unduh untuk batch generate di tool video AI pilihan Anda.")
+            st.caption(
+                "1 baris per scene video. Langsung salin atau unduh untuk batch generate di tool video AI pilihan Anda."
+            )
             st.text_area(
                 "Batch Prompts TXT:",
                 value=flow_shotlist["flow_batch_prompts_txt"],
@@ -816,7 +816,9 @@ if keyword_input:
 
         with e2:
             st.markdown("##### 2️⃣ Manifest JSON (untuk CapCut & Premiere Timeline):")
-            st.caption("Impor manifest ke timeline editor (CapCut / Premiere) untuk menyinkronkan visual dengan naskah audio narasi.")
+            st.caption(
+                "Impor manifest ke timeline editor (CapCut / Premiere) untuk menyinkronkan visual dengan naskah audio narasi."
+            )
             st.json(flow_shotlist["autoflowcut_manifest"], expanded=False)
 
         with st.expander("🛠️ Panduan Eksekusi Pembuatan Video AI:"):
@@ -842,7 +844,9 @@ if keyword_input:
         with col_l1:
             st.markdown("##### 📌 Rekomendasi Struktur Judul")
             st.code(outranking_plan["outranking_title"], language="text")
-            st.caption(f"📐 {outranking_plan.get('title_formula', 'Pola: [Hook Menarik] + [Subjek Topik] + [Nilai Tambah]')}")
+            st.caption(
+                f"📐 {outranking_plan.get('title_formula', 'Pola: [Hook Menarik] + [Subjek Topik] + [Nilai Tambah]')}"
+            )
 
             st.markdown("##### ⏱️ Kerangka Timestamps / Daftar Isi Otomatis")
             st.write("Google Search mengindeks timestamps ini secara otomatis:")
@@ -1039,11 +1043,17 @@ if keyword_input:
             )
 
         # Ensure all trends keys are present even if cached/older version
-        if "youtube_interest_over_time" not in trends_comp or not trends_comp["youtube_interest_over_time"]:
+        if (
+            "youtube_interest_over_time" not in trends_comp
+            or not trends_comp["youtube_interest_over_time"]
+        ):
             trends_comp["youtube_interest_over_time"] = connector.get_interest_over_time(
                 keyword_input, geo=sel_geo_code or "ID", property_type="youtube"
             )
-        if "google_interest_over_time" not in trends_comp or not trends_comp["google_interest_over_time"]:
+        if (
+            "google_interest_over_time" not in trends_comp
+            or not trends_comp["google_interest_over_time"]
+        ):
             trends_comp["google_interest_over_time"] = connector.get_interest_over_time(
                 keyword_input, geo=sel_geo_code or "ID", property_type="web"
             )
@@ -1162,8 +1172,10 @@ if keyword_input:
                     val = it.get("Popularitas (0-100)") or it.get("value") or max(10, 100 - i * 2)
                     formatted.append({"Rank": rank, "Query": q_text, "Popularitas (0-100)": val})
                 else:
-                    val = it.get("Lonjakan Minat") or it.get("value") or (
-                        "Breakout (+5000% 🔥)" if i <= 4 else f"+{max(50, 800 - i * 30)}%"
+                    val = (
+                        it.get("Lonjakan Minat")
+                        or it.get("value")
+                        or ("Breakout (+5000% 🔥)" if i <= 4 else f"+{max(50, 800 - i * 30)}%")
                     )
                     formatted.append({"Rank": rank, "Query": q_text, "Lonjakan Minat": str(val)})
             st.dataframe(pd.DataFrame(formatted), use_container_width=True, height=450)

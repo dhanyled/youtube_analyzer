@@ -1826,7 +1826,9 @@ class SearchIntelligence:
         for idx, q in enumerate(queries_to_check):
             # Deterministic yet dynamic scoring based on query semantics
             q_clean = q.lower()
-            if any(w in q_clean for w in ["cara", "tutorial", "terbaru", "2026", "pemula"]):
+            if any(
+                w in q_clean for w in ["cara", "tutorial", "terbaru", str(current_year), "pemula"]
+            ):
                 volume_tier = "High"
             elif any(w in q_clean for w in ["gratis", "modal", "rahasia", "trik"]):
                 volume_tier = "Medium"
@@ -2240,9 +2242,9 @@ class SearchIntelligence:
             return [
                 {
                     "clip_id": 1,
-                    "clip_title": f"1 Rahasia {clean} Biar Gak Boncos #shorts",
+                    "clip_title": f"1 Rahasia {clean} yang Mengubah Segalanya #shorts",
                     "timestamp_window": "01:15 - 02:00 (45 Detik)",
-                    "hook_line": "Banyak orang boncos di 2026 gara-gara 1 tombol ini...",
+                    "hook_line": f"Banyak yang gagal saat menjalankan {clean} cuma gara-gara 1 kesalahan kecil ini...",
                     "core_insight": "Demonstrasi bagian teknis paling krusial yang langsung mengubah hasil.",
                     "call_to_action": "Tonton tutorial strategi lengkapnya di channel ini!",
                     "projected_virality": "9.2 / 10 🔥",
@@ -2251,7 +2253,7 @@ class SearchIntelligence:
                     "clip_id": 2,
                     "clip_title": f"Cukup 30 Detik Paham Cara Kerja {clean} #shorts",
                     "timestamp_window": "05:30 - 06:15 (45 Detik)",
-                    "hook_line": "Kalau kamu masih bingung cara settingnya, tonton ini sampai habis!",
+                    "hook_line": f"Kalau kamu masih bingung cara kerja {clean}, tonton ini sampai habis!",
                     "core_insight": "Alur visual cepat step-by-step tanpa basa-basi.",
                     "call_to_action": "Simpan video ini biar gak lupa!",
                     "projected_virality": "8.8 / 10 ⭐",
@@ -2260,8 +2262,8 @@ class SearchIntelligence:
                     "clip_id": 3,
                     "clip_title": f"Jangan Pernah Lakukan Ini Saat {clean}! #shorts",
                     "timestamp_window": "10:45 - 11:30 (45 Detik)",
-                    "hook_line": "Ini kesalahan paling fatal yang bikin budget-mu habis sia-sia!",
-                    "core_insight": "Peringatan berbasis studi kasus nyata yang sering diabaikan pemula.",
+                    "hook_line": f"Ini kesalahan paling fatal seputar {clean} yang bikin waktu dan energimu terbuang sia-sia!",
+                    "core_insight": "Peringatan berbasis studi kasus nyata yang sering diabaikan.",
                     "call_to_action": "Komen pendapatmu di bawah, pernah ngalamin juga?",
                     "projected_virality": "9.5 / 10 🔥",
                 },

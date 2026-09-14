@@ -93,7 +93,7 @@ class HasDataTrendsConnector(BaseConnector):
                 }
             )
 
-        results[-1]["Minat Penelusuran"] = min(100, results[-1]["Minat Penelusuran"] + 12)
+        results[-1]["Minat Penelusuran"] = min(100, int(str(results[-1]["Minat Penelusuran"])) + 12)
         return results
 
     def get_interest_by_region(
@@ -175,7 +175,7 @@ class HasDataTrendsConnector(BaseConnector):
                 }
             )
 
-        results.sort(key=lambda x: x["Indeks Minat"], reverse=True)
+        results.sort(key=lambda x: int(str(x["Indeks Minat"])), reverse=True)
         return results
 
     def get_top_and_rising_queries(

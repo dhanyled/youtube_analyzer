@@ -351,7 +351,7 @@ class TopicNormalizer:
             # Include cluster if at least one surface sample exists
             if any([data["google"], data["youtube"], data["aeo"]]):
                 try:
-                    c = IntentCluster(
+                    c: Any = IntentCluster(
                         topic_id=topic_id,
                         cluster_name=data["name"],
                         intent_type=intent,

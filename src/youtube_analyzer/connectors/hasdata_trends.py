@@ -234,9 +234,9 @@ class HasDataTrendsConnector(BaseConnector):
             ]
             rising_patterns = [
                 f"{clean} ai",
-                f"google flow {clean}",
+                f"video ai {clean}",
                 f"cara {clean} pakai ai 2026",
-                f"veo 3.1 {clean}",
+                f"generator video ai {clean}",
                 f"{clean} otomatis tanpa wajah",
                 f"tools ai {clean} gratis",
                 f"rahasia algoritma {clean} terbaru",
@@ -247,8 +247,8 @@ class HasDataTrendsConnector(BaseConnector):
                 f"solusi akun {clean} kena suspend",
                 f"ai script generator {clean}",
                 f"{clean} tren 2026",
-                f"autoflowcut {clean}",
-                f"prompt flow {clean}",
+                f"workflow editing {clean}",
+                f"prompt video ai {clean}",
                 f"cara scale up {clean} 10x",
                 f"{clean} zero budget",
                 f"trik jitu {clean} umkm",

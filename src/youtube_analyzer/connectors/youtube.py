@@ -104,7 +104,7 @@ class YouTubeConnector(BaseConnector):
                 "outlier_status": "🔥 VIRAL_BREAKOUT (12.5x)",
                 "is_ai_generated": True,
                 "ai_badge": "🤖 Altered / AI Video",
-                "ai_label_reason": "Hashtag #ai, AI voiceover (ElevenLabs), Google Flow/Veo B-roll cuts.",
+                "ai_label_reason": "Hashtag #ai, AI voiceover (ElevenLabs), klip visual b-roll AI.",
             },
             {
                 "rank": 4,
@@ -179,7 +179,7 @@ class YouTubeConnector(BaseConnector):
                 "outlier_status": "🔥 VIRAL_BREAKOUT (8.9x)",
                 "is_ai_generated": True,
                 "ai_badge": "🤖 Altered / AI Video",
-                "ai_label_reason": "Google Flow + Veo 3.1 visual scenes, synthetic TTS voiceover.",
+                "ai_label_reason": "Klip visual generator video AI, synthetic TTS voiceover.",
             },
             {
                 "rank": 9,
@@ -723,7 +723,7 @@ class YouTubeConnector(BaseConnector):
                 "outlier_status": "🔥 VIRAL_SHORTS",
                 "is_ai_generated": True,
                 "ai_badge": "🤖 Altered / AI Video",
-                "ai_label_reason": "Generative AI animation (Veo 3.1) & custom TTS.",
+                "ai_label_reason": "Generative AI video animation & custom TTS.",
                 "data_source": "BENCHMARK_FALLBACK",
                 "device": device.upper(),
                 "location": gl,

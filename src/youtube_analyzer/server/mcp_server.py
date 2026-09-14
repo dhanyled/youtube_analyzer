@@ -335,8 +335,8 @@ async def generate_flow_shotlist(
     num_scenes: int = 5,
 ) -> str:
     """
-    Generate Google Flow (Imagen 4 + Veo 3.1) Storyboard & Shotlist.
-    Exports prompt batch format for flow-agent / gflow-cli, AutoFlowCut manifest, and veo-mcp payload.
+    Generate AI Video (Kling, Runway, Luma, Sora, CapCut) Storyboard & Shotlist.
+    Exports prompt batch format for universal video AI generators, CapCut/Premiere manifest, and video API payload.
     - format_type: 'LANDSCAPE' (16:9) or 'SHORTS' (9:16)
     - num_scenes: Number of scenes (default 5)
     """
@@ -417,7 +417,7 @@ async def analyze_competitor_outliers(seed_keyword: str) -> str:
 async def analyze_faceless_niche_viability(seed_keyword: str) -> str:
     """
     Faceless Niche Opportunity Finder.
-    Evaluates suitability for AI Faceless channel creation (Google Flow, Veo 3.1, ElevenLabs).
+    Evaluates suitability for AI Faceless channel creation (Kling, Runway, ElevenLabs).
     """
     rpm_info = SearchIntelligence.estimate_rpm(seed_keyword)
     viability = SearchIntelligence.analyze_faceless_viability(seed_keyword, rpm_info)

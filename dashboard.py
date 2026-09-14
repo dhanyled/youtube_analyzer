@@ -400,7 +400,7 @@ if keyword_input:
             "🕵️‍♂️ Intip Kompetitor & AI",
             "🔥 YouTube Trending Feed",
             "🔬 YouTube Studio & Content Gap",
-            "🎬 Google Flow & Veo Studio",
+            "🎬 Studio Storyboard Video AI",
             "📺 Rencana Video Landscape (16:9)",
             "📱 Rencana Video Shorts (9:16)",
             "🌐 Cross-Surface Keywords",
@@ -731,12 +731,12 @@ if keyword_input:
                             "Pancing penonton klip Shorts ini untuk melihat video lengkap Anda via fitur Related Video YouTube."
                         )
 
-    # ==================== TAB 4: GOOGLE FLOW & VEO STUDIO ====================
+    # ==================== TAB 4: STUDIO STORYBOARD VIDEO AI ====================
     with tab_flow:
-        st.subheader("🎬 Google Flow (Imagen 4 + Veo 3.1) Studio")
+        st.subheader("🎬 Studio Storyboard & Shotlist Video AI")
         st.caption(
-            "Storyboard & shotlist terstruktur siap ekspor ke tools otomatisasi: "
-            "**flow-agent**, **AutoFlowCut**, **gflow-cli**, atau **veo-mcp**."
+            "Storyboard & shotlist terstruktur siap ekspor ke generator video AI favorit Anda "
+            "(Kling AI, Runway Gen-3, Luma Dream Machine, Sora, Haiper, CapCut AI, dsb.)."
         )
 
         f_col1, f_col2 = st.columns([2, 1])
@@ -768,20 +768,20 @@ if keyword_input:
             ):
                 sc_c1, sc_c2 = st.columns([3, 2])
                 with sc_c1:
-                    st.markdown("**Prompt Visual (Google Flow / Veo):**")
+                    st.markdown("**Prompt Visual AI Video (Siap Generate):**")
                     st.code(sc["flow_prompt"], language="text")
                     st.caption(f"🎥 Pergerakan Kamera: *{sc['camera_motion']}*")
                 with sc_c2:
-                    st.markdown("**🎙️ Naskah Narasi / Audio (ElevenLabs / Voiceover):**")
+                    st.markdown("**🎙️ Naskah Narasi / Audio (Voiceover / TTS):**")
                     st.info(f'"{sc["audio_script"]}"')
 
         st.markdown("---")
-        st.markdown("### 🚀 Ekspor Siap Pakai untuk Ekosistem Tools Video AI:")
+        st.markdown("### 🚀 Ekspor Siap Pakai untuk Generator Video AI:")
 
         e1, e2 = st.columns(2)
         with e1:
-            st.markdown("##### 1️⃣ Format Batch `prompts.txt` (untuk `flow-agent` / `gflow-cli`):")
-            st.caption("1 baris per scene video. Langsung copy atau download file txt.")
+            st.markdown("##### 1️⃣ Format Batch `prompts.txt` (Universal AI Video Generators):")
+            st.caption("1 baris per scene video. Langsung salin atau unduh untuk batch generate di tool video AI pilihan Anda.")
             st.text_area(
                 "Batch Prompts TXT:",
                 value=flow_shotlist["flow_batch_prompts_txt"],
@@ -791,27 +791,25 @@ if keyword_input:
             st.download_button(
                 "💾 Download prompts.txt",
                 data=flow_shotlist["flow_batch_prompts_txt"],
-                file_name=f"flow_prompts_{keyword_input.replace(' ', '_').lower()}.txt",
+                file_name=f"prompts_{keyword_input.replace(' ', '_').lower()}.txt",
                 mime="text/plain",
             )
-            st.caption("Perintah di terminal: `flow batch prompts.txt --type video`")
+            st.caption("Kompatibel dengan semua platform text-to-video / image-to-video.")
 
         with e2:
-            st.markdown("##### 2️⃣ Manifest JSON (untuk `AutoFlowCut` / CapCut & Premiere):")
-            st.caption("Import ke AutoFlowCut untuk generate visual lalu ekspor 1-klik ke CapCut.")
+            st.markdown("##### 2️⃣ Manifest JSON (untuk CapCut & Premiere Timeline):")
+            st.caption("Impor manifest ke timeline editor (CapCut / Premiere) untuk menyinkronkan visual dengan naskah audio narasi.")
             st.json(flow_shotlist["autoflowcut_manifest"], expanded=False)
 
-        with st.expander("🛠️ Panduan Integrasi Tools AI Video Rekomendasi:"):
+        with st.expander("🛠️ Panduan Eksekusi Pembuatan Video AI:"):
             st.markdown(
                 """
-                - **Flow-Agent (Autonomous Video Creator)**:
-                  Menggunakan sesi login Google Flow yang sudah aktif di Chrome via extension. Tidak butuh API key, mendukung batch 16 klip sekaligus & upscaler 1080p/4K gratis.
-                - **AutoFlowCut (Timeline Synchronizer)**:
-                  Aplikasi desktop Electron yang menggabungkan Google Flow/Veo dengan CapCut/Premiere. Impor prompt dari tools ini, visual digenerate, langsung masuk timeline CapCut lengkap dengan subtitle & timeline audio!
-                - **Veo MCP Studio**:
-                  MCP server resmi untuk Veo 3.1 via Google AI Studio API token-efficient.
-                - **GFlow CLI (Scene Chaining Automation)**:
-                  CLI Python untuk scene chaining & pembuatan video multi-scene yang konsisten di Google Flow.
+                - **Generator Visual Video AI (Kling, Runway, Luma, Sora, CapCut AI)**:
+                  Gunakan prompt sinematik di atas untuk menghasilkan klip visual berdurasi 4–6 detik per scene dengan pencahayaan dan pergerakan kamera dinamis.
+                - **Voiceover Narasi (ElevenLabs / TTS)**:
+                  Gunakan naskah audio pada tiap scene untuk menghasilkan suara narator yang natural dan ekspresif.
+                - **Editing & Timeline (CapCut / Premiere)**:
+                  Gabungkan klip visual dan audio narasi, lalu tambahkan kinetic subtitle dan musik latar lofi / ambient.
                 """
             )
 

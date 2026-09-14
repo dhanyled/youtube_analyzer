@@ -684,14 +684,14 @@ class SearchIntelligence:
             verdict = "👤 Human Dominant (100% video saat ini dibuat konvensional)"
             feasibility = (
                 "Peluang emas first-mover! Anda bisa menyajikan konten berkualitas tinggi "
-                "menggunakan Google Flow/Veo dengan kecepatan produksi 5x lebih cepat."
+                "menggunakan Generator Video AI modern (Kling, Runway, Luma, Sora) dengan kecepatan produksi 5x lebih cepat."
             )
 
         best_practices = [
             "1. Centang Wajib Disclosure: Selalu beri tanda 'Altered or synthetic content' saat upload di YouTube Studio agar bebas resiko penalti.",
             "2. Hook 3 Detik Pertama: Algoritma YouTube memprioritaskan Watch Time & Retention, bukan menghukum label AI. Pastikan visual pembuka langsung to-the-point.",
-            "3. Pacing B-Roll Cepat: Gunakan klip video Google Flow berdurasi 4-6 detik per scene agar penonton tidak bosan.",
-            "4. Expressive Audio: Gabungkan visual Google Flow dengan voiceover bernada emosional (ElevenLabs / human voice), hindari suara robotik flat.",
+            "3. Pacing B-Roll Cepat: Gunakan klip video AI berdurasi 4-6 detik per scene agar ritme visual tetap dinamis.",
+            "4. Expressive Audio: Gabungkan visual video AI dengan voiceover bernada emosional (ElevenLabs / human voice), hindari suara robotik flat.",
             "5. Hindari Mass Low-Effort Spam: YouTube memblokir monetisasi video 'reused/programmatic spam' yang tidak memiliki nilai tambah.",
         ]
 
@@ -713,11 +713,11 @@ class SearchIntelligence:
         num_scenes: int = 5,
     ) -> dict[str, Any]:
         """
-        Generate a production-ready Google Flow (Imagen 4 + Veo 3.1) Storyboard & Shotlist.
+        Generate a production-ready AI Video Storyboard & Shotlist (Kling, Runway, Luma, Sora, CapCut).
         Compatible with:
-        - flow-agent / gflow-cli (prompts.txt batch format)
-        - AutoFlowCut (CapCut / Premiere scene JSON)
-        - veo-mcp (Direct Veo 3.1 API payload)
+        - prompts.txt batch format (Universal Video AI tools)
+        - Timeline manifest JSON (CapCut / Premiere scene JSON)
+        - Direct Video Gen API payload
         """
         clean = seed.strip().title()
         aspect = "16:9" if format_type.upper() == "LANDSCAPE" else "9:16"
@@ -834,19 +834,19 @@ class SearchIntelligence:
             },
             "recommended_tools": [
                 {
-                    "tool": "kodelyx/flow-agent",
-                    "command": f"flow batch flow_prompts_{clean.replace(' ', '_').lower()}.txt --type video --aspect {aspect_name}",
-                    "best_for": "Akun Google Flow gratis/berlangganan via Chrome extension bridge.",
+                    "tool": "Universal AI Video Generators",
+                    "command": "Kling AI, Runway Gen-3, Luma Dream Machine, OpenAI Sora, Haiper AI",
+                    "best_for": "Render klip visual realistis dan sinematik per scene.",
                 },
                 {
-                    "tool": "AutoFlowCut",
-                    "command": "Import manifest JSON -> Auto-generate visuals -> Export 1-klik ke CapCut / Premiere Pro",
-                    "best_for": "Editing cepat langsung ke timeline video editor (CapCut/Premiere).",
+                    "tool": "CapCut & Premiere Pro",
+                    "command": "Import manifest JSON / susun klip visual + voiceover naskah di timeline editor",
+                    "best_for": "Editing cepat, kinetic subtitle, dan audio sync otomatis.",
                 },
                 {
-                    "tool": "veo-mcp",
+                    "tool": "Direct Video Gen API",
                     "command": "start_batch_video_generation(jobs, concurrency=2)",
-                    "best_for": "Direct Google AI Studio API via MCP agent.",
+                    "best_for": "Eksekusi otomatis batch text-to-video melalui integrasi API / MCP agent.",
                 },
             ],
         }
@@ -1058,7 +1058,7 @@ class SearchIntelligence:
         elif score >= 70:
             tier = "🟡 CUKUP IDEAL (DENGAN B-ROLL BERKUALITAS)"
             verdict = (
-                "Dapat dijalankan tanpa wajah dengan dukungan B-roll Google Flow / Veo 3.1 "
+                "Dapat dijalankan tanpa wajah dengan dukungan klip visual Generator Video AI modern "
                 "dan voiceover AI alami (ElevenLabs)."
             )
         else:
@@ -1075,8 +1075,8 @@ class SearchIntelligence:
                 f"1. Riset Keyword & Outlier: Temukan topik bervolume tinggi di {clean}.",
                 "2. Scripting: Buat naskah hook 3 detik dengan Claude / Gemini.",
                 "3. Voiceover: Gunakan ElevenLabs suara natural bahasa Indonesia / English.",
-                "4. Visual B-Roll: Generate scene visual menggunakan Google Flow (Imagen 4 + Veo 3.1).",
-                "5. Assembly: Ekspor manifest ke AutoFlowCut / CapCut untuk sync otomatis.",
+                "4. Visual B-Roll: Generate scene visual menggunakan Generator Video AI (Kling, Runway, Luma, Sora).",
+                "5. Assembly: Gabungkan klip visual dan naskah audio di CapCut / Premiere untuk sync otomatis.",
             ],
         }
 

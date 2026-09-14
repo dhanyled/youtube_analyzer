@@ -58,7 +58,7 @@ When connected to Claude, Gemini, or Antigravity via Model Context Protocol:
 8. **`compare_google_vs_youtube_trends(keyword)`**:
    Compares relative search velocity on Google Web Search vs YouTube Search.
 9. **`generate_flow_shotlist(seed_keyword, format_type, num_scenes)`**:
-   Generates a scene-by-scene storyboard and prompt batch for Google Flow (Imagen 4 + Veo 3.1) with camera motions, durations, and audio scripts. Exports ready-to-run manifests for `flow-agent`, `AutoFlowCut`, and `veo-mcp`.
+   Generates a scene-by-scene storyboard and prompt batch for AI Video Generators (Kling, Runway, Luma, Sora) with camera motions, durations, and audio scripts. Exports ready-to-run manifests for universal video tools, CapCut, and Premiere Pro.
 
 ---
 
@@ -75,11 +75,13 @@ run.bat
 Visit `http://localhost:8501` to access:
 * **Strategic Verdict Card**: Executive decision (Opportunity Score, AI Adoption Ratio in SERP, Estimated RPM, Landscape vs Shorts verdict).
 * **Tab 1: 🕵️‍♂️ Intip Kompetitor & Label AI**: Live competitor spy with YouTube Altered/Synthetic content badge detection and best practice compliance rules.
-* **Tab 2: 🎬 Google Flow & Veo Studio**: Scene-by-scene AI video storyboard generator, copyable `prompts.txt` batch for `flow-agent` / `gflow-cli`, and CapCut manifest for `AutoFlowCut`.
-* **Tab 3: 📺 Rencana Video Landscape**: 16:9 Long-form blueprint, psychological hook formula, and chapter breakdown for maximum retention.
-* **Tab 4: 📱 Rencana Video Shorts**: 9:16 vertical hook, 45-second retention script, and Related Video funnel strategy.
-* **Tab 5: 🌐 Cross-Surface Intent Matrix**: Google vs YouTube vs AI query mapping.
-* **Tab 6: 📈 Realtime Trends Comparison**: Google vs YouTube momentum graph.
+* **Tab 2: 🔥 YouTube Trending Feed**: Trending videos feed by geography and category with outlier breakout detection.
+* **Tab 3: 🔬 YouTube Studio & Content Gap**: Content gap opportunity detector and search autocomplete expansion.
+* **Tab 4: 🎬 Studio Storyboard Video AI**: Scene-by-scene AI video storyboard generator, copyable `prompts.txt` batch for universal video AI generators, and timeline manifest for CapCut & Premiere.
+* **Tab 5: 📺 Rencana Video Landscape**: 16:9 Long-form blueprint, psychological hook formula, and chapter breakdown for maximum retention.
+* **Tab 6: 📱 Rencana Video Shorts**: 9:16 vertical hook, 45-second retention script, and Related Video funnel strategy.
+* **Tab 7: 🌐 Cross-Surface Intent Matrix**: Google vs YouTube vs AI query mapping.
+* **Tab 8: 📈 Tren Google vs YouTube**: Realtime momentum comparison, Interest by Region, and up to 50 Top & Rising search queries.
 
 ### Prerequisites
 * Python 3.12+

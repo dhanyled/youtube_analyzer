@@ -452,14 +452,52 @@ if keyword_input:
             for bp in ai_presence["best_practices"]:
                 st.markdown(f"- {bp}")
 
+        # Competitor #1 Title Gap Analysis Card
+        if outranking_plan.get("competitor_analysis") and top_comp:
+            comp_ana = outranking_plan["competitor_analysis"]
+            with st.expander(
+                "🎯 Bedah Celah Judul Video #1 & Strategi Tandingan Kita:", expanded=True
+            ):
+                c_gap1, c_gap2 = st.columns(2)
+                with c_gap1:
+                    st.markdown(f"**⚠️ Celah Judul Kompetitor:**  \n{comp_ana.get('weakness', '')}")
+                with c_gap2:
+                    st.markdown(
+                        f"**💡 Strategi Tandingan Kita:**  \n{comp_ana.get('counter_strategy', '')}"
+                    )
+
         st.markdown("#### 🎯 Formula Judul Tandingan untuk Mengalahkan Video #1:")
         st.info(f"👉 **{outranking_plan['outranking_title']}**")
         if outranking_plan.get("title_formula"):
             st.caption(f"📐 {outranking_plan['title_formula']}")
 
-        st.markdown("##### Alternatif Variasi Judul:")
-        for alt in outranking_plan["alternative_titles"]:
-            st.code(alt, language="text")
+        st.markdown("##### 🎭 Alternatif Variasi Judul Berdasarkan 4 Sudut Psikologi Penonton:")
+        if outranking_plan.get("psychological_angles"):
+            p_angles = outranking_plan["psychological_angles"]
+            a_col1, a_col2 = st.columns(2)
+            with a_col1:
+                curiosity = p_angles.get("curiosity_gap", {})
+                st.markdown(f"**{curiosity.get('label', '🔍 Curiosity Gap')}**")
+                st.code(curiosity.get("title", ""), language="text")
+                st.caption(curiosity.get("rationale", ""))
+
+                contrarian = p_angles.get("contrarian", {})
+                st.markdown(f"**{contrarian.get('label', '🤯 Mitos vs Fakta')}**")
+                st.code(contrarian.get("title", ""), language="text")
+                st.caption(contrarian.get("rationale", ""))
+            with a_col2:
+                stakes = p_angles.get("high_stakes", {})
+                st.markdown(f"**{stakes.get('label', '⚡ High-Stakes / Kronologi')}**")
+                st.code(stakes.get("title", ""), language="text")
+                st.caption(stakes.get("rationale", ""))
+
+                deep = p_angles.get("deep_dive", {})
+                st.markdown(f"**{deep.get('label', '📚 Deep Dive')}**")
+                st.code(deep.get("title", ""), language="text")
+                st.caption(deep.get("rationale", ""))
+        else:
+            for alt in outranking_plan["alternative_titles"]:
+                st.code(alt, language="text")
 
         st.markdown("#### 📝 Deskripsi SEO Siap Pakai (Dilengkapi Timestamps & Hashtags):")
         st.caption(

@@ -931,6 +931,111 @@ class SearchIntelligence:
             ]
 
     @classmethod
+    def analyze_competitor_packaging(cls, comp_title: str, seed: str, niche: str) -> dict[str, Any]:
+        """
+        Deconstructs Competitor #1's title and packaging to find actionable weaknesses and counter-angles.
+        Identifies whether the competitor uses clickbait/ALL-CAPS, listicles, questions, generic phrasing, etc.
+        """
+        title_clean = (comp_title or "").strip()
+        lowered = title_clean.lower()
+        words = title_clean.split()
+
+        # Check shouting / caps
+        caps_words = [w for w in words if len(w) > 2 and w.isupper() and w.isalpha()]
+        is_shouting = len(caps_words) >= 2 or (
+            len(words) > 0 and len(caps_words) / len(words) >= 0.35
+        )
+
+        # Check listicle numbers
+        has_number = any(w.isdigit() or any(c.isdigit() for c in w) for w in words)
+
+        # Check question
+        is_question = "?" in title_clean or any(
+            q in lowered for q in ["kenapa", "mengapa", "apakah", "bagaimana", "benarkah"]
+        )
+
+        # Check clickbait / sensational buzzwords
+        has_clickbait = any(
+            b in lowered
+            for b in [
+                "viral",
+                "meledak",
+                "parah",
+                "kaget",
+                "ngeri",
+                "terkejut",
+                "syok",
+                "dahsyat",
+                "gila",
+                "bikin merinding",
+            ]
+        )
+
+        # Check generic / saturated words
+        has_generic = any(
+            g in lowered
+            for g in [
+                "lengkap",
+                "terlengkap",
+                "terbaru",
+                "enak",
+                "mudah",
+                "pemula",
+                "part 1",
+                "eps",
+                "episode",
+            ]
+        )
+
+        # Check if title has year
+        has_year = any(y in lowered for y in ["2020", "2021", "2022", "2023", "2024", "2025"])
+
+        if is_shouting or has_clickbait:
+            weakness = (
+                f"Judul kompetitor menggunakan gaya heboh/sensasional ('{caps_words[0] if caps_words else 'HURUF BESAR'}') "
+                "yang rentan memicu skeptisisme penonton dan sering diabaikan audiens yang mencari substansi mendalam."
+            )
+            counter_strategy = (
+                "Lawan dengan kredibilitas dan alur naratif tenang tapi memikat: sajikan fakta konkret, "
+                "kronologi autentik, atau penjelasan ilmiah mendalam yang tidak terkesan murahan."
+            )
+            dominant_angle = "investigative_proof"
+        elif has_year:
+            weakness = "Judul kompetitor memuat tahun lama yang membuat penonton merasa informasinya berpotensi usang."
+            counter_strategy = "Tawarkan perspektif terkini, temuan arsip terbaru, atau pendekatan modern tanpa menyematkan tahun secara kaku."
+            dominant_angle = "fresh_perspective"
+        elif has_number:
+            weakness = "Kompetitor memakai format listicle poin-poin terpisah yang cenderung dangkal dan cepat membosankan."
+            counter_strategy = (
+                "Gunakan alur cerita utuh (narrative arc) kronologis detik-demi-detik atau studi kasus mendalam "
+                "yang membuat penonton penasaran menonton dari awal hingga akhir."
+            )
+            dominant_angle = "narrative_chronology"
+        elif is_question:
+            weakness = "Kompetitor hanya melempar pertanyaan menggantung tanpa memberikan sinyal jawaban berbobot di judul."
+            counter_strategy = "Berikan hook jawaban tegas yang mengejutkan atau konsekuensi nyata yang belum diketahui publik."
+            dominant_angle = "curiosity_gap"
+        elif has_generic:
+            weakness = "Judul kompetitor menggunakan klaim generik yang sudah terlalu sering dipakai ribuan video lain di YouTube."
+            counter_strategy = "Tawarkan spesifisitas tinggi: rincian angka biaya nyata, 1 trik paling krusial, atau rahasia yang tidak dibahas video umum."
+            dominant_angle = "unique_specificity"
+        else:
+            weakness = "Judul kompetitor cenderung datar dan minim 'curiosity gap' atau emosi yang memicu klik spontan."
+            counter_strategy = "Eksploitasi celah rasa penasaran penonton dengan mengungkap misteri tersembunyi atau fakta kontrarian."
+            dominant_angle = "contrarian_mystery"
+
+        return {
+            "title": title_clean or "Belum ada kompetitor terdeteksi",
+            "weakness": weakness,
+            "counter_strategy": counter_strategy,
+            "dominant_angle": dominant_angle,
+            "is_shouting": is_shouting,
+            "has_number": has_number,
+            "is_question": is_question,
+            "has_year": has_year,
+        }
+
+    @classmethod
     def generate_outranking_plan(
         cls,
         seed: str,
@@ -951,9 +1056,11 @@ class SearchIntelligence:
 
         niche = cls.detect_content_niche(seed)
         clean_tag = "".join(clean.split())
+        seed_mod = sum(ord(c) for c in clean) % 2
+
+        comp_analysis = cls.analyze_competitor_packaging(comp_title, seed, niche)
 
         if niche == "documentary":
-            # Detect documentary sub-type: disaster/history vs science/space
             lowered_seed = seed.strip().lower()
             is_science = any(
                 k in lowered_seed
@@ -981,16 +1088,44 @@ class SearchIntelligence:
                     "hutan",
                     "laut dalam",
                     "sains",
+                    "kosmik",
+                    "bumi",
+                    "antartika",
                 ]
             )
             if is_science:
-                title_formula = "Pola: [Fakta Mengejutkan / Misteri Ilmiah] + [Subjek Sains] + [Penjelasan Mendalam]"
-                outranking_title = f"Fakta Mengejutkan tentang {clean} yang Jarang Diketahui (Penjelasan Ilmiah Lengkap)"
-                alternative_titles = [
-                    f"Misteri {clean} yang Belum Terpecahkan oleh Para Ilmuwan",
-                    f"Apa yang Sebenarnya Tersembunyi di {clean}? Penjelasan Sains Terlengkap",
-                    f"Ilmuwan Terkejut: Temuan Terbaru Tentang {clean} yang Mengubah Segalanya",
-                ]
+                angle_curiosity = (
+                    f"Ada yang Tersembunyi di Bawah Permukaan {clean}: Misteri yang Belum Terpecahkan"
+                    if seed_mod == 0
+                    else f"Misteri {clean} yang Masih Membingungkan Para Ilmuwan Dunia"
+                )
+                angle_stakes = (
+                    f"Bisakah Manusia Bertahan di {clean}? Fakta Ekstrem yang Jarang Diungkap ke Publik"
+                    if seed_mod == 0
+                    else f"Detik-Detik Penemuan Terbesar di {clean} yang Mengubah Pemahaman Sains"
+                )
+                angle_contrarian = (
+                    f"Bukan Sekadar {clean}: Temuan Baru yang Membantah Teori Populer Selama Ini"
+                    if seed_mod == 0
+                    else f"Semua Orang Salah Mengira Tentang {clean} Sampai Data Baru Ini Terungkap..."
+                )
+                angle_deep = (
+                    f"Misteri & Sains di Balik {clean}: Penjelasan Lengkap dari Asal Usul hingga Masa Depan"
+                    if seed_mod == 0
+                    else f"Eksplorasi Ilmiah {clean}: Fakta Menakjubkan yang Mengubah Cara Pandang Kita"
+                )
+
+                if comp_analysis["dominant_angle"] in [
+                    "investigative_proof",
+                    "narrative_chronology",
+                ]:
+                    outranking_title = angle_deep
+                elif comp_analysis["dominant_angle"] == "curiosity_gap":
+                    outranking_title = angle_contrarian
+                else:
+                    outranking_title = f"Mengapa Ilmuwan Begitu Terobsesi dengan {clean}? Fakta Mengejutkan yang Mengubah Teori"
+
+                title_formula = "Pola Counter-Positioning: [Pertanyaan Paradoks Sains] + [Subjek Inti] + [Temuan Baru yang Mengubah Sudut Pandang]"
                 two_line_hook = (
                     f"Seberapa banyak yang kamu tahu tentang {clean}? "
                     f"Di video ini kita bedah fakta ilmiah terkini, misteri yang belum terpecahkan, dan temuan yang bikin tercengang!"
@@ -1008,27 +1143,42 @@ class SearchIntelligence:
                     "#IlmuPengetahuan",
                     "#FaktaMenarik",
                 ]
-                shorts_package = {
-                    "title": f"Fakta Mengejutkan tentang {clean} yang Jarang Dibahas! #shorts",
-                    "three_second_hook": f"Tahukah kamu fakta ilmiah tentang {clean} ini? Hampir semua orang salah sangka!",
-                    "script_structure": [
-                        "00-03s: Hook pertanyaan atau fakta mengejutkan",
-                        "03-30s: Ungkap 1 fakta ilmiah paling mengejutkan",
-                        "30-45s: Ajakan tonton penjelasan lengkap di video utama",
-                    ],
-                    "target_metric": "Viewed vs Swiped Away > 75%",
-                }
             else:
-                title_formula = "Pola: [Detik-Detik / Kisah Nyata] + [Subjek Peristiwa] + [Dampak Nyata] + [Format Dokumenter]"
-                outranking_title = f"Kisah Nyata {clean}: Fakta & Dampak yang Mengguncang Sejarah (Dokumenter Lengkap)"
-                alternative_titles = [
-                    f"Misteri & Fakta Mengejutkan di Balik {clean} yang Jarang Terungkap",
-                    f"Kronologi Lengkap {clean}: Apa yang Sebenarnya Terjadi?",
-                    f"{clean}: Dampak Dahsyat yang Mengubah Dunia Selamanya",
-                ]
+                angle_curiosity = (
+                    f"Apa yang Sebenarnya Terjadi Sebelum {clean}? Arsip Kuno yang Jarang Diungkap"
+                    if seed_mod == 0
+                    else f"Misteri Tersembunyi di Balik {clean} yang Tidak Dicatat Buku Sejarah Umum"
+                )
+                angle_stakes = (
+                    f"Detik-Detik Mencekam {clean}: Kronologi Peristiwa yang Mengubah Sejarah Selamanya"
+                    if seed_mod == 0
+                    else f"Kronologi Menit Demi Menit {clean}: Apa yang Sebenarnya Dialami Korban?"
+                )
+                angle_contrarian = (
+                    f"Bukan Cuma Tragedi Biasa: Ini Alasan Kenapa {clean} Menjadi Titik Balik Dunia"
+                    if seed_mod == 0
+                    else f"Banyak yang Salah Paham Soal {clean}, Ini Fakta Sejarah yang Sebenarnya Terjadi"
+                )
+                angle_deep = (
+                    f"{clean}: Rekonstruksi Sejarah Lengkap & Dampak Nyata yang Mengguncang Peradaban"
+                    if seed_mod == 0
+                    else f"Dokumenter Utuh {clean}: Dari Tanda-Tanda Awal Hingga Dampak Globalnya"
+                )
+
+                if (
+                    comp_analysis["is_shouting"]
+                    or comp_analysis["dominant_angle"] == "investigative_proof"
+                ):
+                    outranking_title = angle_stakes
+                elif comp_analysis["dominant_angle"] == "narrative_chronology":
+                    outranking_title = angle_deep
+                else:
+                    outranking_title = f"Detik-Detik Menegangkan {clean}: Fakta & Kronologi Sejarah yang Mengubah Dunia"
+
+                title_formula = "Pola Counter-Positioning: [Emosi High-Stakes / Detik-Detik] + [Subjek Peristiwa] + [Dampak Bersejarah]"
                 two_line_hook = (
-                    f"Pernahkah kamu membayangkan betapa dahsyatnya {clean}? "
-                    f"Di video ini kita bedah kronologi lengkap, arsip sejarah, dan fakta mengejutkan yang jarang dibahas!"
+                    f"Pernahkah kamu membayangkan betapa dahsyatnya peristiwa {clean}? "
+                    f"Di video ini kita bedah kronologi lengkap, arsip sejarah autentik, dan fakta mengejutkan yang jarang dibahas!"
                 )
                 timestamps = [
                     "00:00 - Kilas Balik Awal Peristiwa",
@@ -1043,30 +1193,47 @@ class SearchIntelligence:
                     "#DokumenterDunia",
                     "#FaktaMenarik",
                 ]
-                shorts_package = {
-                    "title": f"Fakta Mengerikan tentang {clean} yang Bikin Merinding! #shorts",
-                    "three_second_hook": f"Ini fakta tersembunyi tentang {clean} yang tidak pernah diajarkan di sekolah!",
-                    "script_structure": [
-                        "00-03s: Hook visual kilas peristiwa bersejarah",
-                        "03-30s: Ungkap 1 fakta sejarah paling mengejutkan",
-                        "30-45s: Ajakan tonton dokumenter lengkapnya",
-                    ],
-                    "target_metric": "Viewed vs Swiped Away > 75%",
-                }
+
+            shorts_package = {
+                "title": f"Fakta Mengerikan tentang {clean} yang Bikin Merinding! #shorts",
+                "three_second_hook": f"Ini fakta tersembunyi tentang {clean} yang tidak pernah diajarkan di sekolah!",
+                "script_structure": [
+                    "00-03s: Hook visual kilas peristiwa bersejarah",
+                    "03-30s: Ungkap 1 fakta sejarah paling mengejutkan",
+                    "30-45s: Ajakan tonton dokumenter lengkapnya",
+                ],
+                "target_metric": "Viewed vs Swiped Away > 75%",
+            }
         elif niche == "culinary":
-            title_formula = "Pola: [Resep Otentik] + [Subjek Masakan] + [Karakter Rasa] + [Anti Gagal untuk Pemula]"
-            # Avoid double-prefix if keyword already starts with "resep"
             clean_food = clean
             for prefix in ["Resep ", "Cara Masak ", "Cara Membuat ", "Bumbu "]:
                 if clean.lower().startswith(prefix.lower()):
                     clean_food = clean[len(prefix) :].strip()
                     break
-            outranking_title = f"Resep {clean_food} Gurih & Lembut (Anti Gagal untuk Pemula)"
-            alternative_titles = [
-                f"Rahasia Bumbu {clean_food} Rasa Bintang 5 dengan Bahan Rumahan",
-                f"Cara Membuat {clean_food} Praktis & Cepat: Wangi Menggugah Selera",
-                f"Eksperimen Resep {clean_food} Paling Enak: Jangan Lakukan 3 Kesalahan Ini!",
-            ]
+
+            angle_curiosity = (
+                f"Ternyata Ini Rahasia Pedagang Bikin {clean_food} Gurih Nendang Tanpa Banyak Penyedap"
+                if seed_mod == 0
+                else f"1 Bumbu Rahasia yang Bikin {clean_food} Buatanmu Seenak Restoran Bintang 5"
+            )
+            angle_stakes = (
+                f"Resep {clean_food} Praktis: Takaran Bumbu Pas & Cara Masak Biar Daging Super Empuk"
+                if seed_mod == 0
+                else f"Cara Bikin {clean_food} Gurih Meresap Sampai ke Tulang: Langkah demi Langkah"
+            )
+            angle_contrarian = (
+                f"Jangan Masukkan Bahan Ini Saat Masak {clean_food}! Bikin Aroma dan Rasa Berubah Langu"
+                if seed_mod == 0
+                else f"Kesalahan Fatal yang Sering Dilakukan Saat Bikin {clean_food} (Dan Cara Memperbaikinya)"
+            )
+            angle_deep = (
+                f"{clean_food} Otentik Rumahan: Panduan Lengkap Bumbu Rempah & Tips Kuah Tidak Cepat Basi"
+                if seed_mod == 0
+                else f"Resep Komplit {clean_food} Tradisional: Tekstur Pas, Bumbu Medok & Wangi Menggoda"
+            )
+
+            outranking_title = f"Rahasia Bumbu {clean_food} Gurih Meresap: 1 Trik Menumis Biar Gak Langu & Anti Gagal"
+            title_formula = "Pola Counter-Positioning: [Solusi Masalah Rasa/Tekstur] + [Subjek Masakan] + [Trik Spesifik yang Membedakan]"
             two_line_hook = (
                 f"Mau bikin {clean} yang lezat, bumbunya meresap sempurna, dan anti gagal? "
                 f"Simak panduan takaran dan rahasia bumbunya di video ini!"
@@ -1090,15 +1257,41 @@ class SearchIntelligence:
                 "target_metric": "Viewed vs Swiped Away > 75%",
             }
         elif niche == "travel":
-            title_formula = "Pola: [Panduan Eksplorasi] + [Destinasi Wisata] + [Hidden Gem / Spot Terbaik] + [Rute & Budget]"
-            outranking_title = (
-                f"Panduan Lengkap Wisata {clean}: Rute, Biaya, & Hidden Gems Terindah"
+            clean_dest = clean
+            for prefix in [
+                "Wisata ",
+                "Liburan Ke ",
+                "Liburan ",
+                "Tempat Wisata ",
+                "Jalan Jalan Ke ",
+            ]:
+                if clean.lower().startswith(prefix.lower()):
+                    clean_dest = clean[len(prefix) :].strip()
+                    break
+
+            angle_curiosity = (
+                f"Spot Tersembunyi di {clean_dest} yang Jarang Diketahui Turis Biasa"
+                if seed_mod == 0
+                else f"Hidden Gem di {clean_dest} yang Pemandangannya Jauh Lebih Indah dari Tempat Viral"
             )
-            alternative_titles = [
-                f"Eksplorasi {clean} Seharian: Tips Liburan Hemat & Spot Foto Viral",
-                f"Jangan Pergi ke {clean} Sebelum Tahu 5 Hal Penting Ini! (Review Jujur)",
-                f"Itinerary Liburan ke {clean} Paling Nyaman & Bebas Ribet",
-            ]
+            angle_stakes = (
+                f"Cara Liburan ke {clean_dest} Hemat Budget: Tips Pilih Transportasi & Penginapan Nyaman"
+                if seed_mod == 0
+                else f"Eksplorasi {clean_dest} Seharian: Rute Tercepat, Biaya Riil, & Spot Foto Paling Keren"
+            )
+            angle_contrarian = (
+                f"Jangan Pergi ke {clean_dest} Sebelum Tahu 5 Hal Krusial Ini (Review Pengalaman Nyata)"
+                if seed_mod == 0
+                else f"Ekspektasi vs Realita Liburan ke {clean_dest}: Tips Biar Gak Kena Zonk atau Boncos"
+            )
+            angle_deep = (
+                f"Itinerary Lengkap {clean_dest}: Panduan Rute, Rincian Biaya, & Tips Penting Terlengkap"
+                if seed_mod == 0
+                else f"Panduan Jujur Liburan ke {clean_dest}: Estimasi Budget Nyata & Rekomendasi Tempat Terbaik"
+            )
+
+            outranking_title = f"Panduan Jujur Liburan ke {clean_dest}: Rincian Biaya Nyata, Rute Terbaik & Spot Hidden Gem"
+            title_formula = "Pola Counter-Positioning: [Transparansi Biaya & Rute] + [Destinasi] + [Keuntungan Nilai Nyata Bagi Traveler]"
             two_line_hook = (
                 f"Rencana liburan ke {clean}? Tonton panduan lengkap rute terbaik, "
                 f"estimasi budget, dan rekomendasi spot tersembunyi yang wajib kamu kunjungi!"
@@ -1121,76 +1314,36 @@ class SearchIntelligence:
                 ],
                 "target_metric": "Viewed vs Swiped Away > 75%",
             }
-        elif niche == "entertainment":
-            title_formula = "Pola: [Bedah Cerita / Misteri] + [Subjek Film/Tokoh] + [Plot Twist / Teori Tersembunyi]"
-            outranking_title = (
-                f"Bedah Cerita & Misteri {clean}: Teori Tersembunyi yang Bikin Merinding"
-            )
-            alternative_titles = [
-                f"Alur Cerita Lengkap {clean} yang Belum Pernah Dijelaskan Gamblang",
-                f"Fakta Menarik & Rahasia di Balik {clean} yang Jarang Diketahui",
-                f"Penjelasan Ending & Makna Tersirat dari {clean} (Analisis Mendalam)",
-            ]
-            two_line_hook = (
-                f"Ada banyak kejanggalan dan teori mengejutkan di balik {clean}. "
-                f"Di video ini kita kupas tuntas seluruh rahasia dan fakta tersembunyinya!"
-            )
-            timestamps = [
-                "00:00 - Pembuka & Sorotan Menarik",
-                f"02:00 - Latar Belakang & Pengenalan {clean}",
-                "06:30 - Momen Paling Krusial & Plot Twist",
-                "10:45 - Bedah Teori & Makna Tersembunyi",
-                "14:15 - Kesimpulan & Penjelasan Akhir",
-            ]
-            hashtags = [f"#{clean_tag}", f"#AlurCerita{clean_tag}", "#BedahFilm", "#PopCulture"]
-            shorts_package = {
-                "title": f"Fakta Gila Seputar {clean} yang Pasti Belum Kamu Tahu! #shorts",
-                "three_second_hook": f"Kamu gak bakal nyangka kalau ada detail segila ini di dalam {clean}!",
-                "script_structure": [
-                    "00-03s: Hook adegan atau detail mengejutkan",
-                    "03-30s: Ungkap teori atau fakta tersembunyi",
-                    "30-45s: Tonton bedah cerita lengkapnya di link terkait",
-                ],
-                "target_metric": "Viewed vs Swiped Away > 75%",
-            }
-        elif niche == "health_fitness":
-            title_formula = "Pola: [Solusi Medis/Alami] + [Masalah Tubuh/Kesehatan] + [Fakta Teruji & Tips Aman]"
-            outranking_title = f"Cara Alami Menjaga Tubuh dari {clean} Menurut Fakta Medis"
-            alternative_titles = [
-                f"5 Fakta Penting Seputar {clean} yang Wajib Kamu Ketahui Sejak Dini",
-                f"Panduan Mengatasi {clean} Secara Sehat & Aman (Penjelasan Ahli)",
-                f"Kebiasaan Sehari-Hari yang Berdampak pada {clean} dan Solusinya",
-            ]
-            two_line_hook = (
-                f"Khawatir soal {clean}? Simak penjelasan medis, cara pencegahan alami, "
-                f"dan tips menjaga tubuh tetap prima tanpa resiko!"
-            )
-            timestamps = [
-                "00:00 - Pemahaman Dasar Masalah",
-                f"02:15 - Penyebab Utama Terjadinya {clean}",
-                "06:00 - Cara Mengatasi & Pola Sehat",
-                "10:30 - Mitos vs Fakta Menurut Ahli",
-                "13:45 - Rangkuman Langkah Tindakan",
-            ]
-            hashtags = [f"#{clean_tag}", f"#Kesehatan{clean_tag}", "#HidupSehat", "#TipsMedis"]
-            shorts_package = {
-                "title": f"Stop Lakukan Ini Kalau Gak Mau Kena {clean}! #shorts",
-                "three_second_hook": f"Banyak orang belum sadar, 1 kebiasaan sepele ini bisa memicu {clean}!",
-                "script_structure": [
-                    "00-03s: Hook visual peringatan kesehatan",
-                    "03-30s: Jelaskan mekanisme ilmiah singkatnya",
-                    "30-45s: Tips pencegahan dan tonton video lengkapnya",
-                ],
-                "target_metric": "Viewed vs Swiped Away > 75%",
-            }
         elif niche == "business":
-            title_formula = "Pola: [Strategi / Studi Kasus] + [Model Bisnis/Iklan] + [Hasil Terbukti] + [Langkah Konkret]"
-            outranking_title = f"Strategi {clean} yang Terbukti Efektif: Panduan Lengkap dari Nol"
-            alternative_titles = [
-                f"Tutorial {clean} Step-by-Step: Langkah Tepat yang Langsung Bisa Dieksekusi",
-                f"Bongkar Pola Sukses {clean} yang Sering Dirahasiakan Para Praktisi",
-                f"Hindari 5 Kesalahan Fatal Ini Saat Memulai {clean}",
-            ]
+            clean_biz = clean
+            for prefix in ["Strategi ", "Cara ", "Panduan ", "Tips "]:
+                if clean.lower().startswith(prefix.lower()):
+                    clean_biz = clean[len(prefix) :].strip()
+                    break
+
+            angle_curiosity = (
+                f"Bongkar Rahasia {clean_biz}: Modal Terukur Tapi Menghasilkan Orderan & Omset Rutin"
+                if seed_mod == 0
+                else f"1 Strategi {clean_biz} yang Jarang Dibahas Mentor Bisnis: Fokus ke Konversi Nyata"
+            )
+            angle_stakes = (
+                f"Panduan Praktis {clean_biz} Step-by-Step: Alur Kerja yang Langsung Menghasilkan Pembeli"
+                if seed_mod == 0
+                else f"Cara Menjalankan {clean_biz} dari Nol Tanpa Takut Boncos: Eksekusi Cepat & Terarah"
+            )
+            angle_contrarian = (
+                f"Hentikan 3 Kebiasaan Ini Saat Memulai {clean_biz}, Cuma Bikin Modal Habis Percuma!"
+                if seed_mod == 0
+                else f"Banyak yang Gagal di {clean_biz} Gara-Gara 1 Kesalahan Fatal Ini (Evaluasi Bisnis)"
+            )
+            angle_deep = (
+                f"Studi Kasus Nyata {clean_biz}: Dari Nol Sampai Closing Pertama Tanpa Budget Berlebihan"
+                if seed_mod == 0
+                else f"Blueprint Lengkap {clean_biz}: Fondasi, Pengaturan Teknis, & Cara Skalasi Hasil"
+            )
+
+            outranking_title = f"Strategi {clean_biz} yang Terbukti Efektif: Cara Eksekusi Biar Gak Boncos & Menghasilkan Closing"
+            title_formula = "Pola Counter-Positioning: [Mitigasi Risiko Boncos] + [Model Bisnis/Topik] + [Fokus Hasil Konversi Nyata]"
             two_line_hook = (
                 f"Mau belajar {clean} dengan alur yang jelas tanpa buang-buang budget? "
                 f"Di video ini kita kupas strategi terbukti dari nol sampai menghasilkan!"
@@ -1214,23 +1367,35 @@ class SearchIntelligence:
                 "target_metric": "Viewed vs Swiped Away > 75%",
             }
         elif niche == "tech_tutorial":
-            title_formula = (
-                "Pola: [Tutorial Step-by-Step] + [Tool / Skill] + [Dari Nol Sampai Mahir]"
-            )
-            # Avoid double-prefix if keyword already starts with "tutorial"
             clean_tech = clean
-            for prefix in ["Tutorial ", "Cara ", "Panduan ", "Setting "]:
+            for prefix in ["Tutorial ", "Cara ", "Panduan ", "Belajar ", "Setting "]:
                 if clean.lower().startswith(prefix.lower()):
                     clean_tech = clean[len(prefix) :].strip()
                     break
-            outranking_title = (
-                f"Tutorial {clean_tech} Lengkap untuk Pemula (Panduan Cepat & Mudah Dipahami)"
+
+            angle_curiosity = (
+                f"1 Trik Praktik {clean_tech} Biar Cepat Paham dan Gak Terjebak Tutorial Hell"
+                if seed_mod == 0
+                else f"Shortcut & Fitur Tersembunyi di {clean_tech} yang Bakal Menghemat 80% Waktumu"
             )
-            alternative_titles = [
-                f"Cara Menguasai {clean_tech} dari Nol dalam Waktu Singkat",
-                f"Trik & Tips Praktis {clean_tech} yang Bakal Mempermudah Kerjamu",
-                f"Solusi Mengatasi Masalah Umum pada {clean_tech} (Step by Step)",
-            ]
+            angle_stakes = (
+                f"Alur Belajar {clean_tech} yang Masuk Akal: Dari Nol Sampai Bisa Buat Projek Mandiri"
+                if seed_mod == 0
+                else f"Tutorial Praktikal {clean_tech}: Materi Inti yang Benar-Benar Dipakai di Lapangan"
+            )
+            angle_contrarian = (
+                f"Jangan Pelajari Semua Hal Sekaligus! Ini 4 Fondasi Utama {clean_tech} yang Cukup Buat Mulai"
+                if seed_mod == 0
+                else f"Kesalahan Umum Saat Memakai {clean_tech} yang Sering Bikin Error dan Frustrasi"
+            )
+            angle_deep = (
+                f"Roadmap Terstruktur {clean_tech}: Panduan Langkah demi Langkah Paling Rapi untuk Pemula"
+                if seed_mod == 0
+                else f"Kuasai {clean_tech} Lebih Cepat: Penjelasan Konsep Inti & Solusi Masalah Umum"
+            )
+
+            outranking_title = f"Alur Belajar {clean_tech} yang Masuk Akal: Dari Dasar Sampai Bisa Bikin Projek Sendiri"
+            title_formula = "Pola Counter-Positioning: [Alur Praktis Tanpa Bertele-tele] + [Tool/Skill] + [Hasil Projek Nyata]"
             two_line_hook = (
                 f"Baru mau belajar {clean_tech}? Jangan bingung, video ini merangkum "
                 f"tutorial langkah demi langkah dari dasar sampai kamu mahir!"
@@ -1258,16 +1423,122 @@ class SearchIntelligence:
                 ],
                 "target_metric": "Viewed vs Swiped Away > 75%",
             }
-        else:
-            title_formula = "Pola: [Pertanyaan Memikat / Eksplorasi] + [Subjek Topik] + [Fakta & Penjelasan Berbobot]"
-            outranking_title = (
-                f"Semua yang Wajib Kamu Ketahui Tentang {clean} (Fakta & Penjelasan Lengkap)"
+        elif niche == "health_fitness":
+            angle_curiosity = (
+                f"Penyebab Sebenarnya {clean} yang Jarang Disadari (Bukan Cuma Pola Makan Biasa)"
+                if seed_mod == 0
+                else f"Fakta Medis {clean} yang Masih Sering Disalahartikan Banyak Orang"
             )
-            alternative_titles = [
-                f"Mengapa {clean} Sangat Menarik? Penjelasan Mudah & Berbobot",
-                f"Fakta Menakjubkan Seputar {clean} yang Jarang Dibahas Orang",
-                f"Panduan Memahami {clean} dari A Sampai Z Secara Rinci",
+            angle_stakes = (
+                f"Cara Alami Mengatasi {clean}: Langkah Sehat & Terukur Menurut Bukti Medis"
+                if seed_mod == 0
+                else f"Gejala Awal {clean} yang Sering Diabaikan: Kapan Harus Mulai Bertindak?"
+            )
+            angle_contrarian = (
+                f"Jangan Lakukan 3 Kebiasaan Ini Kalau Mau Bebas dari {clean}, Malah Memperparah Kondisi!"
+                if seed_mod == 0
+                else f"Mitos Seputar {clean} yang Harus Ditinggalkan: Ini Penjelasan Ilmiah Ahli"
+            )
+            angle_deep = (
+                f"Panduan Pola Hidup Sehat untuk {clean}: Nutrisi Alami, Olahraga Pas & Pencegahan Jangka Panjang"
+                if seed_mod == 0
+                else f"Bedah Tuntas {clean}: Mekanisme Tubuh, Pemicu Utama, & Solusi Medis Teruji"
+            )
+
+            outranking_title = f"Cara Alami Mengatasi {clean}: 3 Kebiasaan Sederhana yang Terbukti Efektif Menurut Fakta Medis"
+            title_formula = "Pola Counter-Positioning: [Solusi Sehat Bebas Risiko] + [Masalah Kesehatan] + [Landasan Fakta Medis Kredibel]"
+            two_line_hook = (
+                f"Khawatir soal {clean}? Simak penjelasan medis, cara pencegahan alami, "
+                f"dan tips menjaga tubuh tetap prima tanpa resiko!"
+            )
+            timestamps = [
+                "00:00 - Pemahaman Dasar Masalah",
+                f"02:15 - Penyebab Utama Terjadinya {clean}",
+                "06:00 - Cara Mengatasi & Pola Sehat",
+                "10:30 - Mitos vs Fakta Menurut Ahli",
+                "13:45 - Rangkuman Langkah Tindakan",
             ]
+            hashtags = [f"#{clean_tag}", f"#Kesehatan{clean_tag}", "#HidupSehat", "#TipsMedis"]
+            shorts_package = {
+                "title": f"Stop Lakukan Ini Kalau Gak Mau Kena {clean}! #shorts",
+                "three_second_hook": f"Banyak orang belum sadar, 1 kebiasaan sepele ini bisa memicu {clean}!",
+                "script_structure": [
+                    "00-03s: Hook visual peringatan kesehatan",
+                    "03-30s: Jelaskan mekanisme ilmiah singkatnya",
+                    "30-45s: Tips pencegahan dan tonton video lengkapnya",
+                ],
+                "target_metric": "Viewed vs Swiped Away > 75%",
+            }
+        elif niche == "entertainment":
+            angle_curiosity = (
+                f"Detail Kecil di {clean} yang Menjelaskan Misteri Terbesar di Akhir Cerita"
+                if seed_mod == 0
+                else f"Pesan Tersembunyi di {clean} yang Luput dari Perhatian Mayoritas Penonton"
+            )
+            angle_stakes = (
+                f"Kronologi Lengkap & Alur Cerita {clean}: Dari Awal Mula Hingga Plot Twist Tak Terduga"
+                if seed_mod == 0
+                else f"Momen Paling Mengejutkan di {clean} yang Mengubah Seluruh Cerita"
+            )
+            angle_contrarian = (
+                f"Teori Populer Tentang {clean} Ini Ternyata Keliru! Ini Fakta Sebenarnya yang Tersirat"
+                if seed_mod == 0
+                else f"Bukan Sekadar Hiburan Biasa: Ada Pesan Gelap di Balik Cerita {clean}"
+            )
+            angle_deep = (
+                f"Bedah Cerita & Makna Tersirat {clean}: Analisis Karakter, Filosofi, & Ending Lengkap"
+                if seed_mod == 0
+                else f"Penjelasan Ending {clean} Secara Rinci: Mengapa Penutupnya Begitu Jenius?"
+            )
+
+            outranking_title = f"Penjelasan Ending & Makna Tersembunyi {clean}: Pesan Rahasia yang Banyak Dilewatkan Penonton"
+            title_formula = "Pola Counter-Positioning: [Bongkar Detail Tersembunyi / Ending] + [Subjek Karya] + [Nilai Analisis Kritis]"
+            two_line_hook = (
+                f"Ada banyak kejanggalan dan teori mengejutkan di balik {clean}. "
+                f"Di video ini kita kupas tuntas seluruh rahasia dan fakta tersembunyinya!"
+            )
+            timestamps = [
+                "00:00 - Pembuka & Sorotan Menarik",
+                f"02:00 - Latar Belakang & Pengenalan {clean}",
+                "06:30 - Momen Paling Krusial & Plot Twist",
+                "10:45 - Bedah Teori & Makna Tersembunyi",
+                "14:15 - Kesimpulan & Penjelasan Akhir",
+            ]
+            hashtags = [f"#{clean_tag}", f"#AlurCerita{clean_tag}", "#BedahFilm", "#PopCulture"]
+            shorts_package = {
+                "title": f"Fakta Gila Seputar {clean} yang Pasti Belum Kamu Tahu! #shorts",
+                "three_second_hook": f"Kamu gak bakal nyangka kalau ada detail segila ini di dalam {clean}!",
+                "script_structure": [
+                    "00-03s: Hook adegan atau detail mengejutkan",
+                    "03-30s: Ungkap teori atau fakta tersembunyi",
+                    "30-45s: Tonton bedah cerita lengkapnya di link terkait",
+                ],
+                "target_metric": "Viewed vs Swiped Away > 75%",
+            }
+        else:
+            angle_curiosity = (
+                f"Fakta Menarik Seputar {clean} yang Jarang Diketahui Orang Banyak"
+                if seed_mod == 0
+                else f"Ada Apa di Balik Fenomena {clean}? Misteri dan Realita yang Menarik"
+            )
+            angle_stakes = (
+                f"Semua yang Wajib Kamu Pahami Tentang {clean} Sebelum Mengambil Keputusan"
+                if seed_mod == 0
+                else f"Dampak Nyata {clean} bagi Kehidupan Sehari-Hari yang Jarang Disadari"
+            )
+            angle_contrarian = (
+                f"Banyak Orang Keliru Menilai {clean}: Ini Fakta & Data yang Sebenarnya"
+                if seed_mod == 0
+                else f"Jangan Asal Percaya! Ini Kebenaran di Balik Mitos {clean}"
+            )
+            angle_deep = (
+                f"Eksplorasi Mendalam Seputar {clean}: Panduan Komprehensif dari A Sampai Z"
+                if seed_mod == 0
+                else f"Kupas Tuntas {clean}: Sejarah, Perkembangan Terkini, & Hal Penting yang Wajib Tahu"
+            )
+
+            outranking_title = f"Semua yang Wajib Kamu Ketahui Tentang {clean}: Fakta Menarik & Penjelasan Mendalam"
+            title_formula = "Pola Counter-Positioning: [Fakta Menarik / Perspektif Baru] + [Subjek Topik] + [Nilai Informasi Utuh]"
             two_line_hook = (
                 f"Penasaran tentang {clean}? Di video ini kita bahas tuntas sejarah, "
                 f"fakta penting, dan segala hal menarik seputar topik ini!"
@@ -1290,6 +1561,36 @@ class SearchIntelligence:
                 ],
                 "target_metric": "Viewed vs Swiped Away > 75%",
             }
+
+        psychological_angles = {
+            "curiosity_gap": {
+                "label": "🔍 Misteri & Curiosity Gap",
+                "title": angle_curiosity,
+                "rationale": "Memicu rasa penasaran akut penonton dengan menyembunyikan 1 potongan informasi krusial.",
+            },
+            "high_stakes": {
+                "label": "⚡ Kronologi & High-Stakes Storytelling",
+                "title": angle_stakes,
+                "rationale": "Menghadirkan intensitas cerita menit-demi-menit dengan dampak nyata yang besar.",
+            },
+            "contrarian": {
+                "label": "🤯 Mitos vs Fakta / Kontrarian",
+                "title": angle_contrarian,
+                "rationale": "Mendobrak asumsi salah yang selama ini dipercaya penonton umum di YouTube.",
+            },
+            "deep_dive": {
+                "label": "📚 Deep Dive / Dokumenter Komplit",
+                "title": angle_deep,
+                "rationale": "Menjanjikan sajian informasi paling tuntas, terstruktur, dan berbobot.",
+            },
+        }
+
+        alternative_titles = [
+            angle_curiosity,
+            angle_stakes,
+            angle_contrarian,
+            angle_deep,
+        ]
 
         # Build niche-appropriate description intro
         niche_desc_intro_map = {
@@ -1323,9 +1624,13 @@ class SearchIntelligence:
                 "format": comp_format,
             },
             "recommended_format": comp_format,
+            "competitor_analysis": comp_analysis,
+            "competitor_weakness": comp_analysis["weakness"],
+            "counter_strategy": comp_analysis["counter_strategy"],
             "outranking_title": outranking_title,
             "title_formula": title_formula,
             "detected_niche": niche,
+            "psychological_angles": psychological_angles,
             "alternative_titles": alternative_titles,
             "seo_description": full_description,
             "two_line_hook": two_line_hook,

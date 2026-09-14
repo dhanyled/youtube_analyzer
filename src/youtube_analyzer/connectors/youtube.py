@@ -49,13 +49,74 @@ class YouTubeConnector(BaseConnector):
         except Exception:
             pass
 
-        # Fallback offline suggestions
-        return [
-            f"{query} tutorial",
-            f"{query} pemula",
-            f"cara {query}",
-            f"{query} 2026",
-        ]
+        # Fallback offline suggestions tailored to content niche
+        from youtube_analyzer.core.intelligence import SearchIntelligence
+
+        niche = SearchIntelligence.detect_content_niche(query)
+        if niche == "documentary":
+            return [
+                f"dokumenter {query}",
+                f"sejarah {query}",
+                f"kronologi {query}",
+                f"kisah nyata {query}",
+                f"fakta {query}",
+            ]
+        elif niche == "culinary":
+            return [
+                f"resep {query}",
+                f"cara membuat {query}",
+                f"bumbu {query}",
+                f"cara masak {query}",
+                f"{query} praktis",
+            ]
+        elif niche == "travel":
+            return [
+                f"wisata {query}",
+                f"harga tiket {query}",
+                f"rute ke {query}",
+                f"vlog {query}",
+                f"tips liburan ke {query}",
+            ]
+        elif niche == "entertainment":
+            return [
+                f"alur cerita {query}",
+                f"sinopsis {query}",
+                f"bedah film {query}",
+                f"penjelasan ending {query}",
+                f"review {query}",
+            ]
+        elif niche == "health_fitness":
+            return [
+                f"cara mengatasi {query}",
+                f"gejala {query}",
+                f"penyebab {query}",
+                f"tips hidup sehat {query}",
+                f"obat alami {query}",
+            ]
+        elif niche == "business":
+            return [
+                f"cara {query}",
+                f"tutorial {query}",
+                f"strategi {query}",
+                f"panduan {query}",
+                f"{query} pemula",
+            ]
+        elif niche == "tech_tutorial":
+            return [
+                f"tutorial {query}",
+                f"cara setting {query}",
+                f"panduan {query}",
+                f"tips trik {query}",
+                f"cara menggunakan {query}",
+            ]
+        else:
+            return [
+                f"apa itu {query}",
+                f"fakta unik {query}",
+                f"sejarah {query}",
+                f"penjelasan {query}",
+                f"rangkuman {query}",
+            ]
 
     def _get_fallback_competitors(self, query: str) -> list[dict[str, Any]]:
         """Fallback realistic competitor data (based on actual YouTube SERP benchmarks, up to 10 videos)."""

@@ -253,12 +253,12 @@ def fetch_google_trends_rss(geo: str = "ID") -> list[dict[str, str]]:
         pass
     return [
         {
-            "Topik Tren": "Tutorial AI Video 2026",
+            "Topik Tren": "Eksplorasi Wisata & Kuliner Nusantara",
             "Estimasi Penelusuran": "50,000+",
             "Tautan Google": "https://trends.google.co.id",
         },
         {
-            "Topik Tren": "Peluang Usaha Modal Kecil",
+            "Topik Tren": "Perkembangan Teknologi AI Terkini",
             "Estimasi Penelusuran": "20,000+",
             "Tautan Google": "https://trends.google.co.id",
         },
@@ -356,14 +356,14 @@ if keyword_input:
             f"**Format yang Direkomendasikan:** **🎬 {comp_format}**  \n"
             f"**Volume Pencarian:** ~{search_vol:,}/bulan | **Tingkat Persaingan:** {comp_score}/100  \n"
             f"**Analisis Niche ({rpm_data['detected_niche'].upper()}):** Estimasi monetisasi **{rpm_data['rpm_range_usd']} per 1.000 views** "
-            f"dengan potensi cuan {rpm_data['potential_earnings_per_100k_views']} per 100k views."
+            f"dengan potensi pendapatan {rpm_data['potential_earnings_per_100k_views']} per 100k views."
         )
     elif opp_score >= 45:
         st.warning(
             f"### 🟡 KEPUTUSAN STRATEGIS: POTENSIAL DENGAN DIFERENSIASI (Skor Peluang: {opp_score}/100)\n"
             f"**Format yang Direkomendasikan:** **🎬 {comp_format}**  \n"
             f"**Volume Pencarian:** ~{search_vol:,}/bulan | **Tingkat Persaingan:** {comp_score}/100  \n"
-            f"Persaingan cukup ketat di niche **{rpm_data['detected_niche'].upper()}**. Wajib gunakan hook judul 2026 dan thumbnail berbeda dari kompetitor teratas."
+            f"Persaingan cukup ketat di niche **{rpm_data['detected_niche'].upper()}**. Wajib gunakan hook judul yang memikat dan thumbnail berbeda dari kompetitor teratas."
         )
     else:
         st.error(
@@ -882,11 +882,57 @@ if keyword_input:
     # ==================== TAB 4: KEYWORDS & INTENT ====================
     with tab_keywords:
         st.subheader("Pemisahan Kata Kunci Berdasarkan Search Behavior")
+
+        detected_niche = rpm_data.get("detected_niche", "general").lower()
+        intent_captions = {
+            "documentary": {
+                "google": "Fokus artikel sejarah, arsip dokumen & riset ilmiah",
+                "youtube": "Fokus dokumenter visual, rekaman & alur kronologi",
+                "aeo": "Fokus pertanyaan sebab-akibat & misteri sejarah",
+            },
+            "culinary": {
+                "google": "Fokus takaran resep, bumbu & bahan masakan",
+                "youtube": "Fokus tutorial visual masak langkah demi langkah",
+                "aeo": "Fokus tips anti-gagal, takaran & teknik mengolah",
+            },
+            "travel": {
+                "google": "Fokus harga tiket, rute lokasi & estimasi biaya",
+                "youtube": "Fokus vlog suasana nyata lokasi & spot tersembunyi",
+                "aeo": "Fokus rekomendasi waktu terbaik & tips liburan",
+            },
+            "entertainment": {
+                "google": "Fokus sinopsis cerita, biodata & ulasan artikel",
+                "youtube": "Fokus alur cerita lengkap, bedah teori & ending",
+                "aeo": "Fokus penjelasan makna & analisis pesan cerita",
+            },
+            "health_fitness": {
+                "google": "Fokus artikel medis, gejala, obat & pantangan",
+                "youtube": "Fokus panduan gerakan, edukasi dokter & gaya hidup",
+                "aeo": "Fokus pertanyaan diagnosis awal & solusi aman",
+            },
+            "business": {
+                "google": "Fokus riset biaya, jasa & strategi bisnis",
+                "youtube": "Fokus tutorial teknis, studi kasus & strategi",
+                "aeo": "Fokus evaluasi efektivitas & perhitungan kelayakan",
+            },
+            "tech_tutorial": {
+                "google": "Fokus dokumentasi, download software & solusi error",
+                "youtube": "Fokus tutorial rekaman layar step-by-step",
+                "aeo": "Fokus panduan instalasi & tips shortcut efisien",
+            },
+            "general": {
+                "google": "Fokus artikel referensi, definisi & fakta terpercaya",
+                "youtube": "Fokus video edukasi populer & visualisasi konsep",
+                "aeo": "Fokus penjelasan komprehensif & wawasan mendalam",
+            },
+        }
+        niche_caps = intent_captions.get(detected_niche, intent_captions["general"])
+
         k1, k2, k3 = st.columns(3)
 
         with k1:
             st.markdown("##### 🔵 Google Search (GKP)")
-            st.caption("Fokus komersial & jasa")
+            st.caption(niche_caps["google"])
             g_terms = surfaces.get(PlatformEnum.GOOGLE_SEARCH, [])
             st.dataframe(
                 pd.DataFrame(
@@ -900,7 +946,7 @@ if keyword_input:
 
         with k2:
             st.markdown("##### 🔴 YouTube Search")
-            st.caption("Fokus tutorial & cara pasang")
+            st.caption(niche_caps["youtube"])
             yt_terms = surfaces.get(PlatformEnum.YOUTUBE_SEARCH, [])
             st.dataframe(
                 pd.DataFrame(
@@ -914,7 +960,7 @@ if keyword_input:
 
         with k3:
             st.markdown("##### 🟣 AI & AEO Queries")
-            st.caption("Fokus pertanyaan keputusan")
+            st.caption(niche_caps["aeo"])
             ai_terms = surfaces.get(PlatformEnum.AI_SEARCH, [])
             st.dataframe(
                 pd.DataFrame(

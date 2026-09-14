@@ -1472,37 +1472,92 @@ class SearchIntelligence:
             gap_reason = ""
             action_plan = ""
 
-            if "2026" in q_clean or "terbaru" in q_clean or (has_outdated and idx % 2 == 0):
+            if "terbaru" in q_clean or (has_outdated and idx % 2 == 0):
                 is_gap = True
                 gap_type = "📅 Outdated Competitor Gap"
-                gap_reason = (
-                    "Video teratas kompetitor dibuat > 1-2 tahun lalu. "
-                    "Penonton aktif mencari panduan dengan UI dan sistem terbaru 2026."
-                )
-                action_plan = f"Buat video '{q.title()}' dengan demonstrasi fitur terkini 2026."
-            elif not has_shorts and any(w in q_clean for w in ["trik", "rahasia", "cepat", "modal"]):
+                if niche == "documentary":
+                    gap_reason = (
+                        "Video teratas kompetitor dibuat bertahun-tahun lalu dengan kualitas arsip lama. "
+                        "Penonton mencari visualisasi modern dan data penelitian sejarah terbaru."
+                    )
+                    action_plan = f"Buat video '{q.title()}' dengan visual berkualitas tinggi dan ulasan fakta sejarah yang mendalam."
+                    winning_hook = f"Fakta Mencengangkan Seputar {q.title()} yang Jarang Diungkap"
+                elif niche == "culinary":
+                    gap_reason = (
+                        "Banyak video yang beredar memakai takaran perkiraan tanpa gramasi pasti. "
+                        "Penonton mencari resep teruji yang praktis dan anti-gagal."
+                    )
+                    action_plan = f"Sajikan '{q.title()}' dengan takaran gram/sendok presisi dan tips bumbu meresap."
+                    winning_hook = f"Rahasia Resep {q.title()} Seenak Restoran Bintang 5"
+                elif niche == "travel":
+                    gap_reason = (
+                        "Informasi rute, harga tiket, dan fasilitas di video lama sudah usang. "
+                        "Penonton membutuhkan ulasan kondisi terkini dan estimasi budget aktual."
+                    )
+                    action_plan = f"Buat video '{q.title()}' dengan rincian biaya nyata, rute terbaik, dan rekomendasi spot tersembunyi."
+                    winning_hook = f"Panduan Lengkap Wisata {q.title()} Terbaru: Rute & Biaya Hemat"
+                elif niche == "entertainment":
+                    gap_reason = (
+                        "Video yang ada hanya membahas permukaan alur cerita. "
+                        "Penonton mencari bedah teori tersembunyi, plot twist, dan analisis ending mendalam."
+                    )
+                    action_plan = f"Kupas tuntas '{q.title()}' dengan detail penting yang belum pernah dibahas kreator lain."
+                    winning_hook = f"Detail Tersembunyi di {q.title()} yang Bikin Kaget"
+                elif niche == "health_fitness":
+                    gap_reason = (
+                        "Banyak konten beredar terlalu teoritis atau sulit dipraktikkan. "
+                        "Penonton mencari panduan langkah alami yang aman menurut referensi kesehatan."
+                    )
+                    action_plan = f"Buat video '{q.title()}' dengan penjelasan logis, mudah dimengerti, dan berlandaskan fakta."
+                    winning_hook = f"Cara Alami Atasi {q.title()} Secara Aman Tanpa Efek Samping"
+                elif niche == "business":
+                    gap_reason = (
+                        "Video kompetitor memakai strategi lama yang sudah jenuh. "
+                        "Penonton aktif mencari studi kasus dan alur kerja terkini yang terbukti efektif."
+                    )
+                    action_plan = f"Bagikan strategi '{q.title()}' berbasis studi kasus nyata yang langsung bisa dipraktikkan."
+                    winning_hook = f"Strategi Praktis {q.title()} yang Terbukti Menghasilkan"
+                elif niche == "tech_tutorial":
+                    gap_reason = (
+                        "Video kompetitor memakai versi software antarmuka lama. "
+                        "Penonton mencari alur kerja dengan pembaruan sistem terkini."
+                    )
+                    action_plan = f"Demonstrasikan '{q.title()}' dengan langkah to-the-point dan tips shortcut efisien."
+                    winning_hook = f"Cara Cepat Menguasai {q.title()} dari Dasar Sampai Mahir"
+                else:
+                    gap_reason = (
+                        "Konten yang ada kurang merangkum seluruh aspek penting secara terstruktur. "
+                        "Ada peluang besar untuk video edukatif berbobot."
+                    )
+                    action_plan = f"Sajikan '{q.title()}' dengan kemasan ringkas, padat informasi, dan visual memikat."
+                    winning_hook = f"Semua Hal Penting Tentang {q.title()} yang Wajib Kamu Tahu"
+
+            elif not has_shorts and any(w in q_clean for w in ["trik", "rahasia", "cepat", "fakta", "spot", "resep"]):
                 is_gap = True
                 gap_type = "📱 Missing Shorts Gap"
                 gap_reason = (
                     "Hasil pencarian didominasi video durasi panjang (15+ menit). "
-                    "Belum ada video Shorts vertikal 45 detik yang menjawab ringkas."
+                    "Belum ada video Shorts vertikal 45 detik yang menjawab ringkas dan padat."
                 )
-                action_plan = "Buat Shorts 45 detik dengan visual to-the-point dan pancing ke bio."
-            elif "kesalahan" in q_clean or "pemula" in q_clean:
+                action_plan = f"Buat video Shorts vertikal 45 detik untuk '{q.title()}' dengan hook to-the-point dan pancingan ke video lengkap."
+                winning_hook = f"Hal Menarik Seputar {q.title()} yang Belum Banyak Diketahui #shorts"
+
+            elif any(w in q_clean for w in ["kesalahan", "pemula", "solusi", "kendala", "misteri"]):
                 is_gap = True
                 gap_type = "💡 Unsatisfied Search Intent Gap"
                 gap_reason = (
-                    "Banyak penonton mencari solusi kendala teknis, "
-                    "tetapi video yang ada terlalu teoritis tanpa studi kasus nyata."
+                    "Banyak penonton mencari jawaban spesifik untuk kendala yang sering dialami, "
+                    "tetapi video yang ada terlalu teoritis tanpa contoh nyata."
                 )
-                action_plan = (
-                    f"Ungkap 3 kesalahan terbesar saat {clean} dan solusinya di 3 menit awal."
-                )
+                action_plan = f"Jawab langsung pertanyaan seputar '{q.title()}' dengan solusi konkret di menit awal."
+                winning_hook = f"Kupas Tuntas {q.title()}: Solusi Nyata yang Sering Terlewat"
+
             else:
                 is_gap = False
                 gap_type = "✅ Saturated / Covered"
                 gap_reason = "Sudah banyak video kompetitor dengan views tinggi yang membahas topik ini."
-                action_plan = "Hanya buat jika memiliki sudut pandang / studi kasus yang sangat kontras."
+                action_plan = "Hanya buat jika Anda memiliki sudut pandang baru atau studi kasus yang unik."
+                winning_hook = f"Sudut Pandang Baru: Kupas Mendalam {q.title()}"
 
             results.append(
                 {
@@ -1513,7 +1568,7 @@ class SearchIntelligence:
                     "gap_type": gap_type,
                     "gap_reason": gap_reason,
                     "recommended_action": action_plan,
-                    "winning_hook": f"Trik {q.title()} yang Jarang Diketahui Orang (Update 2026)",
+                    "winning_hook": winning_hook,
                 }
             )
 

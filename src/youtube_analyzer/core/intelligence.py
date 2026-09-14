@@ -300,7 +300,15 @@ class SearchIntelligence:
                 "wisata", "liburan", "hotel", "pantai", "villa", "traveling",
                 "staycation", "jalur", "rute", "tiket", "bali", "jogja", "jepang",
                 "eropa", "destinasi", "hidden gem", "curug", "air terjun", "pulau",
-                "bromo", "danau", "candi", "taman", "backpacker", "tour", "trip"
+                "bromo", "danau", "candi", "taman", "backpacker", "tour", "trip",
+                "labuan bajo", "raja ampat", "lombok", "sumba", "flores", "manado",
+                "bunaken", "komodo", "toraja", "wakatobi", "banda neira", "ternate",
+                "bandung", "surabaya", "medan", "makassar", "palembang", "semarang",
+                "singapore", "malaysia", "thailand", "vietnam", "korea", "paris",
+                "london", "dubai", "turki", "mesir", "mekah", "madinah", "umroh",
+                "hiking", "camping", "trekking", "snorkeling", "diving", "glamping",
+                "itinerary", "penginapan", "resort", "airbnb", "solo travel", "road trip",
+                "wisata alam", "wisata religi", "wisata kuliner", "wisata budaya",
             ]
         ):
             return "travel"
@@ -697,42 +705,87 @@ class SearchIntelligence:
         clean_tag = "".join(clean.split())
 
         if niche == "documentary":
-            title_formula = "Pola: [Detik-Detik Mencekam / Peristiwa] + [Subjek Topik] + [Dampak Dunia] + [Format Dokumenter]"
-            outranking_title = f"Detik-Detik Mencekam {clean} yang Mengguncang Dunia (Dokumenter Lengkap)"
-            alternative_titles = [
-                f"Misteri & Fakta Mengerikan di Balik {clean} yang Jarang Terungkap",
-                f"Kronologi Lengkap Peristiwa {clean}: Apa yang Sebenarnya Terjadi?",
-                f"Kisah Nyata {clean}: Dampak Dahsyat yang Mengubah Sejarah Bumi",
-            ]
-            two_line_hook = (
-                f"Pernahkah kamu membayangkan betapa dahsyatnya peristiwa {clean}? "
-                f"Di video dokumenter ini kita bedah kronologi lengkap, arsip sejarah, dan fakta mengejutkan yang jarang dibahas!"
-            )
-            timestamps = [
-                "00:00 - Kilas Balik Awal Peristiwa",
-                f"02:30 - Latar Belakang & Tanda Awal {clean}",
-                "06:45 - Detik-Detik Puncak Terjadinya Peristiwa",
-                "11:20 - Dampak Dahsyat yang Mengguncang Dunia",
-                "15:50 - Pelajaran Sejarah & Kondisi Terkini",
-            ]
-            hashtags = [f"#{clean_tag}", f"#{clean_tag}Sejarah", "#DokumenterDunia", "#FaktaMenarik"]
-            shorts_package = {
-                "title": f"Fakta Mengerikan {clean} yang Bikin Merinding! #shorts",
-                "three_second_hook": f"Ini alasan kenapa peristiwa {clean} disebut salah satu yang paling mengerikan di bumi!",
-                "script_structure": [
-                    "00-03s: Hook visual kilas peristiwa mengerikan",
-                    "03-30s: Ungkap 1 fakta sejarah paling mengejutkan",
-                    "30-45s: Ajakan tonton dokumenter lengkapnya di link video terkait",
-                ],
-                "target_metric": "Viewed vs Swiped Away > 75%",
-            }
+            # Detect documentary sub-type: disaster/history vs science/space
+            lowered_seed = seed.strip().lower()
+            is_science = any(k in lowered_seed for k in [
+                "planet", "mars", "bulan", "bintang", "luar angkasa", "galaksi",
+                "asteroid", "black hole", "lubang hitam", "meteor", "tata surya",
+                "biologi", "fisika", "kimia", "evolusi", "dinosaurus", "fosil",
+                "hewan", "alam", "ekosistem", "hutan", "laut dalam", "sains",
+            ])
+            if is_science:
+                title_formula = "Pola: [Fakta Mengejutkan / Misteri Ilmiah] + [Subjek Sains] + [Penjelasan Mendalam]"
+                outranking_title = f"Fakta Mengejutkan tentang {clean} yang Jarang Diketahui (Penjelasan Ilmiah Lengkap)"
+                alternative_titles = [
+                    f"Misteri {clean} yang Belum Terpecahkan oleh Para Ilmuwan",
+                    f"Apa yang Sebenarnya Tersembunyi di {clean}? Penjelasan Sains Terlengkap",
+                    f"Ilmuwan Terkejut: Temuan Terbaru Tentang {clean} yang Mengubah Segalanya",
+                ]
+                two_line_hook = (
+                    f"Seberapa banyak yang kamu tahu tentang {clean}? "
+                    f"Di video ini kita bedah fakta ilmiah terkini, misteri yang belum terpecahkan, dan temuan yang bikin tercengang!"
+                )
+                timestamps = [
+                    "00:00 - Pengantar: Mengapa Ini Penting?",
+                    f"02:00 - Fakta Dasar tentang {clean}",
+                    "05:30 - Penemuan Ilmiah Paling Mengejutkan",
+                    "10:15 - Misteri yang Masih Belum Terjawab",
+                    "14:30 - Kesimpulan & Prediksi Masa Depan",
+                ]
+                hashtags = [f"#{clean_tag}", f"#{clean_tag}Sains", "#IlmuPengetahuan", "#FaktaMenarik"]
+                shorts_package = {
+                    "title": f"Fakta Mengejutkan tentang {clean} yang Jarang Dibahas! #shorts",
+                    "three_second_hook": f"Tahukah kamu fakta ilmiah tentang {clean} ini? Hampir semua orang salah sangka!",
+                    "script_structure": [
+                        "00-03s: Hook pertanyaan atau fakta mengejutkan",
+                        "03-30s: Ungkap 1 fakta ilmiah paling mengejutkan",
+                        "30-45s: Ajakan tonton penjelasan lengkap di video utama",
+                    ],
+                    "target_metric": "Viewed vs Swiped Away > 75%",
+                }
+            else:
+                title_formula = "Pola: [Detik-Detik / Kisah Nyata] + [Subjek Peristiwa] + [Dampak Nyata] + [Format Dokumenter]"
+                outranking_title = f"Kisah Nyata {clean}: Fakta & Dampak yang Mengguncang Sejarah (Dokumenter Lengkap)"
+                alternative_titles = [
+                    f"Misteri & Fakta Mengejutkan di Balik {clean} yang Jarang Terungkap",
+                    f"Kronologi Lengkap {clean}: Apa yang Sebenarnya Terjadi?",
+                    f"{clean}: Dampak Dahsyat yang Mengubah Dunia Selamanya",
+                ]
+                two_line_hook = (
+                    f"Pernahkah kamu membayangkan betapa dahsyatnya {clean}? "
+                    f"Di video ini kita bedah kronologi lengkap, arsip sejarah, dan fakta mengejutkan yang jarang dibahas!"
+                )
+                timestamps = [
+                    "00:00 - Kilas Balik Awal Peristiwa",
+                    f"02:30 - Latar Belakang & Tanda Awal {clean}",
+                    "06:45 - Kronologi Puncak Kejadian",
+                    "11:20 - Dampak & Akibat bagi Dunia",
+                    "15:50 - Pelajaran Sejarah & Kondisi Terkini",
+                ]
+                hashtags = [f"#{clean_tag}", f"#{clean_tag}Sejarah", "#DokumenterDunia", "#FaktaMenarik"]
+                shorts_package = {
+                    "title": f"Fakta Mengerikan tentang {clean} yang Bikin Merinding! #shorts",
+                    "three_second_hook": f"Ini fakta tersembunyi tentang {clean} yang tidak pernah diajarkan di sekolah!",
+                    "script_structure": [
+                        "00-03s: Hook visual kilas peristiwa bersejarah",
+                        "03-30s: Ungkap 1 fakta sejarah paling mengejutkan",
+                        "30-45s: Ajakan tonton dokumenter lengkapnya",
+                    ],
+                    "target_metric": "Viewed vs Swiped Away > 75%",
+                }
         elif niche == "culinary":
             title_formula = "Pola: [Resep Otentik] + [Subjek Masakan] + [Karakter Rasa] + [Anti Gagal untuk Pemula]"
-            outranking_title = f"Resep {clean} Gurih & Lembut (Anti Gagal untuk Pemula)"
+            # Avoid double-prefix if keyword already starts with "resep"
+            clean_food = clean
+            for prefix in ["Resep ", "Cara Masak ", "Cara Membuat ", "Bumbu "]:
+                if clean.lower().startswith(prefix.lower()):
+                    clean_food = clean[len(prefix):].strip()
+                    break
+            outranking_title = f"Resep {clean_food} Gurih & Lembut (Anti Gagal untuk Pemula)"
             alternative_titles = [
-                f"Rahasia Bumbu {clean} Rasa Bintang 5 dengan Bahan Rumahan",
-                f"Cara Membuat {clean} Praktis & Cepat: Wangi Menggugah Selera",
-                f"Eksperimen Resep {clean} Paling Enak: Jangan Lakukan 3 Kesalahan Ini!",
+                f"Rahasia Bumbu {clean_food} Rasa Bintang 5 dengan Bahan Rumahan",
+                f"Cara Membuat {clean_food} Praktis & Cepat: Wangi Menggugah Selera",
+                f"Eksperimen Resep {clean_food} Paling Enak: Jangan Lakukan 3 Kesalahan Ini!",
             ]
             two_line_hook = (
                 f"Mau bikin {clean} yang lezat, bumbunya meresap sempurna, dan anti gagal? "
@@ -758,7 +811,7 @@ class SearchIntelligence:
             }
         elif niche == "travel":
             title_formula = "Pola: [Panduan Eksplorasi] + [Destinasi Wisata] + [Hidden Gem / Spot Terbaik] + [Rute & Budget]"
-            outranking_title = f"Panduan Lengkap Wisata {clean} 2026: Rute, Biaya, & Hidden Gems Terindah"
+            outranking_title = f"Panduan Lengkap Wisata {clean}: Rute, Biaya, & Hidden Gems Terindah"
             alternative_titles = [
                 f"Eksplorasi {clean} Seharian: Tips Liburan Hemat & Spot Foto Viral",
                 f"Jangan Pergi ke {clean} Sebelum Tahu 5 Hal Penting Ini! (Review Jujur)",
@@ -847,10 +900,10 @@ class SearchIntelligence:
                 "target_metric": "Viewed vs Swiped Away > 75%",
             }
         elif niche == "business":
-            title_formula = "Pola: [Strategi / Pola Sukses] + [Model Bisnis/Iklan] + [Hasil Nyata] + [Minim Resiko]"
-            outranking_title = f"Strategi {clean} Praktis untuk Pemula (Update 2026 Terbukti Efektif)"
+            title_formula = "Pola: [Strategi / Studi Kasus] + [Model Bisnis/Iklan] + [Hasil Terbukti] + [Langkah Konkret]"
+            outranking_title = f"Strategi {clean} yang Terbukti Efektif: Panduan Lengkap dari Nol"
             alternative_titles = [
-                f"Tutorial {clean} Step-by-Step dari Nol: Langkah Tepat Minim Resiko",
+                f"Tutorial {clean} Step-by-Step: Langkah Tepat yang Langsung Bisa Dieksekusi",
                 f"Bongkar Pola Sukses {clean} yang Sering Dirahasiakan Para Praktisi",
                 f"Hindari 5 Kesalahan Fatal Ini Saat Memulai {clean}",
             ]
@@ -867,7 +920,7 @@ class SearchIntelligence:
             ]
             hashtags = [f"#{clean_tag}", f"#{clean_tag}Pemula", "#BisnisDigital", "#StrategiBisnis"]
             shorts_package = {
-                "title": f"1 Rahasia {clean} Biar Gak Boncos! #shorts",
+                "title": f"1 Hal yang Wajib Kamu Tahu Sebelum Mulai {clean}! #shorts",
                 "three_second_hook": f"Jangan pernah coba {clean} sebelum kamu tahu formula penting ini!",
                 "script_structure": [
                     "00-03s: Hook visual jangan lakukan kesalahan ini",
@@ -877,15 +930,21 @@ class SearchIntelligence:
                 "target_metric": "Viewed vs Swiped Away > 75%",
             }
         elif niche == "tech_tutorial":
-            title_formula = "Pola: [Tutorial Step-by-Step] + [Tool / Skill] + [Dari Nol Sampai Mahir] + [Update Terbaru]"
-            outranking_title = f"Tutorial {clean} Lengkap untuk Pemula (Panduan Cepat & Mudah Dipahami)"
+            title_formula = "Pola: [Tutorial Step-by-Step] + [Tool / Skill] + [Dari Nol Sampai Mahir]"
+            # Avoid double-prefix if keyword already starts with "tutorial"
+            clean_tech = clean
+            for prefix in ["Tutorial ", "Cara ", "Panduan ", "Setting "]:
+                if clean.lower().startswith(prefix.lower()):
+                    clean_tech = clean[len(prefix):].strip()
+                    break
+            outranking_title = f"Tutorial {clean_tech} Lengkap untuk Pemula (Panduan Cepat & Mudah Dipahami)"
             alternative_titles = [
-                f"Cara Menguasai {clean} dari Nol dalam Waktu Singkat",
-                f"Trik & Tips Praktis {clean} yang Bakal Mempermudah Kerjamu",
-                f"Solusi Mengatasi Masalah Umum pada {clean} (Step by Step)",
+                f"Cara Menguasai {clean_tech} dari Nol dalam Waktu Singkat",
+                f"Trik & Tips Praktis {clean_tech} yang Bakal Mempermudah Kerjamu",
+                f"Solusi Mengatasi Masalah Umum pada {clean_tech} (Step by Step)",
             ]
             two_line_hook = (
-                f"Baru mau belajar {clean}? Jangan bingung, video ini merangkum "
+                f"Baru mau belajar {clean_tech}? Jangan bingung, video ini merangkum "
                 f"tutorial langkah demi langkah dari dasar sampai kamu mahir!"
             )
             timestamps = [

@@ -511,6 +511,11 @@ class SearchIntelligence:
                 ("marketing", 2),
                 ("passive income", 2),
                 ("penjualan", 2),
+                ("konsultan", 2),
+                ("biro", 2),
+                ("agensi", 2),
+                ("agency", 2),
+                ("jasa", 2),
                 ("ads", 1),
                 ("jualan", 1),
                 ("modal", 1),
@@ -707,6 +712,11 @@ class SearchIntelligence:
         elif any(
             k in lowered
             for k in [
+                "konsultan",
+                "biro",
+                "agency",
+                "agensi",
+                "jasa",
                 "bisnis",
                 "umkm",
                 "usaha",
@@ -1174,8 +1184,162 @@ class SearchIntelligence:
         # Kumpulkan teks semua judul kompetitor teratas untuk ekstraksi entitas
         comp_titles = [c.get("title", "") for c in all_comps if c.get("title")]
         comp_text = " ".join(comp_titles + [seed]).lower()
+        seed_lower = seed.lower()
 
-        if niche == "documentary":
+        is_haji_umroh = any(
+            k in comp_text or k in seed_lower
+            for k in [
+                "haji",
+                "umroh",
+                "umrah",
+                "mekah",
+                "makkah",
+                "madinah",
+                "ka'bah",
+                "kabah",
+                "masjidil haram",
+                "nabawi",
+                "tawaf",
+                "sa'i",
+                "sai",
+                "ihram",
+                "manasik",
+                "ziarah",
+                "visa umroh",
+                "ppiu",
+                "kemenag",
+                "tanah suci",
+                "baitullah",
+            ]
+        )
+
+        if is_haji_umroh:
+            is_consulting_agency = any(
+                k in seed_lower or k in comp_text
+                for k in [
+                    "konsultan",
+                    "biro",
+                    "agen",
+                    "agency",
+                    "jasa",
+                    "pt ",
+                    "bisnis",
+                    "usaha",
+                    "legalitas",
+                    "izin",
+                    "kantor",
+                    "rekomendasi travel",
+                    "memilih travel",
+                    "paket",
+                    "biaya",
+                ]
+            )
+
+            if is_consulting_agency:
+                angle_curiosity = (
+                    f"Bongkar Rahasia Operasional {clean}: Alur Tiketing, Kerjasama Hotel Haramain & Legalitas Resmi PPIU"
+                    if seed_mod == 0
+                    else f"1 Syarat Mutlak yang Wajib Dicek Sebelum Pilih {clean}: Jangan Sampai Tertipu Travel Bodong"
+                )
+                angle_stakes = (
+                    f"Panduan Memilih {clean} Berizin Resmi Kemenag: Ciri Travel Amanah & Antisipasi Kasus Jamaah Gagal Berangkat"
+                    if seed_mod == 0
+                    else f"Jangan Asal Pilih {clean}! Ini Kriteria Wajib Travel Amanah Berizin PPIU Kemenag"
+                )
+                angle_contrarian = (
+                    f"Jangan Tergiur Paket Murah! 3 Ciri {clean} Abal-Abal yang Sering Menelantarkan Jamaah di Tanah Suci"
+                    if seed_mod == 0
+                    else f"Banyak Calon Jamaah Belum Tahu: Ini Standar Hak Fasilitas yang Wajib Diberikan {clean}"
+                )
+                angle_deep = (
+                    f"Standar Pelayanan {clean} Terbaik: Dari Pendaftaran, Manasik, Pengurusan Visa, hingga Akomodasi Hotel Bintang"
+                    if seed_mod == 0
+                    else f"Panduan Komplit Memilih {clean} Terpercaya: Rincian Biaya Transparan, Fasilitas Nyata & Tips Aman"
+                )
+
+                outranking_title = f"Panduan Memilih {clean} Berizin Resmi Kemenag: Cara Cek Legalitas Biar Ibadah Tenang & Terhindar dari Penipuan"
+                title_formula = "Pola Counter-Positioning: [Mitigasi Risiko Penipuan/Legalitas] + [Subjek Konsultan/Biro] + [Ketenangan Ibadah Jamaah]"
+                two_line_hook = (
+                    f"Sedang mencari referensi seputar {clean}? Di video ini kita bedah tuntas "
+                    f"panduan cek izin resmi Kemenag, rincian biaya transparan, dan tips memilih biro layanan yang amanah!"
+                )
+                timestamps = [
+                    "00:00 - Urgensi Memilih Layanan yang Amanah",
+                    "02:30 - Cara Cek Izin Resmi Kemenag (PPIU/PIHK)",
+                    "06:15 - Transparansi Rincian Biaya, Tiket & Jarak Hotel",
+                    "11:00 - Alur Pendampingan Ibadah & Manasik",
+                    "15:30 - Checklist Wajib Sebelum Membayar DP",
+                ]
+                hashtags = [
+                    f"#{clean_tag}",
+                    "#HajiUmroh",
+                    "#TravelUmrohResmi",
+                    "#Kemenag",
+                    "#IbadahTenang",
+                ]
+                shorts_package = {
+                    "title": f"Waspada Pilih {clean}, Cek 1 Hal Ini! #shorts",
+                    "three_second_hook": f"Sebelum transfer DP ke {clean}, pastikan kamu sudah cek 1 syarat mutlak Kemenag ini!",
+                    "script_structure": [
+                        "00-03s: Hook peringatan jangan asal transfer biaya umroh",
+                        "03-30s: Tunjukkan cara cek legalitas resmi di web Kemenag",
+                        "30-45s: Tonton panduan lengkapnya di link terkait",
+                    ],
+                    "target_metric": "Viewed vs Swiped Away > 75%",
+                }
+            else:
+                angle_curiosity = (
+                    f"Hal yang Jarang Dibocorkan Tentang {clean}: Rahasia Ibadah Khusyuk & Stamina Tetap Prima di Tanah Suci"
+                    if seed_mod == 0
+                    else f"Fakta Nyata Kondisi di Makkah & Madinah Seputar {clean} yang Wajib Jamaah Ketahui"
+                )
+                angle_stakes = (
+                    f"Detik-Detik Perjalanan {clean}: Persiapan Mental, Fisik & Rangkaian Ibadah Langkah demi Langkah"
+                    if seed_mod == 0
+                    else f"Pengalaman Nyata Menjalankan {clean}: Dari Manasik, Tawaf, Sa'i Sampai Tahallul"
+                )
+                angle_contrarian = (
+                    f"Jangan Lakukan 3 Hal Ini Saat {clean}! Bikin Ibadah Kurang Khusyuk dan Energi Terkuras Percuma"
+                    if seed_mod == 0
+                    else f"Banyak Jamaah Salah Kaprah Soal {clean}: Ini Tata Cara yang Sesuai Tuntunan & Kondisi Lapangan"
+                )
+                angle_deep = (
+                    f"Panduan Komplit {clean} dari A Sampai Z: Dokumen Penting, Perlengkapan Wajib, Rute & Doa Kunci"
+                    if seed_mod == 0
+                    else f"Manasik & Persiapan {clean} Terlengkap: Bekal Pengetahuan Penting Menuju Baitullah"
+                )
+
+                outranking_title = f"Panduan Praktis & Lengkap {clean}: Tips Fisik, Rincian Biaya Realistis & Alur Ibadah Khusyuk"
+                title_formula = "Pola Counter-Positioning: [Panduan Khusyuk & Realistis] + [Subjek Ibadah] + [Bekal Wajib Jamaah]"
+                two_line_hook = (
+                    f"Mau berangkat {clean}? Tonton panduan lengkap persiapan ibadah, "
+                    f"tips stamina, dan alur perjalanan agar ibadahmu di Tanah Suci mabrur dan khusyuk!"
+                )
+                timestamps = [
+                    "00:00 - Niat & Fondasi Ibadah",
+                    f"02:15 - Perlengkapan Wajib & Dokumen Penting {clean}",
+                    "06:45 - Rangkaian Ibadah Sesuai Sunnah & Kondisi Fisik",
+                    "12:20 - Tips Beribadah Nyaman di Masjidil Haram & Nabawi",
+                    "17:00 - Evaluasi & Doa Mustajab",
+                ]
+                hashtags = [
+                    f"#{clean_tag}",
+                    "#PanduanUmroh",
+                    "#TipsIbadah",
+                    "#TanahSuci",
+                    "#MakkahMadinah",
+                ]
+                shorts_package = {
+                    "title": f"Tips Penting {clean} Biar Gak Kaget di Tanah Suci! #shorts",
+                    "three_second_hook": f"Mau berangkat {clean}? Jangan sampai kamu lewatkan 1 persiapan paling penting ini!",
+                    "script_structure": [
+                        "00-03s: Hook visual persiapan ibadah di Tanah Suci",
+                        "03-30s: Tunjukkan 1 tips fisik atau doa paling krusial",
+                        "30-45s: Simpan video ini dan cek panduan lengkapnya",
+                    ],
+                    "target_metric": "Viewed vs Swiped Away > 75%",
+                }
+        elif niche == "documentary":
             is_volcano = any(
                 k in comp_text
                 for k in [
@@ -1567,63 +1731,242 @@ class SearchIntelligence:
                 "target_metric": "Viewed vs Swiped Away > 75%",
             }
         elif niche == "travel":
-            clean_dest = clean
-            for prefix in [
-                "Wisata ",
-                "Liburan Ke ",
-                "Liburan ",
-                "Tempat Wisata ",
-                "Jalan Jalan Ke ",
-            ]:
-                if clean.lower().startswith(prefix.lower()):
-                    clean_dest = clean[len(prefix) :].strip()
-                    break
-
-            angle_curiosity = (
-                f"Spot Tersembunyi di {clean_dest} yang Jarang Diketahui Turis Biasa"
-                if seed_mod == 0
-                else f"Hidden Gem di {clean_dest} yang Pemandangannya Jauh Lebih Indah dari Tempat Viral"
+            is_lodging = any(
+                k in seed_lower or k in comp_text
+                for k in [
+                    "hotel",
+                    "villa",
+                    "resort",
+                    "penginapan",
+                    "homestay",
+                    "glamping",
+                    "staycation",
+                    "kamar",
+                ]
             )
-            angle_stakes = (
-                f"Cara Liburan ke {clean_dest} Hemat Budget: Tips Pilih Transportasi & Penginapan Nyaman"
-                if seed_mod == 0
-                else f"Eksplorasi {clean_dest} Seharian: Rute Tercepat, Biaya Riil, & Spot Foto Paling Keren"
+            is_transport = any(
+                k in seed_lower or k in comp_text
+                for k in ["tiket", "pesawat", "penerbangan", "kereta", "bus", "bandara", "stasiun"]
             )
-            angle_contrarian = (
-                f"Jangan Pergi ke {clean_dest} Sebelum Tahu 5 Hal Krusial Ini (Review Pengalaman Nyata)"
-                if seed_mod == 0
-                else f"Ekspektasi vs Realita Liburan ke {clean_dest}: Tips Biar Gak Kena Zonk atau Boncos"
-            )
-            angle_deep = (
-                f"Itinerary Lengkap {clean_dest}: Panduan Rute, Rincian Biaya, & Tips Penting Terlengkap"
-                if seed_mod == 0
-                else f"Panduan Jujur Liburan ke {clean_dest}: Estimasi Budget Nyata & Rekomendasi Tempat Terbaik"
+            is_rental = any(
+                k in seed_lower or k in comp_text for k in ["sewa", "rental", "rent car"]
             )
 
-            outranking_title = f"Panduan Jujur Liburan ke {clean_dest}: Rincian Biaya Nyata, Rute Terbaik & Spot Hidden Gem"
-            title_formula = "Pola Counter-Positioning: [Transparansi Biaya & Rute] + [Destinasi] + [Keuntungan Nilai Nyata Bagi Traveler]"
-            two_line_hook = (
-                f"Rencana liburan ke {clean}? Tonton panduan lengkap rute terbaik, "
-                f"estimasi budget, dan rekomendasi spot tersembunyi yang wajib kamu kunjungi!"
-            )
-            timestamps = [
-                "00:00 - Pesona Keindahan Lokasi",
-                f"01:45 - Rute & Transportasi Menuju {clean}",
-                "05:20 - Rekomendasi Spot Terbaik & Hidden Gem",
-                "09:10 - Estimasi Biaya & Kuliner Khas",
-                "12:30 - Tips Penting Sebelum Berangkat",
-            ]
-            hashtags = [f"#{clean_tag}", f"#Wisata{clean_tag}", "#TravelVlog", "#LiburanHemat"]
-            shorts_package = {
-                "title": f"Spot Rahasia di {clean} yang Jarang Orang Tahu! #shorts",
-                "three_second_hook": f"Kalau kamu ke {clean}, jangan cuma ke tempat biasa, cobain spot rahasia ini!",
-                "script_structure": [
-                    "00-03s: Hook panorama indah spot tersembunyi",
-                    "03-30s: Ulas rute dan keindahan uniknya",
-                    "30-45s: Simpan video ini untuk rencana liburanmu",
-                ],
-                "target_metric": "Viewed vs Swiped Away > 75%",
-            }
+            if is_lodging:
+                angle_curiosity = (
+                    f"Review Jujur {clean}: Realita Fasilitas Kamar, Kebersihan & Apakah Sepadan Harganya?"
+                    if seed_mod == 0
+                    else f"Pengalaman Menginap di {clean}: Suasana Kamar, Pemandangan & Fasilitas Nyata"
+                )
+                angle_stakes = (
+                    f"Pengalaman Nyata Menginap di {clean}: Akses Lokasi, Suasana Malam & Kenyamanan Istirahat"
+                    if seed_mod == 0
+                    else f"Review Menginap di {clean}: Apakah Worth It untuk Liburan Bareng Keluarga?"
+                )
+                angle_contrarian = (
+                    f"Jangan Booking {clean} Sebelum Tahu 3 Hal Ini! Perbandingan Foto vs Kondisi Asli di Lapangan"
+                    if seed_mod == 0
+                    else f"Kelebihan & Kekurangan {clean}: Review Transparan Sebelum Kamu Bayar Kamar"
+                )
+                angle_deep = (
+                    f"Room Tour & Ulasan Komplit {clean}: Tipe Kamar, Sarapan Pagi, Fasilitas Unggulan & Kisaran Biaya"
+                    if seed_mod == 0
+                    else f"Panduan Menginap di {clean}: Tipe Kamar Terbaik, Fasilitas & Tips Booking Hemat"
+                )
+                outranking_title = f"Review Jujur {clean}: Realita Fasilitas Kamar, Suasana & Apakah Sepadan Harganya?"
+                title_formula = "Pola Counter-Positioning: [Review Transparan Foto vs Realita] + [Nama Penginapan] + [Pertimbangan Kelayakan Harga]"
+                two_line_hook = (
+                    f"Tertarik menginap di {clean}? Di video ini kita review tuntas suasana kamar, "
+                    f"fasilitas asli di lapangan, dan apakah sepadan dengan biaya menginapnya!"
+                )
+                timestamps = [
+                    "00:00 - First Impression & Lokasi",
+                    f"01:45 - Room Tour & Fasilitas Kamar {clean}",
+                    "05:30 - Area Publik, Kolam & Fasilitas Unggulan",
+                    "08:45 - Review Menu Sarapan & Cita Rasa",
+                    "11:30 - Kesimpulan & Rekomendasi Booking",
+                ]
+                hashtags = [
+                    f"#{clean_tag}",
+                    "#HotelReview",
+                    "#RoomTour",
+                    "#Staycation",
+                    "#ReviewPenginapan",
+                ]
+                shorts_package = {
+                    "title": f"Review Jujur Menginap di {clean}! #shorts",
+                    "three_second_hook": f"Mau staycation di {clean}? Cek realita fasilitas kamarnya dulu!",
+                    "script_structure": [
+                        "00-03s: Hook visual kamar dan pemandangan",
+                        "03-30s: Tunjukkan 1 fasilitas terbaik vs kekurangannya",
+                        "30-45s: Simpan video ini untuk referensi liburanmu",
+                    ],
+                    "target_metric": "Viewed vs Swiped Away > 75%",
+                }
+            elif is_transport:
+                angle_curiosity = (
+                    f"Trik Rahasia Berburu {clean}: Waktu Terbaik Pemesanan Biar Dapat Tarif Termurah"
+                    if seed_mod == 0
+                    else f"Cara Dapat {clean} Murah Tanpa Nunggu Promo Besar: Trik yang Jarang Dipakai"
+                )
+                angle_stakes = (
+                    f"Panduan Perjalanan {clean}: Alur Check-In, Aturan Bagasi & Tips Nyaman Selama Perjalanan"
+                    if seed_mod == 0
+                    else f"Eksplorasi Rute {clean}: Perbandingan Waktu Tempuh, Biaya & Kenyamanan Perjalanan"
+                )
+                angle_contrarian = (
+                    f"Jangan Asal Beli {clean}! 3 Kesalahan yang Sering Bikin Harga Melonjak 2x Lipat"
+                    if seed_mod == 0
+                    else f"Banyak yang Boncos Saat Beli {clean}: Ini Waktu Paling Salah Membeli Tiket"
+                )
+                angle_deep = (
+                    f"Panduan Lengkap Berburu {clean} Murah: Perbandingan Maskapai/Armada, Tips Promo & Rute Paling Hemat"
+                    if seed_mod == 0
+                    else f"Panduan Komprehensif {clean}: Cara Pesan, Kebijakan Refund & Tips Memilih Kursi Terbaik"
+                )
+                outranking_title = f"Trik Berburu {clean} Termurah: Strategi Pilih Tanggal & Waktu Terbaik Pemesanan"
+                title_formula = "Pola Counter-Positioning: [Trik Berburu Harga Termurah] + [Subjek Tiket/Transport] + [Strategi Pemesanan Cerdas]"
+                two_line_hook = (
+                    f"Mau pesan {clean} dengan harga paling hemat? "
+                    f"Di video ini kita bongkar trik berburu tarif termurah dan tips menghindari biaya tersembunyi!"
+                )
+                timestamps = [
+                    "00:00 - Pengantar & Masalah Lonjakan Harga",
+                    f"01:30 - Waktu Terbaik Berburu {clean}",
+                    "05:00 - Perbandingan Platform & Maskapai",
+                    "08:30 - Tips Hindari Biaya Tambahan & Aturan Bagasi",
+                    "11:15 - Kesimpulan & Rekomendasi Pemesanan",
+                ]
+                hashtags = [
+                    f"#{clean_tag}",
+                    "#TiketMurah",
+                    "#TipsTravel",
+                    "#TravelHemat",
+                    "#InfoTransportasi",
+                ]
+                shorts_package = {
+                    "title": f"Trik Rahasia Pesan {clean} Murah! #shorts",
+                    "three_second_hook": f"Jangan beli {clean} sebelum kamu tahu trik jam pemesanan ini!",
+                    "script_structure": [
+                        "00-03s: Hook jangan beli tiket di jam ini",
+                        "03-30s: Tunjukkan trik perbandingan tarif",
+                        "30-45s: Simpan video ini dan cek panduan lengkapnya",
+                    ],
+                    "target_metric": "Viewed vs Swiped Away > 75%",
+                }
+            elif is_rental:
+                angle_curiosity = (
+                    f"Tips Aman & Hemat Memilih {clean}: Syarat Lepas Kunci, Kondisi Unit & Bebas Biaya Terselubung"
+                    if seed_mod == 0
+                    else f"Trik Dapat {clean} Murah dengan Unit Terawat & Pelayanan Amanah"
+                )
+                angle_stakes = (
+                    f"Pengalaman Pakai {clean}: Cek Kondisi Fisik Kendaraan Sebelum Tanda Tangan Serah Terima"
+                    if seed_mod == 0
+                    else f"Alur Sewa {clean} Lepas Kunci: Syarat Berkas, Deposit & Tips Selama Berkendara"
+                )
+                angle_contrarian = (
+                    f"Waspada Jebakan Saat Pakai {clean}: Cek Bagian Ini Biar Gak Kena Klaim Denda Sepihak"
+                    if seed_mod == 0
+                    else f"Jangan Langsung Ambil {clean} Murah Sebelum Cek 3 Hal Wajib Ini!"
+                )
+                angle_deep = (
+                    f"Panduan Lengkap Memilih {clean}: Rincian Tarif Harian, Syarat Sewa & Rekomendasi Terpercaya"
+                    if seed_mod == 0
+                    else f"Panduan Sewa {clean} untuk Pemula: Cara Cek Unit, Asuransi & Hak Konsumen"
+                )
+                outranking_title = f"Panduan Aman Memilih {clean}: Tips Cek Unit, Syarat Sewa & Hindari Biaya Tambahan"
+                title_formula = "Pola Counter-Positioning: [Panduan Aman & Hemat] + [Subjek Rental] + [Mitigasi Biaya Tersembunyi]"
+                two_line_hook = (
+                    f"Sedang butuh {clean} untuk perjalananmu? "
+                    f"Di video ini kita kupas panduan sewa aman, syarat lepas kunci, dan tips cek unit agar tidak rugi!"
+                )
+                timestamps = [
+                    "00:00 - Pengantar & Hal Penting Sebelum Sewa",
+                    f"01:45 - Kisaran Tarif Wajar {clean}",
+                    "04:30 - Cek Fisik & Kelengkapan Surat Unit",
+                    "08:00 - Aturan Deposit, Bensin & Kebijakan Denda",
+                    "10:45 - Kesimpulan & Checklist Serah Terima",
+                ]
+                hashtags = [
+                    f"#{clean_tag}",
+                    "#RentalMobil",
+                    "#RentalMotor",
+                    "#TipsSewa",
+                    "#TravelingHemat",
+                ]
+                shorts_package = {
+                    "title": f"Waspada Sewa {clean}, Cek Ini Dulu! #shorts",
+                    "three_second_hook": f"Sebelum bayar {clean}, rekam video di bagian kendaraan ini biar gak kena denda!",
+                    "script_structure": [
+                        "00-03s: Hook rekam bagian ini sebelum sewa",
+                        "03-30s: Tunjukkan tips cek fisik dan surat",
+                        "30-45s: Simpan video ini untuk rencana travelingmu",
+                    ],
+                    "target_metric": "Viewed vs Swiped Away > 75%",
+                }
+            else:
+                clean_dest = clean
+                for prefix in [
+                    "Tempat Wisata ",
+                    "Wisata Alam ",
+                    "Wisata ",
+                    "Liburan Ke ",
+                    "Liburan ",
+                    "Jalan Jalan Ke ",
+                    "Jalan-Jalan Ke ",
+                    "Tour Ke ",
+                    "Tour ",
+                ]:
+                    if clean.lower().startswith(prefix.lower()):
+                        clean_dest = clean[len(prefix) :].strip()
+                        break
+
+                angle_curiosity = (
+                    f"Spot Tersembunyi di {clean_dest} yang Jarang Diketahui Orang Banyak"
+                    if seed_mod == 0
+                    else f"Hidden Gem di {clean_dest} yang Suasananya Jauh Lebih Menenangkan dari Tempat Viral"
+                )
+                angle_stakes = (
+                    f"Panduan Liburan ke {clean_dest} Hemat Budget: Rute Tercepat, Estimasi Biaya & Tips Nyaman"
+                    if seed_mod == 0
+                    else f"Eksplorasi {clean_dest} Seharian: Rute Tercepat, Biaya Riil, & Spot Foto Paling Keren"
+                )
+                angle_contrarian = (
+                    f"Jangan Pergi ke {clean_dest} Sebelum Tahu 5 Hal Krusial Ini (Review Pengalaman Nyata)"
+                    if seed_mod == 0
+                    else f"Ekspektasi vs Realita Liburan ke {clean_dest}: Tips Biar Gak Kena Zonk atau Boncos"
+                )
+                angle_deep = (
+                    f"Itinerary Lengkap {clean_dest}: Panduan Rute, Rincian Biaya, & Tips Penting Terlengkap"
+                    if seed_mod == 0
+                    else f"Panduan Jujur Liburan ke {clean_dest}: Estimasi Budget Nyata & Rekomendasi Tempat Terbaik"
+                )
+
+                outranking_title = f"Panduan Jujur Liburan ke {clean_dest}: Rincian Biaya Nyata, Rute Terbaik & Spot Wajib Kunjung"
+                title_formula = "Pola Counter-Positioning: [Transparansi Biaya & Rute] + [Destinasi] + [Keuntungan Nilai Nyata Bagi Traveler]"
+                two_line_hook = (
+                    f"Rencana liburan ke {clean}? Tonton panduan lengkap rute terbaik, "
+                    f"estimasi budget, dan rekomendasi spot terbaik yang wajib kamu kunjungi!"
+                )
+                timestamps = [
+                    "00:00 - Pesona Keindahan Lokasi",
+                    f"01:45 - Rute & Transportasi Menuju {clean}",
+                    "05:20 - Rekomendasi Spot Terbaik & Daya Tarik",
+                    "09:10 - Estimasi Biaya & Kuliner Khas",
+                    "12:30 - Tips Penting Sebelum Berangkat",
+                ]
+                hashtags = [f"#{clean_tag}", f"#Wisata{clean_tag}", "#TravelVlog", "#LiburanHemat"]
+                shorts_package = {
+                    "title": f"Spot Menarik di {clean} yang Wajib Kamu Kunjungi! #shorts",
+                    "three_second_hook": f"Kalau kamu ke {clean}, jangan lewatkan spot pemandangan indah satu ini!",
+                    "script_structure": [
+                        "00-03s: Hook panorama indah lokasi wisata",
+                        "03-30s: Ulas rute dan keindahan uniknya",
+                        "30-45s: Simpan video ini untuk rencana liburanmu",
+                    ],
+                    "target_metric": "Viewed vs Swiped Away > 75%",
+                }
         elif niche == "business":
             clean_biz = clean
             for prefix in ["Strategi ", "Cara ", "Panduan ", "Tips "]:
@@ -1906,16 +2249,19 @@ class SearchIntelligence:
         niche_desc_intro_map = {
             "documentary": f"📌 Bedah tuntas fakta, kronologi, dan temuan terbaru seputar {clean}. Tonton dari awal agar tidak ada informasi penting yang terlewat!",
             "culinary": f"📌 Resep lengkap, takaran pas, dan rahasia bumbu untuk membuat {clean} sempurna. Tonton sampai selesai agar hasilnya anti gagal!",
-            "travel": f"📌 Panduan wisata lengkap ke {clean}: rute terbaik, estimasi biaya, dan tips tersembunyi. Tonton agar liburanmu makin seru!",
+            "travel": f"📌 Panduan lengkap seputar {clean}: rute terbaik, estimasi biaya riil, dan tips penting. Tonton agar perjalananmu lebih terencana dan berkesan!",
             "entertainment": f"📌 Bedah cerita, teori, dan detail tersembunyi dari {clean}. Tonton sampai habis agar tidak ada detail penting yang terlewat!",
             "health_fitness": f"📌 Penjelasan medis, tips alami, dan langkah nyata mengatasi {clean}. Simak sampai selesai untuk informasi yang akurat dan aman!",
             "business": f"📌 Strategi nyata, studi kasus, dan langkah eksekusi seputar {clean}. Tonton dari awal hingga akhir agar tidak ada step yang terlewat!",
             "tech_tutorial": f"📌 Tutorial step-by-step dan tips praktis seputar {clean}. Tonton dari awal agar proses belajarmu lebih cepat dan tidak bingung!",
         }
-        desc_intro = niche_desc_intro_map.get(
-            niche,
-            f"📌 Rangkuman lengkap dan mendalam seputar {clean}. Tonton video ini dari awal sampai akhir agar tidak ada detail penting yang terlewat!",
-        )
+        if is_haji_umroh:
+            desc_intro = f"📌 Panduan komprehensif seputar {clean}: persiapan ibadah, transparansi biaya, dan tips penting menuju Tanah Suci. Tonton video ini dari awal sampai akhir agar tidak ada informasi penting yang terlewat!"
+        else:
+            desc_intro = niche_desc_intro_map.get(
+                niche,
+                f"📌 Rangkuman lengkap dan mendalam seputar {clean}. Tonton video ini dari awal sampai akhir agar tidak ada detail penting yang terlewat!",
+            )
 
         full_description = (
             f"{two_line_hook}\n\n"

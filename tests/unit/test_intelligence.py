@@ -214,3 +214,36 @@ def test_generate_clipping_opportunities():
         assert "timestamp_window" in c
         assert "hook_line" in c
         assert "call_to_action" in c
+
+
+def test_smart_heuristic_haji_umroh_consultant():
+    plan = SearchIntelligence.generate_outranking_plan("konsultan haji umroh")
+    # Must NOT have weird travel phrases like "spot tersembunyi" or "liburan"
+    assert "spot tersembunyi" not in plan["outranking_title"].lower()
+    assert "liburan" not in plan["outranking_title"].lower()
+    for alt in plan["alternative_titles"]:
+        assert "spot tersembunyi" not in alt.lower()
+        assert "liburan" not in alt.lower()
+    # Must contain relevant legal/service terms
+    assert any(
+        kw in plan["outranking_title"] or any(kw in a for a in plan["alternative_titles"])
+        for kw in ["Kemenag", "Resmi", "Amanah", "Legalitas", "Jamaah", "PPIU"]
+    )
+
+
+def test_smart_heuristic_travel_subcategories():
+    # Hotel lodging keyword must not mention "spot tersembunyi"
+    hotel_plan = SearchIntelligence.generate_outranking_plan("hotel bali murah")
+    assert "spot tersembunyi" not in hotel_plan["outranking_title"].lower()
+    assert (
+        "review" in hotel_plan["outranking_title"].lower()
+        or "kamar" in hotel_plan["outranking_title"].lower()
+    )
+
+    # Rental keyword must not mention "spot tersembunyi"
+    rental_plan = SearchIntelligence.generate_outranking_plan("sewa mobil jogja")
+    assert "spot tersembunyi" not in rental_plan["outranking_title"].lower()
+    assert (
+        "sewa" in rental_plan["outranking_title"].lower()
+        or "unit" in rental_plan["outranking_title"].lower()
+    )

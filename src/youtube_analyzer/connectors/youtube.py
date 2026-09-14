@@ -393,7 +393,7 @@ class YouTubeConnector(BaseConnector):
                     api_cat_id = "1"
 
                 api_url = "https://www.googleapis.com/youtube/v3/videos"
-                api_params = {
+                api_params: dict[str, str | int] = {
                     "part": "snippet,contentDetails,statistics",
                     "chart": "mostPopular",
                     "regionCode": gl if gl != "WW" else "US",

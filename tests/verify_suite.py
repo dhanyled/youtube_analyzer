@@ -38,9 +38,7 @@ def test_database():
         session.refresh(test_topic)
 
         # Query
-        record = session.exec(
-            select(Topic).where(Topic.canonical_id == "TEST-VERIFY-001")
-        ).first()
+        record = session.exec(select(Topic).where(Topic.canonical_id == "TEST-VERIFY-001")).first()
         assert record is not None
         assert record.name == "Verification Topic"
 
@@ -85,14 +83,20 @@ def test_brand_scrub():
 async def test_live_youtube():
     print("[3/5] Testing Live YouTube Trending & Competitor Connectors...")
     conn = YouTubeConnector()
-    trending = await conn.get_trending_feed(gl="ID", hl="id", category="now", device="desktop", limit=3)
+    trending = await conn.get_trending_feed(
+        gl="ID", hl="id", category="now", device="desktop", limit=3
+    )
     assert len(trending) > 0
     sample = trending[0]
-    print(f"   -> OK: Trending fetched {len(trending)} items. Sample: '{sample['title'][:35]}...' ({sample['views']})")
+    print(
+        f"   -> OK: Trending fetched {len(trending)} items. Sample: '{sample['title'][:35]}...' ({sample['views']})"
+    )
 
     competitors = await conn.get_top_competitors("google ads pemula", limit=3)
     assert len(competitors) > 0
-    print(f"   -> OK: Competitor spy fetched {len(competitors)} videos. Top rank: '{competitors[0]['title'][:35]}...'")
+    print(
+        f"   -> OK: Competitor spy fetched {len(competitors)} videos. Top rank: '{competitors[0]['title'][:35]}...'"
+    )
 
 
 def test_google_trends_rss():
@@ -105,17 +109,27 @@ def test_google_trends_rss():
         items = root.findall(".//item")
         assert len(items) > 0
         top_trend = items[0].find("title").text if items[0].find("title") is not None else "Unknown"
-        print(f"   -> OK: Google Trends RSS live fetched {len(items)} items. Top trend: '{top_trend}'")
+        print(
+            f"   -> OK: Google Trends RSS live fetched {len(items)} items. Top trend: '{top_trend}'"
+        )
 
 
 def test_dynamic_metrics():
     print("[5/5] Testing Dynamic Metric Differencing (Anti-Static Guardrail)...")
-    kw_tech = SearchIntelligence.estimate_keyword_metrics("python programming", [{"views": "500K views"}])
-    kw_cooking = SearchIntelligence.estimate_keyword_metrics("resep tahu tempe murah", [{"views": "5K views"}])
+    kw_tech = SearchIntelligence.estimate_keyword_metrics(
+        "python programming", [{"views": "500K views"}]
+    )
+    kw_cooking = SearchIntelligence.estimate_keyword_metrics(
+        "resep tahu tempe murah", [{"views": "5K views"}]
+    )
     assert kw_tech["search_volume"] != kw_cooking["search_volume"]
     assert kw_tech["opportunity_score"] != kw_cooking["opportunity_score"]
-    print(f"   -> OK: High view keyword: vol={kw_tech['search_volume']}, score={kw_tech['opportunity_score']}")
-    print(f"   -> OK: Niche keyword: vol={kw_cooking['search_volume']}, score={kw_cooking['opportunity_score']}")
+    print(
+        f"   -> OK: High view keyword: vol={kw_tech['search_volume']}, score={kw_tech['opportunity_score']}"
+    )
+    print(
+        f"   -> OK: Niche keyword: vol={kw_cooking['search_volume']}, score={kw_cooking['opportunity_score']}"
+    )
 
 
 async def main():

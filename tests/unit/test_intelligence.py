@@ -167,4 +167,3 @@ def test_generate_clipping_opportunities():
         assert "timestamp_window" in c
         assert "hook_line" in c
         assert "call_to_action" in c
-

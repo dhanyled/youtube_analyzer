@@ -56,4 +56,3 @@ async def test_youtube_trending_feed():
     assert len(mobile_trending) > 0
     assert mobile_trending[0]["device"] == "MOBILE"
     assert mobile_trending[0]["location"] == "US"
-

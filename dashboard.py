@@ -299,7 +299,16 @@ if keyword_input:
     # -------------------------------------------------------------
     # TAB UTAMA DASHBOARD
     # -------------------------------------------------------------
-    tab_spy, tab_trending, tab_research, tab_flow, tab_landscape, tab_shorts, tab_keywords, tab_trends = st.tabs(
+    (
+        tab_spy,
+        tab_trending,
+        tab_research,
+        tab_flow,
+        tab_landscape,
+        tab_shorts,
+        tab_keywords,
+        tab_trends,
+    ) = st.tabs(
         [
             "🕵️‍♂️ Intip Kompetitor & AI",
             "🔥 YouTube Trending Feed",
@@ -465,9 +474,7 @@ if keyword_input:
             f"{ai_in_trending} / {total_vids} Video",
             f"{(ai_in_trending / max(total_vids, 1)) * 100:.1f}% AI Content",
         )
-        tf_c3.metric(
-            "Format Target", dev_val.upper(), f"Negara: {gl_val} | Bahasa: {hl_val}"
-        )
+        tf_c3.metric("Format Target", dev_val.upper(), f"Negara: {gl_val} | Bahasa: {hl_val}")
         tf_c4.metric(
             "Status Sumber Data",
             "🟢 LIVE SERP" if "LIVE" in source_badge else "🟡 BENCHMARK",

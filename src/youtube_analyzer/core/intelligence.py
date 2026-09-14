@@ -909,7 +909,9 @@ class SearchIntelligence:
                     "Penonton aktif mencari panduan dengan UI dan sistem terbaru 2026."
                 )
                 action_plan = f"Buat video '{q.title()}' dengan demonstrasi fitur terkini 2026."
-            elif not has_shorts and any(w in q_clean for w in ["trik", "rahasia", "cepat", "modal"]):
+            elif not has_shorts and any(
+                w in q_clean for w in ["trik", "rahasia", "cepat", "modal"]
+            ):
                 is_gap = True
                 gap_type = "📱 Missing Shorts Gap"
                 gap_reason = (
@@ -930,8 +932,12 @@ class SearchIntelligence:
             else:
                 is_gap = False
                 gap_type = "✅ Saturated / Covered"
-                gap_reason = "Sudah banyak video kompetitor dengan views tinggi yang membahas topik ini."
-                action_plan = "Hanya buat jika memiliki sudut pandang / studi kasus yang sangat kontras."
+                gap_reason = (
+                    "Sudah banyak video kompetitor dengan views tinggi yang membahas topik ini."
+                )
+                action_plan = (
+                    "Hanya buat jika memiliki sudut pandang / studi kasus yang sangat kontras."
+                )
 
             results.append(
                 {
@@ -949,9 +955,7 @@ class SearchIntelligence:
         return results
 
     @classmethod
-    def analyze_competitor_outliers(
-        cls, competitors: list[dict[str, Any]]
-    ) -> dict[str, Any]:
+    def analyze_competitor_outliers(cls, competitors: list[dict[str, Any]]) -> dict[str, Any]:
         """
         Viral Outlier Multiplier Analysis.
         Calculates median views across top ranking videos and finds viral breakout outliers.
@@ -1021,9 +1025,7 @@ class SearchIntelligence:
         }
 
     @classmethod
-    def analyze_faceless_viability(
-        cls, seed: str, rpm_info: dict[str, Any]
-    ) -> dict[str, Any]:
+    def analyze_faceless_viability(cls, seed: str, rpm_info: dict[str, Any]) -> dict[str, Any]:
         """
         Faceless Niche Opportunity Analysis.
         Evaluates AI / Faceless viability, scripting automation, and B-roll feasibility.
@@ -1063,9 +1065,7 @@ class SearchIntelligence:
             )
         else:
             tier = "🔴 KURANG IDEAL UNTUK FACELESS"
-            verdict = (
-                "Niche ini sangat mengandalkan personal branding, ekspresi wajah, atau demonstrasi fisik langsung."
-            )
+            verdict = "Niche ini sangat mengandalkan personal branding, ekspresi wajah, atau demonstrasi fisik langsung."
 
         return {
             "faceless_score": score,

@@ -449,4 +449,3 @@ async def generate_shorts_clipping_ideas(topic: str, title: str = "") -> str:
 
 if __name__ == "__main__":
     mcp.run()
-

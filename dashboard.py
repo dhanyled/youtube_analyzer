@@ -173,46 +173,62 @@ def save_or_get_topic(seed_keyword: str):
     canonical_id = TopicNormalizer.generate_canonical_id(seed_keyword)
     surfaces = TopicNormalizer.expand_seed_surfaces(seed_keyword)
 
-    with Session(engine) as session:
-        topic = session.exec(select(Topic).where(Topic.canonical_id == canonical_id)).first()
-        if not topic:
-            topic = Topic(
-                canonical_id=canonical_id,
-                name=seed_keyword.strip().title(),
-                seed_keyword=seed_keyword.strip(),
-                description=f"Riset topik '{seed_keyword}' via Browser App",
-            )
-            session.add(topic)
-            session.commit()
-            session.refresh(topic)
+    try:
+        with Session(engine) as session:
+            topic = session.exec(select(Topic).where(Topic.canonical_id == canonical_id)).first()
+            if not topic:
+                topic = Topic(
+                    canonical_id=canonical_id,
+                    name=seed_keyword.strip().title(),
+                    seed_keyword=seed_keyword.strip(),
+                    description=f"Riset topik '{seed_keyword}' via Browser App",
+                )
+                session.add(topic)
+                session.commit()
+                session.refresh(topic)
 
-            for platform, queries in surfaces.items():
-                for q in queries:
-                    session.add(
-                        Query(
-                            topic_id=topic.id,
-                            query_text=q,
-                            platform=platform,
-                            query_type="seed_expansion",
+                for platform, queries in surfaces.items():
+                    for q in queries:
+                        session.add(
+                            Query(
+                                topic_id=topic.id,
+                                query_text=q,
+                                platform=platform,
+                                query_type="seed_expansion",
+                            )
                         )
-                    )
 
-            clusters = TopicNormalizer.create_intent_clusters(
-                topic_id=topic.id,
-                google_terms=surfaces[PlatformEnum.GOOGLE_SEARCH],
-                youtube_terms=surfaces[PlatformEnum.YOUTUBE_SEARCH],
-                aeo_queries=surfaces[PlatformEnum.AI_SEARCH],
-            )
-            for c in clusters:
-                session.add(c)
-            session.commit()
+                clusters = TopicNormalizer.create_intent_clusters(
+                    topic_id=topic.id,
+                    google_terms=surfaces[PlatformEnum.GOOGLE_SEARCH],
+                    youtube_terms=surfaces[PlatformEnum.YOUTUBE_SEARCH],
+                    aeo_queries=surfaces[PlatformEnum.AI_SEARCH],
+                )
+                for c in clusters:
+                    session.add(c)
+                session.commit()
 
-        queries = session.exec(select(Query).where(Query.topic_id == topic.id)).all()
-        clusters = session.exec(
-            select(IntentCluster).where(IntentCluster.topic_id == topic.id)
-        ).all()
+            queries = session.exec(select(Query).where(Query.topic_id == topic.id)).all()
+            clusters = session.exec(
+                select(IntentCluster).where(IntentCluster.topic_id == topic.id)
+            ).all()
 
-    return topic, surfaces, clusters, queries
+            return topic, surfaces, clusters, queries
+    except Exception as e:
+        print(f"Notice: Database session notice (fallback to in-memory): {e}")
+        fallback_topic = Topic(
+            canonical_id=canonical_id,
+            name=seed_keyword.strip().title(),
+            seed_keyword=seed_keyword.strip(),
+            description=f"Riset topik '{seed_keyword}' via Browser App",
+        )
+        clusters = TopicNormalizer.create_intent_clusters(
+            topic_id=1,
+            google_terms=surfaces[PlatformEnum.GOOGLE_SEARCH],
+            youtube_terms=surfaces[PlatformEnum.YOUTUBE_SEARCH],
+            aeo_queries=surfaces[PlatformEnum.AI_SEARCH],
+        )
+        return fallback_topic, surfaces, clusters, []
 
 
 def fetch_google_trends_rss(geo: str = "ID") -> list[dict[str, str]]:

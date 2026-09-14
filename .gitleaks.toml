@@ -1,0 +1,6 @@
+[allowlist]
+description = "Global allowlist for tests and examples"
+paths = [
+    '''tests/.*''',
+    '''\.env\.example''',
+]

@@ -92,14 +92,19 @@ def test_smart_heuristic_volcano_vs_climbing_differentiation():
 
 
 def test_generate_outranking_plan_ai_error_graceful_fallback():
-    # Pass an invalid API key config - it should cleanly catch error and fall back
-    plan = SearchIntelligence.generate_outranking_plan(
-        "gunung krakatau",
-        competitors=[{"title": "Erupsi Krakatau", "views": "100K"}],
-        ai_config={"provider": "gemini", "api_key": "invalid_test_key_12345"},
-    )
-    assert "outranking_title" in plan
-    assert len(plan["alternative_titles"]) == 4
+    from unittest.mock import patch
+
+    with patch(
+        "youtube_analyzer.core.ai_generator.AITitleGenerator.generate_strategy",
+        side_effect=Exception("API Timeout"),
+    ):
+        plan = SearchIntelligence.generate_outranking_plan(
+            "gunung krakatau",
+            competitors=[{"title": "Erupsi Krakatau", "views": "100K"}],
+            ai_config={"provider": "gemini", "api_key": "mock"},
+        )
+        assert "outranking_title" in plan
+        assert len(plan["alternative_titles"]) == 4
 
 
 def test_analyze_ai_competitor_presence():

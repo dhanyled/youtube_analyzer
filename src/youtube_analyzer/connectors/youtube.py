@@ -915,7 +915,7 @@ class YouTubeConnector(BaseConnector):
                     competitors = self._parse_youtube_search_html(resp.text, limit=limit)
                     if competitors:
                         if len(competitors) < limit:
-                            for fb in fallback_items[len(competitors):limit]:
+                            for fb in fallback_items[len(competitors) : limit]:
                                 fb_copy = dict(fb)
                                 fb_copy["rank"] = len(competitors) + 1
                                 competitors.append(fb_copy)
@@ -1239,7 +1239,7 @@ class YouTubeConnector(BaseConnector):
                             c["location"] = gl
                             c["language"] = hl
                         if len(competitors) < limit:
-                            for fb in fallback_feed[len(competitors):limit]:
+                            for fb in fallback_feed[len(competitors) : limit]:
                                 fb_copy = dict(fb)
                                 fb_copy["rank"] = len(competitors) + 1
                                 competitors.append(fb_copy)

@@ -256,119 +256,328 @@ class SearchIntelligence:
     @classmethod
     def detect_content_niche(cls, seed: str) -> str:
         """
-        Intelligently detects content genre/niche for context-aware copywriting,
-        titles, hooks, timestamps, and storyboards.
+        Intelligently detects content genre/niche using a weighted keyword scoring system.
+        Each keyword match increments a niche score. The niche with the highest total score wins.
+        Ties are broken by a predefined priority order.
+
         Returns one of: 'documentary', 'culinary', 'travel', 'entertainment',
         'health_fitness', 'business', 'tech_tutorial', 'general'.
         """
         lowered = seed.strip().lower()
 
-        # 1. Documentary / History / Disaster / Nature / Science / Mystery
-        if any(
-            k in lowered
-            for k in [
-                "krakatau", "letusan", "gunung", "meletus", "gempa", "tsunami",
-                "bencana", "sejarah", "perang", "dinosaurus", "misteri", "alien",
-                "segitiga bermuda", "luar angkasa", "bumi", "planet", "arkeologi",
-                "fosil", "konspirasi", "mitos", "legenda", "antartika", "tragedi",
-                "kronologi", "sains", "biologi", "fisika", "tata surya", "hewan buas",
-                "hiu", "singa", "ekspedisi", "piramida", "atlantis", "hantu", "horor",
-                "meteor", "asteroid", "black hole", "lubang hitam", "kerajaan",
-                "majapahit", "pahlawan", "kisah nyata", "dokumenter", "arkeologis",
-                "alam", "laut dalam", "palung", "hutan", "safari", "antartika"
-            ]
-        ):
-            return "documentary"
+        # --- Keyword pools per niche with weight ---
+        # Weight 2 = strong signal (specific, unambiguous keyword)
+        # Weight 1 = weak signal (generic, may appear in multiple contexts)
+        niche_keywords: dict[str, list[tuple[str, int]]] = {
+            "documentary": [
+                ("krakatau", 2),
+                ("letusan", 2),
+                ("meletus", 2),
+                ("gempa", 2),
+                ("tsunami", 2),
+                ("bencana", 2),
+                ("sejarah", 2),
+                ("perang", 2),
+                ("dinosaurus", 2),
+                ("alien", 2),
+                ("segitiga bermuda", 2),
+                ("luar angkasa", 2),
+                ("planet", 2),
+                ("arkeologi", 2),
+                ("fosil", 2),
+                ("konspirasi", 2),
+                ("mitos", 2),
+                ("legenda", 2),
+                ("antartika", 2),
+                ("tragedi", 2),
+                ("kronologi", 2),
+                ("tata surya", 2),
+                ("hewan buas", 2),
+                ("ekspedisi", 2),
+                ("piramida", 2),
+                ("atlantis", 2),
+                ("meteor", 2),
+                ("asteroid", 2),
+                ("black hole", 2),
+                ("lubang hitam", 2),
+                ("kerajaan", 2),
+                ("majapahit", 2),
+                ("pahlawan", 2),
+                ("kisah nyata", 2),
+                ("dokumenter", 2),
+                ("arkeologis", 2),
+                ("laut dalam", 2),
+                ("palung", 2),
+                ("safari", 2),
+                ("gunung", 1),
+                ("bumi", 1),
+                ("misteri", 1),
+                ("sains", 1),
+                ("biologi", 1),
+                ("fisika", 1),
+                ("hiu", 1),
+                ("singa", 1),
+                ("hantu", 1),
+                ("horor", 1),
+                ("alam", 1),
+                ("hutan", 1),
+                ("sejarah dunia", 2),
+                ("fakta sejarah", 2),
+            ],
+            "culinary": [
+                ("resep", 2),
+                ("masak", 2),
+                ("bumbu", 2),
+                ("dapur", 2),
+                ("kuliner", 2),
+                ("koki", 2),
+                ("chef", 2),
+                ("mukbang", 2),
+                ("jajanan", 2),
+                ("bakso", 2),
+                ("rendang", 2),
+                ("soto", 2),
+                ("sambal", 2),
+                ("cemilan", 2),
+                ("bolu", 2),
+                ("goreng", 2),
+                ("rebus", 2),
+                ("panggang", 2),
+                ("food", 2),
+                ("snack", 2),
+                ("ayam", 1),
+                ("daging", 1),
+                ("nasi", 1),
+                ("mie", 1),
+                ("kue", 1),
+                ("makanan", 1),
+                ("minuman", 1),
+                ("pedas", 1),
+                ("roti", 1),
+                ("jus", 1),
+                ("kopi", 1),
+                ("teh", 1),
+                ("cafe", 1),
+                ("restoran", 1),
+            ],
+            "travel": [
+                ("wisata", 2),
+                ("liburan", 2),
+                ("itinerary", 2),
+                ("backpacker", 2),
+                ("hidden gem", 2),
+                ("traveling", 2),
+                ("staycation", 2),
+                ("glamping", 2),
+                ("snorkeling", 2),
+                ("diving", 2),
+                ("trekking", 2),
+                ("hiking", 2),
+                ("penginapan", 2),
+                ("resort", 2),
+                ("labuan bajo", 2),
+                ("raja ampat", 2),
+                ("komodo", 2),
+                ("wakatobi", 2),
+                ("bromo", 2),
+                ("toraja", 2),
+                ("solo travel", 2),
+                ("road trip", 2),
+                ("wisata alam", 2),
+                ("wisata religi", 2),
+                ("umroh", 2),
+                ("mekah", 2),
+                ("madinah", 2),
+                ("hotel", 1),
+                ("pantai", 1),
+                ("villa", 1),
+                ("rute", 1),
+                ("tiket", 1),
+                ("bali", 1),
+                ("jogja", 1),
+                ("lombok", 1),
+                ("sumba", 1),
+                ("flores", 1),
+                ("manado", 1),
+                ("bandung", 1),
+                ("surabaya", 1),
+                ("medan", 1),
+                ("makassar", 1),
+                ("singapore", 1),
+                ("malaysia", 1),
+                ("thailand", 1),
+                ("vietnam", 1),
+                ("korea", 1),
+                ("paris", 1),
+                ("london", 1),
+                ("dubai", 1),
+                ("turki", 1),
+                ("mesir", 1),
+                ("jepang", 1),
+                ("eropa", 1),
+                ("danau", 1),
+                ("pulau", 1),
+                ("curug", 1),
+                ("air terjun", 1),
+                ("candi", 1),
+                ("taman", 1),
+                ("tour", 1),
+            ],
+            "entertainment": [
+                ("film", 2),
+                ("movie", 2),
+                ("drama", 2),
+                ("anime", 2),
+                ("manga", 2),
+                ("alur cerita", 2),
+                ("sinopsis", 2),
+                ("rekap", 2),
+                ("ending", 2),
+                ("trailer", 2),
+                ("lirik", 2),
+                ("chord", 2),
+                ("konser", 2),
+                ("komedi", 2),
+                ("parodi", 2),
+                ("sketsa", 2),
+                ("artis", 2),
+                ("gosip", 2),
+                ("gameplay", 2),
+                ("mobile legends", 2),
+                ("free fire", 2),
+                ("roblox", 2),
+                ("genshin", 2),
+                ("valorant", 2),
+                ("minecraft", 2),
+                ("walkthrough", 2),
+                ("streamer", 2),
+                ("lagu", 1),
+                ("musik", 1),
+                ("vlog", 1),
+                ("lucu", 1),
+                ("game", 1),
+                ("gaming", 1),
+                ("gta", 1),
+                ("ps5", 1),
+                ("ff", 1),
+            ],
+            "health_fitness": [
+                ("diet", 2),
+                ("gym", 2),
+                ("fitness", 2),
+                ("workout", 2),
+                ("kalori", 2),
+                ("skincare", 2),
+                ("glowing", 2),
+                ("jerawat", 2),
+                ("herbal", 2),
+                ("medis", 2),
+                ("terapi", 2),
+                ("kolesterol", 2),
+                ("diabetes", 2),
+                ("asam urat", 2),
+                ("penyakit", 2),
+                ("gejala", 2),
+                ("dokter", 2),
+                ("obat", 2),
+                ("kesehatan", 2),
+                ("otot", 1),
+                ("kurus", 1),
+                ("lemak", 1),
+                ("sehat", 1),
+                ("rambut", 1),
+            ],
+            "business": [
+                ("google ads", 2),
+                ("fb ads", 2),
+                ("tiktok ads", 2),
+                ("iklan", 2),
+                ("bisnis", 2),
+                ("omset", 2),
+                ("reseller", 2),
+                ("dropship", 2),
+                ("affiliate", 2),
+                ("saham", 2),
+                ("crypto", 2),
+                ("trading", 2),
+                ("investasi", 2),
+                ("keuangan", 2),
+                ("closing", 2),
+                ("freelance", 2),
+                ("umkm", 2),
+                ("franchise", 2),
+                ("toko online", 2),
+                ("ekspor", 2),
+                ("marketing", 2),
+                ("passive income", 2),
+                ("penjualan", 2),
+                ("ads", 1),
+                ("jualan", 1),
+                ("modal", 1),
+                ("cuan", 1),
+                ("usaha", 1),
+                ("sales", 1),
+                ("gaji", 1),
+                ("impor", 1),
+            ],
+            "tech_tutorial": [
+                ("coding", 2),
+                ("python", 2),
+                ("javascript", 2),
+                ("programming", 2),
+                ("excel", 2),
+                ("canva", 2),
+                ("capcut", 2),
+                ("photoshop", 2),
+                ("developer", 2),
+                ("software", 2),
+                ("chatgpt", 2),
+                ("prompt ai", 2),
+                ("edit video", 2),
+                ("instal", 2),
+                ("download", 2),
+                ("gadget", 2),
+                ("tutorial", 1),
+                ("cara membuat", 1),
+                ("panduan", 1),
+                ("komputer", 1),
+                ("laptop", 1),
+                ("hp", 1),
+                ("setting", 1),
+                ("review hp", 1),
+            ],
+        }
 
-        # 2. Culinary / Food / Recipe / Cooking
-        if any(
-            k in lowered
-            for k in [
-                "masak", "resep", "kuliner", "makanan", "minuman", "kue", "bumbu",
-                "dapur", "ayam", "sambal", "daging", "nasi", "mukbang", "jajanan",
-                "bakso", "mie", "koki", "chef", "goreng", "rebus", "panggang",
-                "pedas", "soto", "rendang", "cemilan", "roti", "bolu", "jus",
-                "kopi", "teh", "cafe", "restoran", "food", "snack"
-            ]
-        ):
-            return "culinary"
+        # Priority order for tie-breaking (highest priority first)
+        priority_order = [
+            "documentary",
+            "culinary",
+            "travel",
+            "entertainment",
+            "health_fitness",
+            "business",
+            "tech_tutorial",
+        ]
 
-        # 3. Travel / Vacation / Places
-        if any(
-            k in lowered
-            for k in [
-                "wisata", "liburan", "hotel", "pantai", "villa", "traveling",
-                "staycation", "jalur", "rute", "tiket", "bali", "jogja", "jepang",
-                "eropa", "destinasi", "hidden gem", "curug", "air terjun", "pulau",
-                "bromo", "danau", "candi", "taman", "backpacker", "tour", "trip",
-                "labuan bajo", "raja ampat", "lombok", "sumba", "flores", "manado",
-                "bunaken", "komodo", "toraja", "wakatobi", "banda neira", "ternate",
-                "bandung", "surabaya", "medan", "makassar", "palembang", "semarang",
-                "singapore", "malaysia", "thailand", "vietnam", "korea", "paris",
-                "london", "dubai", "turki", "mesir", "mekah", "madinah", "umroh",
-                "hiking", "camping", "trekking", "snorkeling", "diving", "glamping",
-                "itinerary", "penginapan", "resort", "airbnb", "solo travel", "road trip",
-                "wisata alam", "wisata religi", "wisata kuliner", "wisata budaya",
-            ]
-        ):
-            return "travel"
+        # Score each niche
+        scores: dict[str, int] = {niche: 0 for niche in niche_keywords}
+        for niche, kw_list in niche_keywords.items():
+            for kw, weight in kw_list:
+                if kw in lowered:
+                    scores[niche] += weight
 
-        # 4. Entertainment / Gaming / Pop Culture / Media / Anime
-        if any(
-            k in lowered
-            for k in [
-                "film", "movie", "drama", "anime", "manga", "alur cerita",
-                "sinopsis", "rekap", "ending", "trailer", "lagu", "musik",
-                "lirik", "chord", "konser", "vlog", "lucu", "komedi", "parodi",
-                "sketsa", "artis", "gosip", "game", "gaming", "gameplay",
-                "mobile legends", "ff", "free fire", "roblox", "gta", "genshin",
-                "valorant", "minecraft", "ps5", "walkthrough", "streamer"
-            ]
-        ):
-            return "entertainment"
+        # Find the best niche
+        max_score = max(scores.values())
+        if max_score == 0:
+            # No match — fallback: if question/how-to words present, use tech_tutorial
+            if any(k in lowered for k in ["cara", "tips", "trik", "bagaimana"]):
+                return "tech_tutorial"
+            return "general"
 
-        # 5. Health / Fitness / Beauty / Wellness
-        if any(
-            k in lowered
-            for k in [
-                "diet", "gym", "fitness", "workout", "otot", "kalori", "kurus",
-                "sehat", "kesehatan", "obat", "penyakit", "gejala", "dokter",
-                "skincare", "glowing", "jerawat", "rambut", "herbal", "medis",
-                "terapi", "kolesterol", "diabetes", "asam urat", "lemak"
-            ]
-        ):
-            return "health_fitness"
-
-        # 6. Business / Finance / Ads / Marketing / Making Money
-        if any(
-            k in lowered
-            for k in [
-                "ads", "iklan", "google ads", "fb ads", "tiktok ads", "jualan",
-                "bisnis", "modal", "omset", "cuan", "boncos", "reseller",
-                "dropship", "affiliate", "saham", "crypto", "trading",
-                "investasi", "keuangan", "closing", "freelance", "umkm",
-                "franchise", "usaha", "toko online", "ekspor", "impor",
-                "marketing", "sales", "penjualan", "gaji", "passive income"
-            ]
-        ):
-            return "business"
-
-        # 7. Tech / Coding / Software / Video Editing / Tutorials
-        if any(
-            k in lowered
-            for k in [
-                "tutorial", "cara membuat", "panduan", "coding", "python",
-                "excel", "canva", "capcut", "edit video", "photoshop",
-                "developer", "komputer", "laptop", "hp", "review hp",
-                "setting", "instal", "download", "prompt ai", "chatgpt",
-                "software", "programming", "javascript", "gadget"
-            ]
-        ):
-            return "tech_tutorial"
-
-        # Fallback based on question or tutorial keywords
-        if any(k in lowered for k in ["cara", "tips", "trik", "panduan", "bagaimana"]):
-            return "tech_tutorial"
+        # Among niches with the same top score, pick by priority order
+        for niche in priority_order:
+            if scores[niche] == max_score:
+                return niche
 
         return "general"
 
@@ -648,22 +857,61 @@ class SearchIntelligence:
             "potential_earnings_per_100k_views": f"${benchmark['avg'] * 100:.2f}",
         }
 
-    @staticmethod
-    def generate_high_ctr_titles(seed: str, intent_type: IntentEnum) -> list[str]:
+    @classmethod
+    def generate_high_ctr_titles(cls, seed: str, intent_type: IntentEnum) -> list[str]:
         """
-        Generate high-CTR title formulas
-        tailored to the target intent.
+        Generate high-CTR title formulas tailored to the target intent AND content niche.
+        Avoids generic tech-tutorial phrases (e.g. 'Setting', 'Panduan Pemula') for
+        non-tech topics like science, history, travel, etc.
         """
         clean = seed.strip().title()
         year = datetime.now(UTC).year
+        niche = cls.detect_content_niche(seed)
 
         if intent_type == IntentEnum.TUTORIAL:
-            return [
-                f"Cara {clean} dari Nol untuk Pemula (Step-by-Step {year})",
-                f"Tutorial {clean} Paling Lengkap & Mudah Dipahami",
-                f"Rahasia Setting {clean} yang Jarang Diketahui Orang",
-                f"Hentikan Kesalahan Ini Saat Memulai {clean}!",
-            ]
+            # Tech/tutorial-specific phrasing only for tech niche
+            if niche == "tech_tutorial":
+                return [
+                    f"Cara {clean} dari Nol untuk Pemula (Step-by-Step {year})",
+                    f"Tutorial {clean} Paling Lengkap & Mudah Dipahami",
+                    f"Rahasia Konfigurasi {clean} yang Jarang Diketahui Orang",
+                    f"Hentikan Kesalahan Ini Saat Memulai {clean}!",
+                ]
+            elif niche == "documentary":
+                return [
+                    f"Penjelasan Lengkap: Apa yang Sebenarnya Terjadi pada {clean}?",
+                    f"Fakta Mengejutkan tentang {clean} yang Jarang Dibahas",
+                    f"Kronologi {clean}: Dari Awal hingga Dampaknya bagi Dunia",
+                    f"Ilmuwan Terkejut: Temuan Terbaru Tentang {clean}",
+                ]
+            elif niche == "culinary":
+                return [
+                    f"Cara Membuat {clean} Anti Gagal untuk Pemula (Takaran Pas)",
+                    f"Resep {clean} Paling Mudah & Enak yang Wajib Dicoba",
+                    f"Rahasia Bumbu {clean} Meresap Sempurna Ala Chef Profesional",
+                    f"Jangan Masak {clean} Sebelum Tahu Trik Ini!",
+                ]
+            elif niche == "travel":
+                return [
+                    f"Panduan Wisata {clean}: Rute, Budget & Tips Terlengkap {year}",
+                    f"Cara Liburan ke {clean} dengan Hemat & Bebas Ribet",
+                    f"Semua yang Harus Kamu Tahu Sebelum Pergi ke {clean}",
+                    f"Jangan ke {clean} Sebelum Nonton Video Ini!",
+                ]
+            elif niche == "health_fitness":
+                return [
+                    f"Cara Alami Mengatasi {clean} Tanpa Efek Samping",
+                    f"Panduan Sehat: Langkah Tepat Menghadapi {clean}",
+                    f"Fakta Medis {clean} yang Wajib Kamu Ketahui",
+                    f"Jangan Abaikan Gejala {clean} — Lakukan Ini Segera!",
+                ]
+            else:
+                return [
+                    f"Cara Memahami {clean} dari Awal hingga Mahir",
+                    f"Penjelasan Lengkap {clean}: Panduan Ringkas & Padat",
+                    f"Hal Penting Seputar {clean} yang Jarang Dibahas",
+                    f"Jangan Salah Paham tentang {clean} — Ini Faktanya!",
+                ]
         elif intent_type == IntentEnum.COMMERCIAL:
             return [
                 f"Berapa Biaya {clean} yang Sebenarnya? (Bongkar Budget)",
@@ -677,7 +925,7 @@ class SearchIntelligence:
             ]
         else:
             return [
-                f"Apakah {clean} Masih Efektif di {year}? Data Membuktikannya",
+                f"Apakah {clean} Masih Relevan di {year}? Data Membuktikannya",
                 f"Semua yang Wajib Anda Tahu Tentang {clean}",
                 f"5 Fakta Mengejutkan Seputar {clean}",
             ]
@@ -707,12 +955,34 @@ class SearchIntelligence:
         if niche == "documentary":
             # Detect documentary sub-type: disaster/history vs science/space
             lowered_seed = seed.strip().lower()
-            is_science = any(k in lowered_seed for k in [
-                "planet", "mars", "bulan", "bintang", "luar angkasa", "galaksi",
-                "asteroid", "black hole", "lubang hitam", "meteor", "tata surya",
-                "biologi", "fisika", "kimia", "evolusi", "dinosaurus", "fosil",
-                "hewan", "alam", "ekosistem", "hutan", "laut dalam", "sains",
-            ])
+            is_science = any(
+                k in lowered_seed
+                for k in [
+                    "planet",
+                    "mars",
+                    "bulan",
+                    "bintang",
+                    "luar angkasa",
+                    "galaksi",
+                    "asteroid",
+                    "black hole",
+                    "lubang hitam",
+                    "meteor",
+                    "tata surya",
+                    "biologi",
+                    "fisika",
+                    "kimia",
+                    "evolusi",
+                    "dinosaurus",
+                    "fosil",
+                    "hewan",
+                    "alam",
+                    "ekosistem",
+                    "hutan",
+                    "laut dalam",
+                    "sains",
+                ]
+            )
             if is_science:
                 title_formula = "Pola: [Fakta Mengejutkan / Misteri Ilmiah] + [Subjek Sains] + [Penjelasan Mendalam]"
                 outranking_title = f"Fakta Mengejutkan tentang {clean} yang Jarang Diketahui (Penjelasan Ilmiah Lengkap)"
@@ -732,7 +1002,12 @@ class SearchIntelligence:
                     "10:15 - Misteri yang Masih Belum Terjawab",
                     "14:30 - Kesimpulan & Prediksi Masa Depan",
                 ]
-                hashtags = [f"#{clean_tag}", f"#{clean_tag}Sains", "#IlmuPengetahuan", "#FaktaMenarik"]
+                hashtags = [
+                    f"#{clean_tag}",
+                    f"#{clean_tag}Sains",
+                    "#IlmuPengetahuan",
+                    "#FaktaMenarik",
+                ]
                 shorts_package = {
                     "title": f"Fakta Mengejutkan tentang {clean} yang Jarang Dibahas! #shorts",
                     "three_second_hook": f"Tahukah kamu fakta ilmiah tentang {clean} ini? Hampir semua orang salah sangka!",
@@ -762,7 +1037,12 @@ class SearchIntelligence:
                     "11:20 - Dampak & Akibat bagi Dunia",
                     "15:50 - Pelajaran Sejarah & Kondisi Terkini",
                 ]
-                hashtags = [f"#{clean_tag}", f"#{clean_tag}Sejarah", "#DokumenterDunia", "#FaktaMenarik"]
+                hashtags = [
+                    f"#{clean_tag}",
+                    f"#{clean_tag}Sejarah",
+                    "#DokumenterDunia",
+                    "#FaktaMenarik",
+                ]
                 shorts_package = {
                     "title": f"Fakta Mengerikan tentang {clean} yang Bikin Merinding! #shorts",
                     "three_second_hook": f"Ini fakta tersembunyi tentang {clean} yang tidak pernah diajarkan di sekolah!",
@@ -779,7 +1059,7 @@ class SearchIntelligence:
             clean_food = clean
             for prefix in ["Resep ", "Cara Masak ", "Cara Membuat ", "Bumbu "]:
                 if clean.lower().startswith(prefix.lower()):
-                    clean_food = clean[len(prefix):].strip()
+                    clean_food = clean[len(prefix) :].strip()
                     break
             outranking_title = f"Resep {clean_food} Gurih & Lembut (Anti Gagal untuk Pemula)"
             alternative_titles = [
@@ -811,7 +1091,9 @@ class SearchIntelligence:
             }
         elif niche == "travel":
             title_formula = "Pola: [Panduan Eksplorasi] + [Destinasi Wisata] + [Hidden Gem / Spot Terbaik] + [Rute & Budget]"
-            outranking_title = f"Panduan Lengkap Wisata {clean}: Rute, Biaya, & Hidden Gems Terindah"
+            outranking_title = (
+                f"Panduan Lengkap Wisata {clean}: Rute, Biaya, & Hidden Gems Terindah"
+            )
             alternative_titles = [
                 f"Eksplorasi {clean} Seharian: Tips Liburan Hemat & Spot Foto Viral",
                 f"Jangan Pergi ke {clean} Sebelum Tahu 5 Hal Penting Ini! (Review Jujur)",
@@ -841,7 +1123,9 @@ class SearchIntelligence:
             }
         elif niche == "entertainment":
             title_formula = "Pola: [Bedah Cerita / Misteri] + [Subjek Film/Tokoh] + [Plot Twist / Teori Tersembunyi]"
-            outranking_title = f"Bedah Cerita & Misteri {clean}: Teori Tersembunyi yang Bikin Merinding"
+            outranking_title = (
+                f"Bedah Cerita & Misteri {clean}: Teori Tersembunyi yang Bikin Merinding"
+            )
             alternative_titles = [
                 f"Alur Cerita Lengkap {clean} yang Belum Pernah Dijelaskan Gamblang",
                 f"Fakta Menarik & Rahasia di Balik {clean} yang Jarang Diketahui",
@@ -930,14 +1214,18 @@ class SearchIntelligence:
                 "target_metric": "Viewed vs Swiped Away > 75%",
             }
         elif niche == "tech_tutorial":
-            title_formula = "Pola: [Tutorial Step-by-Step] + [Tool / Skill] + [Dari Nol Sampai Mahir]"
+            title_formula = (
+                "Pola: [Tutorial Step-by-Step] + [Tool / Skill] + [Dari Nol Sampai Mahir]"
+            )
             # Avoid double-prefix if keyword already starts with "tutorial"
             clean_tech = clean
             for prefix in ["Tutorial ", "Cara ", "Panduan ", "Setting "]:
                 if clean.lower().startswith(prefix.lower()):
-                    clean_tech = clean[len(prefix):].strip()
+                    clean_tech = clean[len(prefix) :].strip()
                     break
-            outranking_title = f"Tutorial {clean_tech} Lengkap untuk Pemula (Panduan Cepat & Mudah Dipahami)"
+            outranking_title = (
+                f"Tutorial {clean_tech} Lengkap untuk Pemula (Panduan Cepat & Mudah Dipahami)"
+            )
             alternative_titles = [
                 f"Cara Menguasai {clean_tech} dari Nol dalam Waktu Singkat",
                 f"Trik & Tips Praktis {clean_tech} yang Bakal Mempermudah Kerjamu",
@@ -954,7 +1242,12 @@ class SearchIntelligence:
                 "10:15 - Trik Rahasia & Shortcut Berguna",
                 "14:00 - Kesimpulan & Langkah Lanjutan",
             ]
-            hashtags = [f"#{clean_tag}", f"#Tutorial{clean_tag}", "#BelajarTeknologi", "#TipsTutorial"]
+            hashtags = [
+                f"#{clean_tag}",
+                f"#Tutorial{clean_tag}",
+                "#BelajarTeknologi",
+                "#TipsTutorial",
+            ]
             shorts_package = {
                 "title": f"Trik Cepat {clean} yang Wajib Kamu Tahu! #shorts",
                 "three_second_hook": f"Ini cara tercepat dan paling simpel buat kamu yang lagi belajar {clean}!",
@@ -967,7 +1260,9 @@ class SearchIntelligence:
             }
         else:
             title_formula = "Pola: [Pertanyaan Memikat / Eksplorasi] + [Subjek Topik] + [Fakta & Penjelasan Berbobot]"
-            outranking_title = f"Semua yang Wajib Kamu Ketahui Tentang {clean} (Fakta & Penjelasan Lengkap)"
+            outranking_title = (
+                f"Semua yang Wajib Kamu Ketahui Tentang {clean} (Fakta & Penjelasan Lengkap)"
+            )
             alternative_titles = [
                 f"Mengapa {clean} Sangat Menarik? Penjelasan Mudah & Berbobot",
                 f"Fakta Menakjubkan Seputar {clean} yang Jarang Dibahas Orang",
@@ -996,13 +1291,25 @@ class SearchIntelligence:
                 "target_metric": "Viewed vs Swiped Away > 75%",
             }
 
+        # Build niche-appropriate description intro
+        niche_desc_intro_map = {
+            "documentary": f"📌 Bedah tuntas fakta, kronologi, dan temuan terbaru seputar {clean}. Tonton dari awal agar tidak ada informasi penting yang terlewat!",
+            "culinary": f"📌 Resep lengkap, takaran pas, dan rahasia bumbu untuk membuat {clean} sempurna. Tonton sampai selesai agar hasilnya anti gagal!",
+            "travel": f"📌 Panduan wisata lengkap ke {clean}: rute terbaik, estimasi biaya, dan tips tersembunyi. Tonton agar liburanmu makin seru!",
+            "entertainment": f"📌 Bedah cerita, teori, dan detail tersembunyi dari {clean}. Tonton sampai habis agar tidak ada detail penting yang terlewat!",
+            "health_fitness": f"📌 Penjelasan medis, tips alami, dan langkah nyata mengatasi {clean}. Simak sampai selesai untuk informasi yang akurat dan aman!",
+            "business": f"📌 Strategi nyata, studi kasus, dan langkah eksekusi seputar {clean}. Tonton dari awal hingga akhir agar tidak ada step yang terlewat!",
+            "tech_tutorial": f"📌 Tutorial step-by-step dan tips praktis seputar {clean}. Tonton dari awal agar proses belajarmu lebih cepat dan tidak bingung!",
+        }
+        desc_intro = niche_desc_intro_map.get(
+            niche,
+            f"📌 Rangkuman lengkap dan mendalam seputar {clean}. Tonton video ini dari awal sampai akhir agar tidak ada detail penting yang terlewat!",
+        )
+
         full_description = (
             f"{two_line_hook}\n\n"
-            f"📌 Rangkuman & panduan lengkap seputar {clean}. Tonton video ini dari awal "
-            f"sampai akhir agar tidak ada detail penting yang terlewat!\n\n"
-            f"⏱️ TIMESTAMPS / DAFTAR ISI:\n"
-            + "\n".join(timestamps)
-            + f"\n\n🔗 LINK & INFORMASI:\n"
+            f"{desc_intro}\n\n"
+            f"⏱️ TIMESTAMPS / DAFTAR ISI:\n" + "\n".join(timestamps) + f"\n\n🔗 LINK & INFORMASI:\n"
             f"- Sumber Informasi & Diskusi: https://example.com\n\n"
             f"{' '.join(hashtags)}"
         )
@@ -1424,6 +1731,7 @@ class SearchIntelligence:
         """
         clean = seed.strip().title()
         niche = cls.detect_content_niche(seed)
+        current_year = datetime.now(UTC).year
         if autocomplete_queries:
             queries_to_check = autocomplete_queries
         elif niche == "documentary":
@@ -1448,7 +1756,7 @@ class SearchIntelligence:
             ]
         elif niche == "travel":
             queries_to_check = [
-                f"panduan wisata {clean} 2026",
+                f"panduan wisata {clean} {current_year}",
                 f"rute dan biaya ke {clean}",
                 f"hidden gem terbaik di {clean}",
                 f"tips liburan ke {clean} hemat",
@@ -1478,18 +1786,18 @@ class SearchIntelligence:
             ]
         elif niche == "business":
             queries_to_check = [
-                f"strategi {clean} 2026",
-                f"cara mulai {clean} untuk pemula",
-                f"trik jualan {clean} laris manis",
-                f"kesalahan fatal saat {clean}",
-                f"analisis modal dan omset {clean}",
-                f"cara scale up bisnis {clean}",
-                f"review jujur {clean}",
+                f"strategi {clean} {current_year}",
+                f"cara mulai {clean} dari nol",
+                f"kunci sukses {clean} yang terbukti",
+                f"kesalahan fatal saat menjalankan {clean}",
+                f"analisis peluang dan risiko {clean}",
+                f"cara scale up {clean}",
+                f"studi kasus sukses {clean}",
             ]
         elif niche == "tech_tutorial":
             queries_to_check = [
                 f"tutorial {clean} untuk pemula step by step",
-                f"cara setting {clean} terbaru 2026",
+                f"cara menggunakan {clean} terbaru {current_year}",
                 f"solusi error pada {clean}",
                 f"tips dan trik cepat {clean}",
                 f"alternatif terbaik untuk {clean}",
@@ -1591,7 +1899,9 @@ class SearchIntelligence:
                     action_plan = f"Sajikan '{q.title()}' dengan kemasan ringkas, padat informasi, dan visual memikat."
                     winning_hook = f"Semua Hal Penting Tentang {q.title()} yang Wajib Kamu Tahu"
 
-            elif not has_shorts and any(w in q_clean for w in ["trik", "rahasia", "cepat", "fakta", "spot", "resep"]):
+            elif not has_shorts and any(
+                w in q_clean for w in ["trik", "rahasia", "cepat", "fakta", "spot", "resep"]
+            ):
                 is_gap = True
                 gap_type = "📱 Missing Shorts Gap"
                 gap_reason = (
@@ -1599,7 +1909,9 @@ class SearchIntelligence:
                     "Belum ada video Shorts vertikal 45 detik yang menjawab ringkas dan padat."
                 )
                 action_plan = f"Buat video Shorts vertikal 45 detik untuk '{q.title()}' dengan hook to-the-point dan pancingan ke video lengkap."
-                winning_hook = f"Hal Menarik Seputar {q.title()} yang Belum Banyak Diketahui #shorts"
+                winning_hook = (
+                    f"Hal Menarik Seputar {q.title()} yang Belum Banyak Diketahui #shorts"
+                )
 
             elif any(w in q_clean for w in ["kesalahan", "pemula", "solusi", "kendala", "misteri"]):
                 is_gap = True
@@ -1614,8 +1926,12 @@ class SearchIntelligence:
             else:
                 is_gap = False
                 gap_type = "✅ Saturated / Covered"
-                gap_reason = "Sudah banyak video kompetitor dengan views tinggi yang membahas topik ini."
-                action_plan = "Hanya buat jika Anda memiliki sudut pandang baru atau studi kasus yang unik."
+                gap_reason = (
+                    "Sudah banyak video kompetitor dengan views tinggi yang membahas topik ini."
+                )
+                action_plan = (
+                    "Hanya buat jika Anda memiliki sudut pandang baru atau studi kasus yang unik."
+                )
                 winning_hook = f"Sudut Pandang Baru: Kupas Mendalam {q.title()}"
 
             results.append(
@@ -1634,9 +1950,7 @@ class SearchIntelligence:
         return results
 
     @classmethod
-    def analyze_competitor_outliers(
-        cls, competitors: list[dict[str, Any]]
-    ) -> dict[str, Any]:
+    def analyze_competitor_outliers(cls, competitors: list[dict[str, Any]]) -> dict[str, Any]:
         """
         Viral Outlier Multiplier Analysis.
         Calculates median views across top ranking videos and finds viral breakout outliers.
@@ -1706,9 +2020,7 @@ class SearchIntelligence:
         }
 
     @classmethod
-    def analyze_faceless_viability(
-        cls, seed: str, rpm_info: dict[str, Any]
-    ) -> dict[str, Any]:
+    def analyze_faceless_viability(cls, seed: str, rpm_info: dict[str, Any]) -> dict[str, Any]:
         """
         Faceless Niche Opportunity Analysis.
         Evaluates AI / Faceless viability, scripting automation, and B-roll feasibility.
@@ -1748,9 +2060,7 @@ class SearchIntelligence:
             )
         else:
             tier = "🔴 KURANG IDEAL UNTUK FACELESS"
-            verdict = (
-                "Niche ini sangat mengandalkan personal branding, ekspresi wajah, atau demonstrasi fisik langsung."
-            )
+            verdict = "Niche ini sangat mengandalkan personal branding, ekspresi wajah, atau demonstrasi fisik langsung."
 
         return {
             "faceless_score": score,

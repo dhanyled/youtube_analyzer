@@ -447,6 +447,8 @@ if keyword_input:
 
         st.markdown("#### 🎯 Formula Judul Tandingan untuk Mengalahkan Video #1:")
         st.info(f"👉 **{outranking_plan['outranking_title']}**")
+        if outranking_plan.get("title_formula"):
+            st.caption(f"📐 {outranking_plan['title_formula']}")
 
         st.markdown("##### Alternatif Variasi Judul:")
         for alt in outranking_plan["alternative_titles"]:
@@ -826,14 +828,14 @@ if keyword_input:
     with tab_landscape:
         st.subheader("🎬 Blueprint Video Landscape (16:9 Panjang)")
         st.write(
-            "Format ini ditujukan untuk penonton yang mencari panduan tuntas dan menghasilkan **AdSense RPM tinggi ($12–$35)**."
+            f"Format ini ditujukan untuk penonton yang mencari eksplorasi mendalam dan menghasilkan potensi **AdSense RPM {rpm_data['rpm_range_usd']} ({rpm_data['detected_niche'].title()})**."
         )
 
         col_l1, col_l2 = st.columns([1, 1])
         with col_l1:
             st.markdown("##### 📌 Rekomendasi Struktur Judul")
             st.code(outranking_plan["outranking_title"], language="text")
-            st.caption("Pola: [Solusi/Tutorial] + [Target Pemula] + [Update 2026] + [Anti-Boncos]")
+            st.caption(f"📐 {outranking_plan.get('title_formula', 'Pola: [Hook Menarik] + [Subjek Topik] + [Nilai Tambah]')}")
 
             st.markdown("##### ⏱️ Kerangka Timestamps / Daftar Isi Otomatis")
             st.write("Google Search mengindeks timestamps ini secara otomatis:")
@@ -845,7 +847,7 @@ if keyword_input:
             st.markdown(
                 """
                 - [x] **Durasi Ideal:** 12 – 22 Menit (memungkinkan iklan mid-roll otomatis).
-                - [x] **Hook 30 Detik Awal:** Jangan buang waktu salam berbelit! Langsung perlihatkan hasil akhir / studi kasus.
+                - [x] **Hook 30 Detik Awal:** Jangan buang waktu salam berbelit! Langsung perlihatkan cuplikan utama / poin paling krusial topik.
                 - [x] **Thumbnail:** Maksimal 3-4 kata besar + ekspresi wajah atau grafik kontras.
                 - [x] **Bab/Chapters:** Wajib pasang timestamps di deskripsi untuk SEO Google Search.
                 """
@@ -873,8 +875,8 @@ if keyword_input:
 
         st.markdown("##### 🔗 Trik Funnel (Pancingan ke Video Panjang):")
         st.info(
-            "Di YouTube Shorts, sematkan fitur **Related Video** yang menunjuk ke video tutorial panjang Anda! "
-            "Penonton Shorts yang penasaran akan langsung mengklik dan menonton video panjang Anda."
+            "Di YouTube Shorts, sematkan fitur **Related Video** yang menunjuk ke video utama panjang Anda! "
+            "Penonton Shorts yang penasaran akan langsung mengklik dan menonton video lengkap Anda."
         )
 
     # ==================== TAB 4: KEYWORDS & INTENT ====================

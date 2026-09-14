@@ -27,6 +27,7 @@ class SearchIntelligence:
         "education": {"low": 4.0, "avg": 8.0, "high": 15.0},
         "travel": {"low": 3.0, "avg": 6.0, "high": 11.0},
         "culinary": {"low": 2.5, "avg": 4.8, "high": 8.5},
+        "documentary": {"low": 3.5, "avg": 6.8, "high": 12.0},
         "lifestyle": {"low": 2.0, "avg": 4.0, "high": 7.5},
         "gaming": {"low": 1.5, "avg": 2.8, "high": 5.0},
         "entertainment": {"low": 1.2, "avg": 2.5, "high": 4.5},
@@ -251,6 +252,117 @@ class SearchIntelligence:
             "avg_competitor_views": int(avg_comp_views),
             "max_competitor_views": int(max_comp_views),
         }
+
+    @classmethod
+    def detect_content_niche(cls, seed: str) -> str:
+        """
+        Intelligently detects content genre/niche for context-aware copywriting,
+        titles, hooks, timestamps, and storyboards.
+        Returns one of: 'documentary', 'culinary', 'travel', 'entertainment',
+        'health_fitness', 'business', 'tech_tutorial', 'general'.
+        """
+        lowered = seed.strip().lower()
+
+        # 1. Documentary / History / Disaster / Nature / Science / Mystery
+        if any(
+            k in lowered
+            for k in [
+                "krakatau", "letusan", "gunung", "meletus", "gempa", "tsunami",
+                "bencana", "sejarah", "perang", "dinosaurus", "misteri", "alien",
+                "segitiga bermuda", "luar angkasa", "bumi", "planet", "arkeologi",
+                "fosil", "konspirasi", "mitos", "legenda", "antartika", "tragedi",
+                "kronologi", "sains", "biologi", "fisika", "tata surya", "hewan buas",
+                "hiu", "singa", "ekspedisi", "piramida", "atlantis", "hantu", "horor",
+                "meteor", "asteroid", "black hole", "lubang hitam", "kerajaan",
+                "majapahit", "pahlawan", "kisah nyata", "dokumenter", "arkeologis",
+                "alam", "laut dalam", "palung", "hutan", "safari", "antartika"
+            ]
+        ):
+            return "documentary"
+
+        # 2. Culinary / Food / Recipe / Cooking
+        if any(
+            k in lowered
+            for k in [
+                "masak", "resep", "kuliner", "makanan", "minuman", "kue", "bumbu",
+                "dapur", "ayam", "sambal", "daging", "nasi", "mukbang", "jajanan",
+                "bakso", "mie", "koki", "chef", "goreng", "rebus", "panggang",
+                "pedas", "soto", "rendang", "cemilan", "roti", "bolu", "jus",
+                "kopi", "teh", "cafe", "restoran", "food", "snack"
+            ]
+        ):
+            return "culinary"
+
+        # 3. Travel / Vacation / Places
+        if any(
+            k in lowered
+            for k in [
+                "wisata", "liburan", "hotel", "pantai", "villa", "traveling",
+                "staycation", "jalur", "rute", "tiket", "bali", "jogja", "jepang",
+                "eropa", "destinasi", "hidden gem", "curug", "air terjun", "pulau",
+                "bromo", "danau", "candi", "taman", "backpacker", "tour", "trip"
+            ]
+        ):
+            return "travel"
+
+        # 4. Entertainment / Gaming / Pop Culture / Media / Anime
+        if any(
+            k in lowered
+            for k in [
+                "film", "movie", "drama", "anime", "manga", "alur cerita",
+                "sinopsis", "rekap", "ending", "trailer", "lagu", "musik",
+                "lirik", "chord", "konser", "vlog", "lucu", "komedi", "parodi",
+                "sketsa", "artis", "gosip", "game", "gaming", "gameplay",
+                "mobile legends", "ff", "free fire", "roblox", "gta", "genshin",
+                "valorant", "minecraft", "ps5", "walkthrough", "streamer"
+            ]
+        ):
+            return "entertainment"
+
+        # 5. Health / Fitness / Beauty / Wellness
+        if any(
+            k in lowered
+            for k in [
+                "diet", "gym", "fitness", "workout", "otot", "kalori", "kurus",
+                "sehat", "kesehatan", "obat", "penyakit", "gejala", "dokter",
+                "skincare", "glowing", "jerawat", "rambut", "herbal", "medis",
+                "terapi", "kolesterol", "diabetes", "asam urat", "lemak"
+            ]
+        ):
+            return "health_fitness"
+
+        # 6. Business / Finance / Ads / Marketing / Making Money
+        if any(
+            k in lowered
+            for k in [
+                "ads", "iklan", "google ads", "fb ads", "tiktok ads", "jualan",
+                "bisnis", "modal", "omset", "cuan", "boncos", "reseller",
+                "dropship", "affiliate", "saham", "crypto", "trading",
+                "investasi", "keuangan", "closing", "freelance", "umkm",
+                "franchise", "usaha", "toko online", "ekspor", "impor",
+                "marketing", "sales", "penjualan", "gaji", "passive income"
+            ]
+        ):
+            return "business"
+
+        # 7. Tech / Coding / Software / Video Editing / Tutorials
+        if any(
+            k in lowered
+            for k in [
+                "tutorial", "cara membuat", "panduan", "coding", "python",
+                "excel", "canva", "capcut", "edit video", "photoshop",
+                "developer", "komputer", "laptop", "hp", "review hp",
+                "setting", "instal", "download", "prompt ai", "chatgpt",
+                "software", "programming", "javascript", "gadget"
+            ]
+        ):
+            return "tech_tutorial"
+
+        # Fallback based on question or tutorial keywords
+        if any(k in lowered for k in ["cara", "tips", "trik", "panduan", "bagaimana"]):
+            return "tech_tutorial"
+
+        return "general"
 
     @classmethod
     def estimate_rpm(cls, topic_name: str) -> dict[str, Any]:
@@ -581,52 +693,260 @@ class SearchIntelligence:
         comp_channel = competitor.get("channel", "Kompetitor") if competitor else "Kompetitor"
         comp_format = competitor.get("format", "LANDSCAPE") if competitor else "LANDSCAPE"
 
-        outranking_title = f"Cara {clean} dari Nol untuk Pemula (Update 2026 - Anti Boncos)"
-        alternative_titles = [
-            f"Tutorial {clean} Lengkap 2026 | Modal Kecil Hasil Maksimal",
-            f"Bongkar Rahasia {clean} yang Jarang Dibahas Orang (Panduan Pemula)",
-            f"Hentikan Kesalahan Ini Saat Setting {clean}! (Step by Step)",
-        ]
-
-        two_line_hook = (
-            f"Bingung cara mulai {clean} tanpa takut boncos? Di video ini kita bedah "
-            f"panduan lengkap {clean} dari nol khusus pemula sampai berhasil dapat hasil!"
-        )
-
-        timestamps = [
-            "00:00 - Kenapa Harus Mulai Sekarang?",
-            f"02:15 - Riset & Persiapan {clean}",
-            "06:30 - Langkah Setting Step-by-Step",
-            "12:45 - Trik Budget Minimal Anti Boncos",
-            "17:20 - Evaluasi & Cara Skalasi Hasil",
-        ]
-
+        niche = cls.detect_content_niche(seed)
         clean_tag = "".join(clean.split())
-        hashtags = [f"#{clean_tag}", f"#{clean_tag}Pemula", "#BelajarDigital"]
+
+        if niche == "documentary":
+            title_formula = "Pola: [Detik-Detik Mencekam / Peristiwa] + [Subjek Topik] + [Dampak Dunia] + [Format Dokumenter]"
+            outranking_title = f"Detik-Detik Mencekam {clean} yang Mengguncang Dunia (Dokumenter Lengkap)"
+            alternative_titles = [
+                f"Misteri & Fakta Mengerikan di Balik {clean} yang Jarang Terungkap",
+                f"Kronologi Lengkap Peristiwa {clean}: Apa yang Sebenarnya Terjadi?",
+                f"Kisah Nyata {clean}: Dampak Dahsyat yang Mengubah Sejarah Bumi",
+            ]
+            two_line_hook = (
+                f"Pernahkah kamu membayangkan betapa dahsyatnya peristiwa {clean}? "
+                f"Di video dokumenter ini kita bedah kronologi lengkap, arsip sejarah, dan fakta mengejutkan yang jarang dibahas!"
+            )
+            timestamps = [
+                "00:00 - Kilas Balik Awal Peristiwa",
+                f"02:30 - Latar Belakang & Tanda Awal {clean}",
+                "06:45 - Detik-Detik Puncak Terjadinya Peristiwa",
+                "11:20 - Dampak Dahsyat yang Mengguncang Dunia",
+                "15:50 - Pelajaran Sejarah & Kondisi Terkini",
+            ]
+            hashtags = [f"#{clean_tag}", f"#{clean_tag}Sejarah", "#DokumenterDunia", "#FaktaMenarik"]
+            shorts_package = {
+                "title": f"Fakta Mengerikan {clean} yang Bikin Merinding! #shorts",
+                "three_second_hook": f"Ini alasan kenapa peristiwa {clean} disebut salah satu yang paling mengerikan di bumi!",
+                "script_structure": [
+                    "00-03s: Hook visual kilas peristiwa mengerikan",
+                    "03-30s: Ungkap 1 fakta sejarah paling mengejutkan",
+                    "30-45s: Ajakan tonton dokumenter lengkapnya di link video terkait",
+                ],
+                "target_metric": "Viewed vs Swiped Away > 75%",
+            }
+        elif niche == "culinary":
+            title_formula = "Pola: [Resep Otentik] + [Subjek Masakan] + [Karakter Rasa] + [Anti Gagal untuk Pemula]"
+            outranking_title = f"Resep {clean} Gurih & Lembut (Anti Gagal untuk Pemula)"
+            alternative_titles = [
+                f"Rahasia Bumbu {clean} Rasa Bintang 5 dengan Bahan Rumahan",
+                f"Cara Membuat {clean} Praktis & Cepat: Wangi Menggugah Selera",
+                f"Eksperimen Resep {clean} Paling Enak: Jangan Lakukan 3 Kesalahan Ini!",
+            ]
+            two_line_hook = (
+                f"Mau bikin {clean} yang lezat, bumbunya meresap sempurna, dan anti gagal? "
+                f"Simak panduan takaran dan rahasia bumbunya di video ini!"
+            )
+            timestamps = [
+                "00:00 - Tampilan & Rahasia Kelezatan",
+                "01:15 - Bahan-Bahan & Takaran Pas",
+                f"04:30 - Cara Mengolah & Meracik {clean}",
+                "08:15 - Tips Memasak dengan Api Sempurna",
+                "11:40 - Hasil Akhir & Uji Rasa",
+            ]
+            hashtags = [f"#{clean_tag}", f"#Resep{clean_tag}", "#KulinerViral", "#MasakPraktis"]
+            shorts_package = {
+                "title": f"Trik Rahasia Bikin {clean} Jadi Super Enak! #shorts",
+                "three_second_hook": f"Ternyata cuma butuh 1 trik ini biar {clean} buatanmu seenak restoran bintang 5!",
+                "script_structure": [
+                    "00-03s: Hook visual kelezatan makanan menggoda",
+                    "03-30s: Tunjukkan 1 rahasia bumbu utama",
+                    "30-45s: Call to action tonton resep takaran lengkap",
+                ],
+                "target_metric": "Viewed vs Swiped Away > 75%",
+            }
+        elif niche == "travel":
+            title_formula = "Pola: [Panduan Eksplorasi] + [Destinasi Wisata] + [Hidden Gem / Spot Terbaik] + [Rute & Budget]"
+            outranking_title = f"Panduan Lengkap Wisata {clean} 2026: Rute, Biaya, & Hidden Gems Terindah"
+            alternative_titles = [
+                f"Eksplorasi {clean} Seharian: Tips Liburan Hemat & Spot Foto Viral",
+                f"Jangan Pergi ke {clean} Sebelum Tahu 5 Hal Penting Ini! (Review Jujur)",
+                f"Itinerary Liburan ke {clean} Paling Nyaman & Bebas Ribet",
+            ]
+            two_line_hook = (
+                f"Rencana liburan ke {clean}? Tonton panduan lengkap rute terbaik, "
+                f"estimasi budget, dan rekomendasi spot tersembunyi yang wajib kamu kunjungi!"
+            )
+            timestamps = [
+                "00:00 - Pesona Keindahan Lokasi",
+                f"01:45 - Rute & Transportasi Menuju {clean}",
+                "05:20 - Rekomendasi Spot Terbaik & Hidden Gem",
+                "09:10 - Estimasi Biaya & Kuliner Khas",
+                "12:30 - Tips Penting Sebelum Berangkat",
+            ]
+            hashtags = [f"#{clean_tag}", f"#Wisata{clean_tag}", "#TravelVlog", "#LiburanHemat"]
+            shorts_package = {
+                "title": f"Spot Rahasia di {clean} yang Jarang Orang Tahu! #shorts",
+                "three_second_hook": f"Kalau kamu ke {clean}, jangan cuma ke tempat biasa, cobain spot rahasia ini!",
+                "script_structure": [
+                    "00-03s: Hook panorama indah spot tersembunyi",
+                    "03-30s: Ulas rute dan keindahan uniknya",
+                    "30-45s: Simpan video ini untuk rencana liburanmu",
+                ],
+                "target_metric": "Viewed vs Swiped Away > 75%",
+            }
+        elif niche == "entertainment":
+            title_formula = "Pola: [Bedah Cerita / Misteri] + [Subjek Film/Tokoh] + [Plot Twist / Teori Tersembunyi]"
+            outranking_title = f"Bedah Cerita & Misteri {clean}: Teori Tersembunyi yang Bikin Merinding"
+            alternative_titles = [
+                f"Alur Cerita Lengkap {clean} yang Belum Pernah Dijelaskan Gamblang",
+                f"Fakta Menarik & Rahasia di Balik {clean} yang Jarang Diketahui",
+                f"Penjelasan Ending & Makna Tersirat dari {clean} (Analisis Mendalam)",
+            ]
+            two_line_hook = (
+                f"Ada banyak kejanggalan dan teori mengejutkan di balik {clean}. "
+                f"Di video ini kita kupas tuntas seluruh rahasia dan fakta tersembunyinya!"
+            )
+            timestamps = [
+                "00:00 - Pembuka & Sorotan Menarik",
+                f"02:00 - Latar Belakang & Pengenalan {clean}",
+                "06:30 - Momen Paling Krusial & Plot Twist",
+                "10:45 - Bedah Teori & Makna Tersembunyi",
+                "14:15 - Kesimpulan & Penjelasan Akhir",
+            ]
+            hashtags = [f"#{clean_tag}", f"#AlurCerita{clean_tag}", "#BedahFilm", "#PopCulture"]
+            shorts_package = {
+                "title": f"Fakta Gila Seputar {clean} yang Pasti Belum Kamu Tahu! #shorts",
+                "three_second_hook": f"Kamu gak bakal nyangka kalau ada detail segila ini di dalam {clean}!",
+                "script_structure": [
+                    "00-03s: Hook adegan atau detail mengejutkan",
+                    "03-30s: Ungkap teori atau fakta tersembunyi",
+                    "30-45s: Tonton bedah cerita lengkapnya di link terkait",
+                ],
+                "target_metric": "Viewed vs Swiped Away > 75%",
+            }
+        elif niche == "health_fitness":
+            title_formula = "Pola: [Solusi Medis/Alami] + [Masalah Tubuh/Kesehatan] + [Fakta Teruji & Tips Aman]"
+            outranking_title = f"Cara Alami Menjaga Tubuh dari {clean} Menurut Fakta Medis"
+            alternative_titles = [
+                f"5 Fakta Penting Seputar {clean} yang Wajib Kamu Ketahui Sejak Dini",
+                f"Panduan Mengatasi {clean} Secara Sehat & Aman (Penjelasan Ahli)",
+                f"Kebiasaan Sehari-Hari yang Berdampak pada {clean} dan Solusinya",
+            ]
+            two_line_hook = (
+                f"Khawatir soal {clean}? Simak penjelasan medis, cara pencegahan alami, "
+                f"dan tips menjaga tubuh tetap prima tanpa resiko!"
+            )
+            timestamps = [
+                "00:00 - Pemahaman Dasar Masalah",
+                f"02:15 - Penyebab Utama Terjadinya {clean}",
+                "06:00 - Cara Mengatasi & Pola Sehat",
+                "10:30 - Mitos vs Fakta Menurut Ahli",
+                "13:45 - Rangkuman Langkah Tindakan",
+            ]
+            hashtags = [f"#{clean_tag}", f"#Kesehatan{clean_tag}", "#HidupSehat", "#TipsMedis"]
+            shorts_package = {
+                "title": f"Stop Lakukan Ini Kalau Gak Mau Kena {clean}! #shorts",
+                "three_second_hook": f"Banyak orang belum sadar, 1 kebiasaan sepele ini bisa memicu {clean}!",
+                "script_structure": [
+                    "00-03s: Hook visual peringatan kesehatan",
+                    "03-30s: Jelaskan mekanisme ilmiah singkatnya",
+                    "30-45s: Tips pencegahan dan tonton video lengkapnya",
+                ],
+                "target_metric": "Viewed vs Swiped Away > 75%",
+            }
+        elif niche == "business":
+            title_formula = "Pola: [Strategi / Pola Sukses] + [Model Bisnis/Iklan] + [Hasil Nyata] + [Minim Resiko]"
+            outranking_title = f"Strategi {clean} Praktis untuk Pemula (Update 2026 Terbukti Efektif)"
+            alternative_titles = [
+                f"Tutorial {clean} Step-by-Step dari Nol: Langkah Tepat Minim Resiko",
+                f"Bongkar Pola Sukses {clean} yang Sering Dirahasiakan Para Praktisi",
+                f"Hindari 5 Kesalahan Fatal Ini Saat Memulai {clean}",
+            ]
+            two_line_hook = (
+                f"Mau belajar {clean} dengan alur yang jelas tanpa buang-buang budget? "
+                f"Di video ini kita kupas strategi terbukti dari nol sampai menghasilkan!"
+            )
+            timestamps = [
+                "00:00 - Kenapa Harus Mulai Sekarang?",
+                f"02:15 - Riset & Fondasi Dasar {clean}",
+                "06:30 - Langkah Eksekusi Step-by-Step",
+                "12:45 - Optimasi & Cara Skalasi Hasil",
+                "17:20 - Evaluasi & Checklist Sukses",
+            ]
+            hashtags = [f"#{clean_tag}", f"#{clean_tag}Pemula", "#BisnisDigital", "#StrategiBisnis"]
+            shorts_package = {
+                "title": f"1 Rahasia {clean} Biar Gak Boncos! #shorts",
+                "three_second_hook": f"Jangan pernah coba {clean} sebelum kamu tahu formula penting ini!",
+                "script_structure": [
+                    "00-03s: Hook visual jangan lakukan kesalahan ini",
+                    "03-30s: Bongkar 1 formula paling berdampak",
+                    "30-45s: Tutorial lengkapnya klik link video di bawah",
+                ],
+                "target_metric": "Viewed vs Swiped Away > 75%",
+            }
+        elif niche == "tech_tutorial":
+            title_formula = "Pola: [Tutorial Step-by-Step] + [Tool / Skill] + [Dari Nol Sampai Mahir] + [Update Terbaru]"
+            outranking_title = f"Tutorial {clean} Lengkap untuk Pemula (Panduan Cepat & Mudah Dipahami)"
+            alternative_titles = [
+                f"Cara Menguasai {clean} dari Nol dalam Waktu Singkat",
+                f"Trik & Tips Praktis {clean} yang Bakal Mempermudah Kerjamu",
+                f"Solusi Mengatasi Masalah Umum pada {clean} (Step by Step)",
+            ]
+            two_line_hook = (
+                f"Baru mau belajar {clean}? Jangan bingung, video ini merangkum "
+                f"tutorial langkah demi langkah dari dasar sampai kamu mahir!"
+            )
+            timestamps = [
+                "00:00 - Pengantar & Konsep Dasar",
+                f"02:00 - Persiapan & Interface {clean}",
+                "05:30 - Langkah demi Langkah Praktik Langsung",
+                "10:15 - Trik Rahasia & Shortcut Berguna",
+                "14:00 - Kesimpulan & Langkah Lanjutan",
+            ]
+            hashtags = [f"#{clean_tag}", f"#Tutorial{clean_tag}", "#BelajarTeknologi", "#TipsTutorial"]
+            shorts_package = {
+                "title": f"Trik Cepat {clean} yang Wajib Kamu Tahu! #shorts",
+                "three_second_hook": f"Ini cara tercepat dan paling simpel buat kamu yang lagi belajar {clean}!",
+                "script_structure": [
+                    "00-03s: Hook visual shortcut atau trik cepat",
+                    "03-30s: Tunjukkan demonstrasi layar langsung",
+                    "30-45s: Simpan video ini dan cek panduan lengkapnya",
+                ],
+                "target_metric": "Viewed vs Swiped Away > 75%",
+            }
+        else:
+            title_formula = "Pola: [Pertanyaan Memikat / Eksplorasi] + [Subjek Topik] + [Fakta & Penjelasan Berbobot]"
+            outranking_title = f"Semua yang Wajib Kamu Ketahui Tentang {clean} (Fakta & Penjelasan Lengkap)"
+            alternative_titles = [
+                f"Mengapa {clean} Sangat Menarik? Penjelasan Mudah & Berbobot",
+                f"Fakta Menakjubkan Seputar {clean} yang Jarang Dibahas Orang",
+                f"Panduan Memahami {clean} dari A Sampai Z Secara Rinci",
+            ]
+            two_line_hook = (
+                f"Penasaran tentang {clean}? Di video ini kita bahas tuntas sejarah, "
+                f"fakta penting, dan segala hal menarik seputar topik ini!"
+            )
+            timestamps = [
+                "00:00 - Pengantar Topik Menarik",
+                f"02:15 - Fakta Penting Seputar {clean}",
+                "06:00 - Penjelasan Mendalam & Contoh Nyata",
+                "10:30 - Mitos yang Sering Salah Dipahami",
+                "13:50 - Rangkuman & Pandangan Masa Depan",
+            ]
+            hashtags = [f"#{clean_tag}", f"#{clean_tag}Indonesia", "#EdukasiPopuler", "#FaktaUnik"]
+            shorts_package = {
+                "title": f"Fakta Unik {clean} yang Bikin Kaget! #shorts",
+                "three_second_hook": f"Pernah gak kamu bertanya-tanya, kenapa {clean} bisa seunik ini?",
+                "script_structure": [
+                    "00-03s: Hook pertanyaan menggelitik pikiran",
+                    "03-30s: Ceritakan 1 fakta paling unik",
+                    "30-45s: Tulis pendapatmu dan tonton video lengkapnya",
+                ],
+                "target_metric": "Viewed vs Swiped Away > 75%",
+            }
 
         full_description = (
             f"{two_line_hook}\n\n"
-            f"📌 Di video ini, Anda akan mempelajari cara setting dan strategi terbaik "
-            f"untuk {clean} yang sudah terbukti efektif di tahun 2026. Tonton dari awal "
-            f"sampai akhir agar tidak ada langkah penting yang terlewat!\n\n"
+            f"📌 Rangkuman & panduan lengkap seputar {clean}. Tonton video ini dari awal "
+            f"sampai akhir agar tidak ada detail penting yang terlewat!\n\n"
             f"⏱️ TIMESTAMPS / DAFTAR ISI:\n"
             + "\n".join(timestamps)
-            + f"\n\n🔗 LINK & RESOURCE TERKAIT:\n"
-            f"- Download Template Gratis: https://example.com\n"
-            f"- Konsultasi / Diskusi: https://example.com/komunitas\n\n"
+            + f"\n\n🔗 LINK & INFORMASI:\n"
+            f"- Sumber Informasi & Diskusi: https://example.com\n\n"
             f"{' '.join(hashtags)}"
         )
-
-        shorts_package = {
-            "title": f"Trik Rahasia {clean} Biar Gak Rugi! #shorts",
-            "three_second_hook": f"Jangan pernah coba {clean} sebelum kamu tahu 1 tombol rahasia ini!",
-            "script_structure": [
-                "00-03s: Hook visual ('Jangan lakukan ini!')",
-                "03-30s: Bongkar 1 tips paling berdampak",
-                "30-45s: Call to action ('Tutorial lengkapnya klik link video di bawah!')",
-            ],
-            "target_metric": "Viewed vs Swiped Away > 75%",
-        }
 
         return {
             "seed_keyword": seed,
@@ -638,6 +958,8 @@ class SearchIntelligence:
             },
             "recommended_format": comp_format,
             "outranking_title": outranking_title,
+            "title_formula": title_formula,
+            "detected_niche": niche,
             "alternative_titles": alternative_titles,
             "seo_description": full_description,
             "two_line_hook": two_line_hook,
@@ -723,49 +1045,224 @@ class SearchIntelligence:
         aspect = "16:9" if format_type.upper() == "LANDSCAPE" else "9:16"
         aspect_name = "landscape" if aspect == "16:9" else "portrait"
 
-        # 5 Structured Core Scenes for a high-retention video
-        scene_templates = [
-            {
-                "scene_num": 1,
-                "role": "Hook (00-05s)",
-                "duration": 4,
-                "action": f"Close-up intense shot of a modern creator analyzing {clean} on a glowing holographic workstation, shocked expression, subtle cinematic lighting",
-                "camera": "Slow cinematic push-in to eye level, 35mm anamorphic lens",
-                "audio_script": f"Jangan pernah coba {clean} sebelum kamu tahu rahasia penting ini!",
-            },
-            {
-                "scene_num": 2,
-                "role": "The Problem (05-12s)",
-                "duration": 6,
-                "action": "Dramatic overhead view of scattered business charts and messy ad dashboard showing budget loss with red indicators, cinematic contrast",
-                "camera": "High-angle slow tilt down, moody corporate lighting",
-                "audio_script": f"Banyak pemula boncos jutaan rupiah karena melewatkan 1 setting krusial di {clean}.",
-            },
-            {
-                "scene_num": 3,
-                "role": "The Discovery / Solution (12-20s)",
-                "duration": 6,
-                "action": "Futuristic clean minimalist office, smiling entrepreneur pointing at a green skyrocketing growth graph on a transparent glass monitor",
-                "camera": "Smooth horizontal track left to right, golden hour natural light",
-                "audio_script": "Padahal solusinya sederhana kalau kamu paham alur langkah demi langkahnya.",
-            },
-            {
-                "scene_num": 4,
-                "role": "Execution Breakdown (20-28s)",
-                "duration": 8,
-                "action": f"Hyper-detailed macro shot of hands clicking a futuristic luminous keyboard, screen displaying step-by-step verified workflow for {clean}",
-                "camera": "Macro dolly zoom, vibrant cyber accents, depth of field",
-                "audio_script": "Cukup ikuti 3 tahapan ini dan sistem akan bekerja secara otomatis untuk bisnismu.",
-            },
-            {
-                "scene_num": 5,
-                "role": "Call to Action / Outro (28-35s)",
-                "duration": 6,
-                "action": "Wide panoramic shot of an inspiring modern skyline at sunrise, clean minimalist logo placeholder hovering gently",
-                "camera": "Epic slow drone pull-back, cinematic 8k, warm morning sunlight",
-                "audio_script": "Ketik 'MAU' di komentar atau klik link di deskripsi untuk dapatkan blueprint lengkapnya sekarang!",
-            },
-        ]
+        niche = cls.detect_content_niche(seed)
+
+        # 5 Structured Core Scenes tailored to content niche
+        if niche == "documentary":
+            scene_templates = [
+                {
+                    "scene_num": 1,
+                    "role": "Hook (00-05s)",
+                    "duration": 4,
+                    "action": f"Dramatic cinematic establishing shot of {clean}, colossal ancient volcano surrounded by eerie ocean mist, ominous red volcanic glow illuminating stormy clouds, 35mm anamorphic lens, award-winning cinematography",
+                    "camera": "Slow epic cinematic push-in to eye level, dark atmospheric volumetric lighting",
+                    "audio_script": f"Pernahkah kamu membayangkan salah satu peristiwa alam paling dahsyat yang pernah mengguncang bumi, yaitu {clean}?",
+                },
+                {
+                    "scene_num": 2,
+                    "role": "The Escalation (05-12s)",
+                    "duration": 6,
+                    "action": f"Massive colossal ash clouds billowing tens of kilometers into the stratosphere, volcanic lightning crackling inside dense black smoke during {clean}, cataclysmic cinematic scale",
+                    "camera": "High-angle dramatic slow tilt down, photorealistic volumetric smoke and flying embers",
+                    "audio_script": "Dentuman dahsyatnya terdengar hingga ribuan kilometer dan melenyapkan daratan dalam sekejap.",
+                },
+                {
+                    "scene_num": 3,
+                    "role": "The Cataclysm (12-20s)",
+                    "duration": 6,
+                    "action": "Turbulent stormy ocean with gigantic tidal waves crashing against distant horizon, apocalyptic dark sky, historical archival cinematic recreation",
+                    "camera": "Dynamic horizontal drone track over roaring oceanic waves, intense cinematic contrast",
+                    "audio_script": "Langit seketika berubah gelap gulita selama berhari-hari, memicu gelombang dahsyat yang mengubah peradaban.",
+                },
+                {
+                    "scene_num": 4,
+                    "role": "Scientific Breakdown (20-28s)",
+                    "duration": 8,
+                    "action": f"Intricate 3D geological cutaway visualization showing molten magma chamber rupturing beneath tectonic plates for {clean}, glowing magma fissures and luminous scientific telemetry data",
+                    "camera": "Macro dolly zoom into subterranean earth layers, scientific hyper-realism",
+                    "audio_script": "Para ilmuwan mencatat kekuatan ledakannya setara puluhan ribu bom atom, mengubah iklim global selama bertahun-tahun.",
+                },
+                {
+                    "scene_num": 5,
+                    "role": "Resolution & Outro (28-35s)",
+                    "duration": 6,
+                    "action": f"Breathtaking aerial drone flight over modern calm ocean waters and lush green archipelago of {clean} at golden hour sunrise, awe-inspiring beauty",
+                    "camera": "Epic slow drone pull-back into glorious sunrise, inspiring cinematic 8k",
+                    "audio_script": "Sebuah pengingat abadi tentang kekuatan alam yang luar biasa. Bagaimana menurutmu? Tulis pandanganmu di komentar!",
+                },
+            ]
+        elif niche == "culinary":
+            scene_templates = [
+                {
+                    "scene_num": 1,
+                    "role": "Hook (00-05s)",
+                    "duration": 4,
+                    "action": f"Mouthwatering extreme close-up macro shot of freshly cooked {clean}, steam rising gracefully, rich aromatic glaze glistening under warm studio light",
+                    "camera": "Slow cinematic push-in with shallow depth of field, 50mm macro lens",
+                    "audio_script": f"Ini dia rahasia bikin {clean} yang super gurih, bumbunya meresap, dan anti gagal!",
+                },
+                {
+                    "scene_num": 2,
+                    "role": "Ingredients Prep (05-12s)",
+                    "duration": 6,
+                    "action": "Top-down overhead view of fresh aromatic herbs, spices, and premium ingredients neatly arranged on rustic wooden kitchen table, knife slicing smoothly",
+                    "camera": "Slow fluid horizontal pan across colorful fresh spices, bright natural morning light",
+                    "audio_script": "Kuncinya ada pada takaran bumbu dasar ini yang bikin aromanya langsung semerbak.",
+                },
+                {
+                    "scene_num": 3,
+                    "role": "Cooking Action (12-20s)",
+                    "duration": 6,
+                    "action": f"Sizzling hot wok pan, vibrant sauce caramelizing perfectly with {clean}, gentle tossing motions, savory smoke rising dynamically",
+                    "camera": "Side angle dynamic slow motion 120fps, cinematic kitchen atmosphere",
+                    "audio_script": "Masak dengan api sedang sampai bumbunya meresap sempurna dan warnanya berubah kecokelatan.",
+                },
+                {
+                    "scene_num": 4,
+                    "role": "Plating Presentation (20-28s)",
+                    "duration": 8,
+                    "action": f"Artisanal plating of {clean} onto elegant ceramic plate, garnished with fresh herbs and crunchy shallots, restaurant quality presentation",
+                    "camera": "Rotating 360 slow dolly around the finished dish, mouthwatering food commercial cinematography",
+                    "audio_script": "Hasilnya benar-benar lembut di dalam, renyah di luar, dan rasanya setara restoran bintang 5.",
+                },
+                {
+                    "scene_num": 5,
+                    "role": "Tasting & Outro (28-35s)",
+                    "duration": 6,
+                    "action": "Fork taking a perfect bite, tender texture visible, smiling creator giving thumbs up in cozy modern kitchen",
+                    "camera": "Gentle zoom out, warm inviting domestic atmosphere",
+                    "audio_script": "Yuk coba resepnya di rumah! Jangan lupa like dan simpan video ini agar tidak lupa!",
+                },
+            ]
+        elif niche == "travel":
+            scene_templates = [
+                {
+                    "scene_num": 1,
+                    "role": "Hook (00-05s)",
+                    "duration": 4,
+                    "action": f"Breathtaking panoramic drone shot of majestic scenery at {clean}, golden sunrise casting vibrant rays across lush landscapes and dramatic horizon",
+                    "camera": "Slow epic drone forward push over cliff edge, 8k hyper-realistic travel cinematography",
+                    "audio_script": f"Kalau kamu punya rencana ke {clean}, jangan lewatkan tempat tersembunyi yang satu ini!",
+                },
+                {
+                    "scene_num": 2,
+                    "role": "The Journey (05-12s)",
+                    "duration": 6,
+                    "action": f"Scenic road trip journey towards {clean}, winding roads surrounded by tropical greenery, window reflection of passing paradise scenery",
+                    "camera": "Tracking side shot of moving vehicle, vibrant daylight, cinematic motion blur",
+                    "audio_script": "Rutenya ternyata sangat mudah diakses dan pemandangan sepanjang jalan sudah bikin takjub.",
+                },
+                {
+                    "scene_num": 3,
+                    "role": "Hidden Gem Spot (12-20s)",
+                    "duration": 6,
+                    "action": f"Secret untouched viewpoint at {clean}, crystal clear water and pristine natural surroundings, peaceful paradise vibe",
+                    "camera": "Low angle smooth gimbal walk-through emerging onto stunning panoramic view",
+                    "audio_script": "Banyak turis melewatkan spot ini, padahal pemandangannya jauh lebih indah dan bebas antrean.",
+                },
+                {
+                    "scene_num": 4,
+                    "role": "Local Experience & Food (20-28s)",
+                    "duration": 8,
+                    "action": f"Enjoying authentic local culinary delicacy and cozy cafe atmosphere overlooking the iconic landmark of {clean}",
+                    "camera": "Warm medium shot blending food culture and travel lifestyle, golden hour sun flare",
+                    "audio_script": "Harganya pun sangat terjangkau, cocok banget buat liburan santai bareng keluarga atau teman.",
+                },
+                {
+                    "scene_num": 5,
+                    "role": "Call to Action (28-35s)",
+                    "duration": 6,
+                    "action": f"Magnificent sunset silhouette at {clean}, vibrant orange and purple twilight sky, inspiring wanderlust feeling",
+                    "camera": "Slow cinematic drone rise into dusk sky, cinematic 8k",
+                    "audio_script": "Bagikan video ini ke teman liburanmu dan simpan untuk panduan trip berikutnya!",
+                },
+            ]
+        elif niche in ["tech_tutorial", "business"]:
+            scene_templates = [
+                {
+                    "scene_num": 1,
+                    "role": "Hook (00-05s)",
+                    "duration": 4,
+                    "action": f"Close-up intense shot of a creator analyzing {clean} on a glowing modern workstation, focused expression, cinematic ambient lighting",
+                    "camera": "Slow cinematic push-in to eye level, 35mm anamorphic lens",
+                    "audio_script": f"Jangan pernah coba {clean} sebelum kamu tahu rahasia penting ini!",
+                },
+                {
+                    "scene_num": 2,
+                    "role": "The Problem (05-12s)",
+                    "duration": 6,
+                    "action": "Dramatic overhead view of complex workflow charts and dashboard displaying pain points and common roadblocks, high contrast",
+                    "camera": "High-angle slow tilt down, moody studio lighting",
+                    "audio_script": f"Banyak orang membuang banyak waktu dan energi karena melewatkan 1 tahapan krusial di {clean}.",
+                },
+                {
+                    "scene_num": 3,
+                    "role": "The Solution (12-20s)",
+                    "duration": 6,
+                    "action": "Futuristic clean minimalist office, creator pointing at a clean step-by-step framework on an ultra-wide curved monitor",
+                    "camera": "Smooth horizontal track left to right, golden natural light",
+                    "audio_script": "Padahal solusinya sederhana kalau kamu paham alur langkah demi langkahnya.",
+                },
+                {
+                    "scene_num": 4,
+                    "role": "Execution (20-28s)",
+                    "duration": 8,
+                    "action": f"Hyper-detailed macro shot of hands on keyboard, screen displaying verified workflow and instant positive results for {clean}",
+                    "camera": "Macro dolly zoom, vibrant subtle accents, depth of field",
+                    "audio_script": "Cukup ikuti tahapan praktis ini dan kamu bisa langsung melihat hasilnya secara nyata.",
+                },
+                {
+                    "scene_num": 5,
+                    "role": "Call to Action (28-35s)",
+                    "duration": 6,
+                    "action": "Wide panoramic shot of an inspiring modern creative studio at sunrise, clean minimalist environment",
+                    "camera": "Epic slow pull-back, cinematic 8k, warm morning sunlight",
+                    "audio_script": "Simpan video ini dan cek panduan lengkapnya di deskripsi untuk mulai sekarang!",
+                },
+            ]
+        else:
+            scene_templates = [
+                {
+                    "scene_num": 1,
+                    "role": "Hook (00-05s)",
+                    "duration": 4,
+                    "action": f"Intriguing cinematic shot introducing {clean}, dramatic lighting revealing subject details, suspenseful atmosphere",
+                    "camera": "Slow cinematic push-in to subject, 35mm cinematic lens",
+                    "audio_script": f"Tahukah kamu fakta mengejutkan seputar {clean} yang jarang diketahui banyak orang?",
+                },
+                {
+                    "scene_num": 2,
+                    "role": "Background & Context (05-12s)",
+                    "duration": 6,
+                    "action": f"Rich detailed visual story sequence exploring historical roots and context of {clean}, engaging documentary style",
+                    "camera": "Smooth horizontal dolly shot, warm evocative lighting",
+                    "audio_script": "Di balik popularitasnya, ada kisah panjang dan fakta tersembunyi yang jarang diungkap.",
+                },
+                {
+                    "scene_num": 3,
+                    "role": "Key Revelation (12-20s)",
+                    "duration": 6,
+                    "action": f"Dramatic visual highlight revealing the core turning point and unique aspect of {clean}, high production value",
+                    "camera": "Dynamic camera arc around central subject, cinematic volumetric lighting",
+                    "audio_script": "Inilah detail penting yang membuat banyak orang tercengang ketika pertama kali mendengarnya.",
+                },
+                {
+                    "scene_num": 4,
+                    "role": "Deeper Analysis (20-28s)",
+                    "duration": 8,
+                    "action": f"Comprehensive visual breakdown with crisp infographics and engaging cinematic demonstrations for {clean}",
+                    "camera": "Macro dolly zoom with soft depth of field, vivid realistic colors",
+                    "audio_script": "Mari kita lihat bagaimana hal ini berdampak nyata dan mengubah pemahaman kita selama ini.",
+                },
+                {
+                    "scene_num": 5,
+                    "role": "Conclusion & CTA (28-35s)",
+                    "duration": 6,
+                    "action": f"Inspiring wide panoramic closing shot capturing the lasting essence of {clean}, golden hour sunset glow",
+                    "camera": "Epic slow drone pull-back into glorious horizon, cinematic 8k",
+                    "audio_script": "Bagaimana menurutmu? Tuliskan pendapatmu di kolom komentar dan bagikan video ini!",
+                },
+            ]
 
         scenes = []
         batch_prompts_txt_lines = []
@@ -867,15 +1364,89 @@ class SearchIntelligence:
         4. Irrelevant title matching.
         """
         clean = seed.strip().title()
-        queries_to_check = autocomplete_queries or [
-            f"cara {seed} terbaru 2026",
-            f"tutorial {seed} pemula step by step",
-            f"{seed} tanpa modal",
-            f"kesalahan fatal {seed}",
-            f"{seed} gratis vs berbayar",
-            f"trik rahasia {seed}",
-            f"{seed} review jujur",
-        ]
+        niche = cls.detect_content_niche(seed)
+        if autocomplete_queries:
+            queries_to_check = autocomplete_queries
+        elif niche == "documentary":
+            queries_to_check = [
+                f"sejarah {clean} lengkap",
+                f"kronologi detik detik {clean}",
+                f"fakta mengerikan {clean} yang jarang terungkap",
+                f"dampak {clean} bagi peradaban",
+                f"kisah nyata saksi {clean}",
+                f"misteri tersembunyi {clean}",
+                f"penjelasan ilmiah fenomena {clean}",
+            ]
+        elif niche == "culinary":
+            queries_to_check = [
+                f"resep {clean} enak dan praktis",
+                f"cara membuat {clean} anti gagal",
+                f"rahasia bumbu {clean} meresap",
+                f"tips memasak {clean} empuk gurih",
+                f"{clean} ala restoran bintang 5",
+                f"resep {clean} takaran sendok",
+                f"kesalahan fatal saat masak {clean}",
+            ]
+        elif niche == "travel":
+            queries_to_check = [
+                f"panduan wisata {clean} 2026",
+                f"rute dan biaya ke {clean}",
+                f"hidden gem terbaik di {clean}",
+                f"tips liburan ke {clean} hemat",
+                f"spot foto estetik di {clean}",
+                f"itinerary 3 hari 2 malam {clean}",
+                f"review jujur liburan ke {clean}",
+            ]
+        elif niche == "entertainment":
+            queries_to_check = [
+                f"alur cerita {clean} lengkap",
+                f"penjelasan ending {clean}",
+                f"teori konspirasi {clean}",
+                f"fakta unik {clean} yang jarang diketahui",
+                f"karakter terkuat di {clean}",
+                f"easter egg tersembunyi {clean}",
+                f"rekap alur {clean}",
+            ]
+        elif niche == "health_fitness":
+            queries_to_check = [
+                f"cara alami mengatasi {clean}",
+                f"gejala dan penyebab {clean}",
+                f"pantangan makanan untuk {clean}",
+                f"tips hidup sehat bebas {clean}",
+                f"penjelasan dokter tentang {clean}",
+                f"kebiasaan pemicu {clean}",
+                f"solusi aman meredakan {clean}",
+            ]
+        elif niche == "business":
+            queries_to_check = [
+                f"strategi {clean} 2026",
+                f"cara mulai {clean} untuk pemula",
+                f"trik jualan {clean} laris manis",
+                f"kesalahan fatal saat {clean}",
+                f"analisis modal dan omset {clean}",
+                f"cara scale up bisnis {clean}",
+                f"review jujur {clean}",
+            ]
+        elif niche == "tech_tutorial":
+            queries_to_check = [
+                f"tutorial {clean} untuk pemula step by step",
+                f"cara setting {clean} terbaru 2026",
+                f"solusi error pada {clean}",
+                f"tips dan trik cepat {clean}",
+                f"alternatif terbaik untuk {clean}",
+                f"fitur tersembunyi di {clean}",
+                f"panduan lengkap {clean} dari nol",
+            ]
+        else:
+            queries_to_check = [
+                f"fakta menarik tentang {clean}",
+                f"penjelasan lengkap {clean}",
+                f"sejarah dan asal usul {clean}",
+                f"perkembangan terbaru {clean}",
+                f"dampak {clean} yang wajib diketahui",
+                f"apa itu {clean} dan fungsinya",
+                f"hal penting seputar {clean}",
+            ]
 
         # Extract competitor ages and views
         comp_ages = [str(c.get("upload_age", "")).lower() for c in competitors]
@@ -1089,32 +1660,245 @@ class SearchIntelligence:
         Deconstructs a long-form video topic into 3-4 viral Short clips with hooks and timestamps.
         """
         clean = topic.strip().title()
-        return [
-            {
-                "clip_id": 1,
-                "clip_title": f"Trik Terlarang {clean} yang Jarang Diungkap #shorts",
-                "timestamp_window": "01:15 - 02:00 (45 Detik)",
-                "hook_line": "Banyak orang boncos di 2026 gara-gara 1 tombol ini...",
-                "core_insight": "Demonstrasi bagian teknis paling krusial yang langsung mengubah hasil.",
-                "call_to_action": "Tonton tutorial full 15 menit di channel ini!",
-                "projected_virality": "9.2 / 10 🔥",
-            },
-            {
-                "clip_id": 2,
-                "clip_title": f"Cukup 30 Detik Paham Cara Kerja {clean} #shorts",
-                "timestamp_window": "05:30 - 06:15 (45 Detik)",
-                "hook_line": "Kalau kamu masih bingung cara settingnya, tonton ini sampai habis!",
-                "core_insight": "Alur visual cepat step-by-step tanpa basa-basi.",
-                "call_to_action": "Simpan video ini biar gak lupa!",
-                "projected_virality": "8.8 / 10 ⭐",
-            },
-            {
-                "clip_id": 3,
-                "clip_title": f"Jangan Pernah Lakukan Ini Saat {clean}! #shorts",
-                "timestamp_window": "10:45 - 11:30 (45 Detik)",
-                "hook_line": "Ini kesalahan paling fatal yang bikin akunmu kena suspend!",
-                "core_insight": "Peringatan kontroversial berbasis pengalaman nyata yang memicu perdebatan di komentar.",
-                "call_to_action": "Komen pendapatmu di bawah, pernah ngalamin juga?",
-                "projected_virality": "9.5 / 10 🔥",
-            },
-        ]
+        niche = cls.detect_content_niche(topic)
+
+        if niche == "documentary":
+            return [
+                {
+                    "clip_id": 1,
+                    "clip_title": f"Detik-Detik Mencekam {clean} #shorts",
+                    "timestamp_window": "01:15 - 02:00 (45 Detik)",
+                    "hook_line": f"Ini detik-detik paling mengerikan saat peristiwa {clean} mengguncang dunia...",
+                    "core_insight": "Visualisasi dramatis dan catatan saksi mata saat puncak letusan/bencana terjadi.",
+                    "call_to_action": "Tonton dokumenter sejarah lengkapnya di video utama!",
+                    "projected_virality": "9.5 / 10 🔥",
+                },
+                {
+                    "clip_id": 2,
+                    "clip_title": f"Fakta Mengerikan {clean} yang Jarang Diungkap #shorts",
+                    "timestamp_window": "05:30 - 06:15 (45 Detik)",
+                    "hook_line": f"Tahukah kamu kalau dampak dahsyat {clean} sempat mengubah iklim seluruh bumi?",
+                    "core_insight": "Pengungkapan bukti arsip sejarah dan sains yang mencengangkan.",
+                    "call_to_action": "Simpan video ini dan bagikan fakta ini ke temanmu!",
+                    "projected_virality": "9.1 / 10 ⭐",
+                },
+                {
+                    "clip_id": 3,
+                    "clip_title": f"Misteri Tersembunyi di Balik {clean} #shorts",
+                    "timestamp_window": "10:45 - 11:30 (45 Detik)",
+                    "hook_line": f"Ada satu kejanggalan besar dalam catatan peristiwa {clean} yang masih misterius...",
+                    "core_insight": "Teori ilmiah dan temuan baru yang memicu rasa ingin tahu tinggi.",
+                    "call_to_action": "Bagaimana menurutmu? Tulis pendapatmu di kolom komentar!",
+                    "projected_virality": "9.4 / 10 🔥",
+                },
+            ]
+        elif niche == "culinary":
+            return [
+                {
+                    "clip_id": 1,
+                    "clip_title": f"Rahasia Bumbu {clean} Seenak Restoran #shorts",
+                    "timestamp_window": "01:15 - 02:00 (45 Detik)",
+                    "hook_line": f"Ternyata cuma butuh 1 bumbu rahasia ini biar {clean} buatanmu 10x lebih lezat!",
+                    "core_insight": "Trik marinasi dan takaran bumbu kunci yang jarang dibocorkan restoran.",
+                    "call_to_action": "Tonton takaran gram lengkapnya di video utama!",
+                    "projected_virality": "9.3 / 10 🔥",
+                },
+                {
+                    "clip_id": 2,
+                    "clip_title": f"Jangan Lakukan Ini Saat Masak {clean}! #shorts",
+                    "timestamp_window": "05:30 - 06:15 (45 Detik)",
+                    "hook_line": f"Stop lakukan kesalahan sepele ini kalau gak mau {clean} buatanmu gagal total!",
+                    "core_insight": "Teknik pengaturan api dan waktu agar tekstur matang sempurna.",
+                    "call_to_action": "Simpan resep ini buat menu masak berikutnya!",
+                    "projected_virality": "8.9 / 10 ⭐",
+                },
+                {
+                    "clip_id": 3,
+                    "clip_title": f"Trik Cepat Bikin {clean} Cuma 5 Menit #shorts",
+                    "timestamp_window": "10:45 - 11:30 (45 Detik)",
+                    "hook_line": f"Pengen makan {clean} tapi gak mau repot? Cobain metode kilat anti gagal ini!",
+                    "core_insight": "Langkah ringkas praktis yang bisa langsung dipraktikkan siapa saja.",
+                    "call_to_action": "Tulis di komentar, mau resep apa lagi selanjutnya?",
+                    "projected_virality": "9.2 / 10 🔥",
+                },
+            ]
+        elif niche == "travel":
+            return [
+                {
+                    "clip_id": 1,
+                    "clip_title": f"Spot Tersembunyi di {clean} yang Wajib Tahu #shorts",
+                    "timestamp_window": "01:15 - 02:00 (45 Detik)",
+                    "hook_line": f"Kalau kamu ke {clean}, jangan cuma ke tempat biasa, spot rahasia ini jauh lebih indah!",
+                    "core_insight": "Sudut panorama tersembunyi yang belum ramai turis.",
+                    "call_to_action": "Tonton panduan rute dan rincian biaya di video lengkap!",
+                    "projected_virality": "9.4 / 10 🔥",
+                },
+                {
+                    "clip_id": 2,
+                    "clip_title": f"Tips Hemat Liburan ke {clean} #shorts",
+                    "timestamp_window": "05:30 - 06:15 (45 Detik)",
+                    "hook_line": f"Liburan ke {clean} gak harus mahal! Terapkan trik hemat ini biar budget aman!",
+                    "core_insight": "Rincian pengeluaran realistis dan waktu terbaik berkunjung.",
+                    "call_to_action": "Simpan video ini untuk rencana itinerary liburanmu!",
+                    "projected_virality": "8.8 / 10 ⭐",
+                },
+                {
+                    "clip_id": 3,
+                    "clip_title": f"Aturan Wajib Sebelum Berangkat ke {clean} #shorts",
+                    "timestamp_window": "10:45 - 11:30 (45 Detik)",
+                    "hook_line": f"Jangan pernah ke {clean} sebelum kamu tahu peringatan penting ini!",
+                    "core_insight": "Informasi cuaca, medan lokasi, dan etika berkunjung yang harus dipatuhi.",
+                    "call_to_action": "Pernah ke sini juga? Bagikan pengalamanmu di komentar!",
+                    "projected_virality": "9.1 / 10 🔥",
+                },
+            ]
+        elif niche == "entertainment":
+            return [
+                {
+                    "clip_id": 1,
+                    "clip_title": f"Detail Gila di {clean} yang Terlewatkan #shorts",
+                    "timestamp_window": "01:15 - 02:00 (45 Detik)",
+                    "hook_line": f"Hampir 99% orang gak sadar kalau ada detail tersembunyi di {clean}!",
+                    "core_insight": "Analisis adegan / petunjuk rahasia yang mengubah jalan cerita.",
+                    "call_to_action": "Tonton bedah cerita lengkapnya di video utama!",
+                    "projected_virality": "9.6 / 10 🔥",
+                },
+                {
+                    "clip_id": 2,
+                    "clip_title": f"Teori Mengejutkan Seputar {clean} #shorts",
+                    "timestamp_window": "05:30 - 06:15 (45 Detik)",
+                    "hook_line": f"Gimana kalau fakta sesungguhnya di {clean} sama sekali bukan seperti yang kamu duga?",
+                    "core_insight": "Eksplorasi plot twist dan spekulasi cerita yang memukau.",
+                    "call_to_action": "Tonton video lengkapnya untuk penjelasan alur selengkapnya!",
+                    "projected_virality": "9.0 / 10 ⭐",
+                },
+                {
+                    "clip_id": 3,
+                    "clip_title": f"Makna Sebenarnya dari Ending {clean} #shorts",
+                    "timestamp_window": "10:45 - 11:30 (45 Detik)",
+                    "hook_line": f"Masih bingung sama adegan akhir {clean}? Ini penjelasan makna sesungguhnya!",
+                    "core_insight": "Penjelasan makna filosofis dan pesan tersirat sang kreator.",
+                    "call_to_action": "Setuju gak sama teori ini? Tulis pendapatmu di komentar!",
+                    "projected_virality": "9.3 / 10 🔥",
+                },
+            ]
+        elif niche == "health_fitness":
+            return [
+                {
+                    "clip_id": 1,
+                    "clip_title": f"Tanda Tubuhmu Mengalami {clean} #shorts",
+                    "timestamp_window": "01:15 - 02:00 (45 Detik)",
+                    "hook_line": f"Waspada 3 tanda ini di tubuhmu, jangan-jangan kamu sedang mengalami {clean}!",
+                    "core_insight": "Edukasi deteksi gejala awal menurut fakta kesehatan.",
+                    "call_to_action": "Tonton penjelasan dokter dan solusi alaminya di video lengkap!",
+                    "projected_virality": "9.2 / 10 🔥",
+                },
+                {
+                    "clip_id": 2,
+                    "clip_title": f"Hindari 1 Hal Ini Kalau Ada {clean}! #shorts",
+                    "timestamp_window": "05:30 - 06:15 (45 Detik)",
+                    "hook_line": f"Banyak orang belum tahu, 1 kebiasaan sepele ini justru bikin {clean} makin parah!",
+                    "core_insight": "Pantangan medis penting dan alternatif kebiasaan yang lebih sehat.",
+                    "call_to_action": "Simpan video ini dan kirim ke orang tersayang!",
+                    "projected_virality": "9.0 / 10 ⭐",
+                },
+                {
+                    "clip_id": 3,
+                    "clip_title": f"Cara Alami Atasi {clean} Tanpa Obat Kimia #shorts",
+                    "timestamp_window": "10:45 - 11:30 (45 Detik)",
+                    "hook_line": f"Coba lakukan langkah alami ini secara rutin untuk meredakan {clean}!",
+                    "core_insight": "Pola hidup sehat dan nutrisi alami yang terbukti menjaga kondisi tubuh.",
+                    "call_to_action": "Komen di bawah apa keluhan yang paling sering kamu rasakan!",
+                    "projected_virality": "8.9 / 10 ⭐",
+                },
+            ]
+        elif niche == "business":
+            return [
+                {
+                    "clip_id": 1,
+                    "clip_title": f"1 Rahasia {clean} Biar Gak Boncos #shorts",
+                    "timestamp_window": "01:15 - 02:00 (45 Detik)",
+                    "hook_line": "Banyak orang boncos di 2026 gara-gara 1 tombol ini...",
+                    "core_insight": "Demonstrasi bagian teknis paling krusial yang langsung mengubah hasil.",
+                    "call_to_action": "Tonton tutorial strategi lengkapnya di channel ini!",
+                    "projected_virality": "9.2 / 10 🔥",
+                },
+                {
+                    "clip_id": 2,
+                    "clip_title": f"Cukup 30 Detik Paham Cara Kerja {clean} #shorts",
+                    "timestamp_window": "05:30 - 06:15 (45 Detik)",
+                    "hook_line": "Kalau kamu masih bingung cara settingnya, tonton ini sampai habis!",
+                    "core_insight": "Alur visual cepat step-by-step tanpa basa-basi.",
+                    "call_to_action": "Simpan video ini biar gak lupa!",
+                    "projected_virality": "8.8 / 10 ⭐",
+                },
+                {
+                    "clip_id": 3,
+                    "clip_title": f"Jangan Pernah Lakukan Ini Saat {clean}! #shorts",
+                    "timestamp_window": "10:45 - 11:30 (45 Detik)",
+                    "hook_line": "Ini kesalahan paling fatal yang bikin budget-mu habis sia-sia!",
+                    "core_insight": "Peringatan berbasis studi kasus nyata yang sering diabaikan pemula.",
+                    "call_to_action": "Komen pendapatmu di bawah, pernah ngalamin juga?",
+                    "projected_virality": "9.5 / 10 🔥",
+                },
+            ]
+        elif niche == "tech_tutorial":
+            return [
+                {
+                    "clip_id": 1,
+                    "clip_title": f"Shortcut Rahasia {clean} yang Wajib Tahu #shorts",
+                    "timestamp_window": "01:15 - 02:00 (45 Detik)",
+                    "hook_line": f"Kerja pakai {clean} bakal 10x lebih cepat kalau kamu tahu trik tersembunyi ini!",
+                    "core_insight": "Tips efisiensi kerja dan fitur tersembunyi yang menghemat waktu.",
+                    "call_to_action": "Tonton tutorial lengkap langkah demi langkah di video utama!",
+                    "projected_virality": "9.3 / 10 🔥",
+                },
+                {
+                    "clip_id": 2,
+                    "clip_title": f"Solusi Error pada {clean} dalam 30 Detik #shorts",
+                    "timestamp_window": "05:30 - 06:15 (45 Detik)",
+                    "hook_line": f"Pernah ngalamin kendala ini pas pakai {clean}? Jangan panik, ini solusinya!",
+                    "core_insight": "Perbaikan langsung untuk kendala teknis yang paling sering muncul.",
+                    "call_to_action": "Simpan video ini buat jaga-jaga kalau ketemu error serupa!",
+                    "projected_virality": "8.9 / 10 ⭐",
+                },
+                {
+                    "clip_id": 3,
+                    "clip_title": f"Fitur Baru {clean} Versi 2026 #shorts",
+                    "timestamp_window": "10:45 - 11:30 (45 Detik)",
+                    "hook_line": f"Ada update keren di {clean} yang bikin cara kerjamu jauh lebih simpel!",
+                    "core_insight": "Review ringkas peningkatan performa dan navigasi baru.",
+                    "call_to_action": "Udah coba fitur ini belum? Komen di bawah ya!",
+                    "projected_virality": "9.1 / 10 🔥",
+                },
+            ]
+        else:
+            return [
+                {
+                    "clip_id": 1,
+                    "clip_title": f"Fakta Menakjubkan Seputar {clean} #shorts",
+                    "timestamp_window": "01:15 - 02:00 (45 Detik)",
+                    "hook_line": f"Tahukah kamu ada fakta mengejutkan seputar {clean} yang jarang diketahui?",
+                    "core_insight": "Informasi unik dan berbobot yang memancing rasa penasaran audiens.",
+                    "call_to_action": "Tonton penjelasan lengkapnya di video utama!",
+                    "projected_virality": "9.1 / 10 🔥",
+                },
+                {
+                    "clip_id": 2,
+                    "clip_title": f"Kenapa {clean} Begitu Menarik? #shorts",
+                    "timestamp_window": "05:30 - 06:15 (45 Detik)",
+                    "hook_line": f"Banyak orang belum sadar alasan kenapa {clean} punya pengaruh sebesar ini...",
+                    "core_insight": "Sudut pandang segar dan analisis mendalam yang mudah dipahami.",
+                    "call_to_action": "Simpan video ini untuk referensi wawasanmu!",
+                    "projected_virality": "8.7 / 10 ⭐",
+                },
+                {
+                    "clip_id": 3,
+                    "clip_title": f"Mitos vs Fakta Seputar {clean} #shorts",
+                    "timestamp_window": "10:45 - 11:30 (45 Detik)",
+                    "hook_line": f"Jangan gampang percaya, mitos tentang {clean} ini ternyata keliru besar!",
+                    "core_insight": "Pembongkaran miskonsepsi umum berdasarkan fakta valid.",
+                    "call_to_action": "Bagaimana menurutmu? Tulis tanggapanmu di komentar!",
+                    "projected_virality": "9.2 / 10 🔥",
+                },
+            ]

@@ -21,6 +21,8 @@ SRC_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "src"))
 if SRC_DIR not in sys.path:
     sys.path.insert(0, SRC_DIR)
 
+from typing import Any
+
 import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
@@ -169,9 +171,36 @@ def get_all_topics():
         return []
 
 
+class InMemQuery:
+    def __init__(self, query_text: str, platform: Any):
+        self.query_text = query_text
+        self.platform = platform
+
+
+class InMemTopic:
+    def __init__(self, canonical_id: str, name: str, seed_keyword: str):
+        self.id = 1
+        self.canonical_id = canonical_id
+        self.name = name
+        self.seed_keyword = seed_keyword
+        self.description = f"Riset topik '{seed_keyword}'"
+
+
 def save_or_get_topic(seed_keyword: str):
     canonical_id = TopicNormalizer.generate_canonical_id(seed_keyword)
     surfaces = TopicNormalizer.expand_seed_surfaces(seed_keyword)
+    in_mem_queries = [InMemQuery(q, p) for p, qs in surfaces.items() for q in qs]
+    in_mem_clusters = TopicNormalizer.create_intent_clusters(
+        topic_id=1,
+        google_terms=surfaces.get(PlatformEnum.GOOGLE_SEARCH, []),
+        youtube_terms=surfaces.get(PlatformEnum.YOUTUBE_SEARCH, []),
+        aeo_queries=surfaces.get(PlatformEnum.AI_SEARCH, []),
+    )
+    in_mem_topic = InMemTopic(
+        canonical_id=canonical_id,
+        name=seed_keyword.strip().title(),
+        seed_keyword=seed_keyword.strip(),
+    )
 
     try:
         with Session(engine) as session:
@@ -200,9 +229,9 @@ def save_or_get_topic(seed_keyword: str):
 
                 clusters = TopicNormalizer.create_intent_clusters(
                     topic_id=topic.id,
-                    google_terms=surfaces[PlatformEnum.GOOGLE_SEARCH],
-                    youtube_terms=surfaces[PlatformEnum.YOUTUBE_SEARCH],
-                    aeo_queries=surfaces[PlatformEnum.AI_SEARCH],
+                    google_terms=surfaces.get(PlatformEnum.GOOGLE_SEARCH, []),
+                    youtube_terms=surfaces.get(PlatformEnum.YOUTUBE_SEARCH, []),
+                    aeo_queries=surfaces.get(PlatformEnum.AI_SEARCH, []),
                 )
                 for c in clusters:
                     session.add(c)
@@ -216,19 +245,7 @@ def save_or_get_topic(seed_keyword: str):
             return topic, surfaces, clusters, queries
     except Exception as e:
         print(f"Notice: Database session notice (fallback to in-memory): {e}")
-        fallback_topic = Topic(
-            canonical_id=canonical_id,
-            name=seed_keyword.strip().title(),
-            seed_keyword=seed_keyword.strip(),
-            description=f"Riset topik '{seed_keyword}' via Browser App",
-        )
-        clusters = TopicNormalizer.create_intent_clusters(
-            topic_id=1,
-            google_terms=surfaces[PlatformEnum.GOOGLE_SEARCH],
-            youtube_terms=surfaces[PlatformEnum.YOUTUBE_SEARCH],
-            aeo_queries=surfaces[PlatformEnum.AI_SEARCH],
-        )
-        return fallback_topic, surfaces, clusters, []
+        return in_mem_topic, surfaces, in_mem_clusters, in_mem_queries
 
 
 def fetch_google_trends_rss(geo: str = "ID") -> list[dict[str, str]]:

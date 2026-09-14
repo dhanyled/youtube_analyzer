@@ -287,7 +287,7 @@ if keyword_input:
     # Fetch Top Competitors Live
     yt_connector = YouTubeConnector()
     with st.spinner("Mengintip video kompetitor ranking teratas di YouTube..."):
-        competitors = asyncio.run(yt_connector.get_top_competitors(keyword_input, limit=5))
+        competitors = asyncio.run(yt_connector.get_top_competitors(keyword_input, limit=10))
 
     top_comp = competitors[0] if competitors else None
     outranking_plan = SearchIntelligence.generate_outranking_plan(keyword_input, top_comp)
@@ -505,7 +505,7 @@ if keyword_input:
                     hl=hl_val,
                     category=cat_val,
                     device=dev_val,
-                    limit=12,
+                    limit=10,
                 )
             )
 
@@ -901,8 +901,9 @@ if keyword_input:
     with tab_trends:
         st.subheader("📈 Tren Google Web vs YouTube Search (`gprop=youtube`)")
         st.caption(
-            "Eksplorasi perbandingan minat penelusuran antara Google Web Search dan YouTube Search (`gprop=youtube`). "
-            "Pilih wilayah target (Seluruh Dunia / Indonesia) dan pantau topik pencarian harian yang sedang viral."
+            "Eksplorasi perbandingan minat penelusuran resmi Google Trends: "
+            "Grafik Minat Sepanjang Waktu (Interest Over Time), Distribusi Wilayah (Interest by Region), "
+            "serta 50 Kueri Teratas (Top Queries) & 50 Kueri Melonjak (Rising Queries)."
         )
 
         tr_col1, tr_col2 = st.columns([1, 2])
@@ -942,22 +943,138 @@ if keyword_input:
                 connector.compare_google_vs_youtube(keyword_input, geo=sel_geo_code or "ID")
             )
 
-        t1, t2 = st.columns(2)
-        with t1:
-            st.markdown("##### 🌐 Google Web Trends (Search Biasa)")
-            st.dataframe(pd.DataFrame(trends_comp["google_web_trends"]), use_container_width=True)
+        # -------------------------------------------------------------
+        # 1. INTEREST OVER TIME (GRAFIK MINAT SEPANJANG WAKTU - 52 MINGGU)
+        # -------------------------------------------------------------
+        st.markdown("---")
+        st.markdown("#### 📊 Grafik Minat Penelusuran Sepanjang Waktu (Interest Over Time)")
+        st.caption(
+            "Perbandingan tren historis 52 minggu (12 bulan terakhir) antara **YouTube Search (`gprop=youtube`)** "
+            "dan **Google Web Search** dengan skala indeks 0–100."
+        )
 
-        with t2:
-            st.markdown("##### 📺 YouTube Search Trends (`gprop=youtube`)")
-            st.dataframe(pd.DataFrame(trends_comp["youtube_trends"]), use_container_width=True)
+        yt_ot = trends_comp.get("youtube_interest_over_time", [])
+        gw_ot = trends_comp.get("google_interest_over_time", [])
 
+        if yt_ot and gw_ot:
+            df_yt = pd.DataFrame(yt_ot)[["Tanggal", "Minat Penelusuran"]].rename(
+                columns={"Minat Penelusuran": "YouTube Search (gprop=youtube)"}
+            )
+            df_gw = pd.DataFrame(gw_ot)[["Tanggal", "Minat Penelusuran"]].rename(
+                columns={"Minat Penelusuran": "Google Web Search"}
+            )
+            merged_ot = pd.merge(df_yt, df_gw, on="Tanggal")
+            merged_ot.set_index("Tanggal", inplace=True)
+
+            yt_col_name = "YouTube Search (gprop=youtube)"
+            gw_col_name = "Google Web Search"
+            yt_avg = int(merged_ot[yt_col_name].mean())
+            gw_avg = int(merged_ot[gw_col_name].mean())
+            yt_peak = int(merged_ot[yt_col_name].max())
+            latest_val = int(merged_ot[yt_col_name].iloc[-1])
+            prev_val = int(merged_ot[yt_col_name].iloc[-4])
+            diff_mom = latest_val - prev_val
+
+            mo1, mo2, mo3, mo4 = st.columns(4)
+            mo1.metric("Rata-rata YouTube (12 Bln)", f"{yt_avg} / 100", "Minat Penonton")
+            mo2.metric("Puncak Minat YouTube", f"{yt_peak} / 100", "Peak Demand")
+            mo3.metric("Rata-rata Google Web", f"{gw_avg} / 100", "Pencarian Teks")
+            mo4.metric(
+                "Momentum YouTube Terkini",
+                f"{latest_val} / 100",
+                f"{'+' if diff_mom >= 0 else ''}{diff_mom} poin (vs bulan lalu)",
+            )
+
+            st.line_chart(merged_ot, use_container_width=True)
+
+        # -------------------------------------------------------------
+        # 2. INTEREST BY REGION (MINAT BERDASARKAN WILAYAH / PROVINSI)
+        # -------------------------------------------------------------
+        st.markdown("---")
+        st.markdown(f"#### 🗺️ Minat Penelusuran Berdasarkan Wilayah ({sel_geo_label})")
+        st.caption(
+            "Distribusi geografis intensitas penelusuran di subwilayah/provinsi (skala 0–100)."
+        )
+
+        region_data = trends_comp.get("interest_by_region", [])
+        if region_data:
+            reg_df = pd.DataFrame(region_data)
+            r_col1, r_col2 = st.columns([3, 2])
+            with r_col1:
+                st.markdown("##### 📊 Top 10 Wilayah Teratas")
+                top_regions_chart = reg_df.head(10).set_index("Wilayah")[["Indeks Minat"]]
+                st.bar_chart(top_regions_chart, use_container_width=True)
+            with r_col2:
+                st.markdown("##### 📋 Tabel Lengkap Wilayah")
+                st.dataframe(
+                    reg_df[["Wilayah", "Kode", "Indeks Minat", "Tingkat Minat"]],
+                    use_container_width=True,
+                    height=320,
+                )
+
+        # -------------------------------------------------------------
+        # 3. TOP & RISING QUERIES (HINGGA 50 KUERI)
+        # -------------------------------------------------------------
+        st.markdown("---")
+        st.markdown("#### 🎯 Kueri Terkait: Top Query & Rising Query (Hingga 50 Kueri)")
+        st.caption(
+            "Kueri penelusuran berperingkat 1–50 sesuai sistem resmi Google Trends. "
+            "**Top Queries** menunjukkan volume absolut tertinggi, sedangkan **Rising Queries** menunjukkan lonjakan tren terbaru (Breakout)."
+        )
+
+        limit_count = st.select_slider(
+            "Pilih Jumlah Kueri yang Ditampilkan:",
+            options=[10, 20, 30, 40, 50],
+            value=50,
+            key="trends_query_limit_slider",
+        )
+
+        q_tab_yt, q_tab_gw = st.tabs(
+            ["📺 YouTube Search (`gprop=youtube`)", "🌐 Google Web Search"]
+        )
+
+        with q_tab_yt:
+            col_yt_top, col_yt_rising = st.columns(2)
+            with col_yt_top:
+                st.markdown(f"##### 🔝 Top Queries YouTube (Rank 1 - {limit_count})")
+                st.caption("Paling banyak dicari pengguna YouTube di kotak pencarian.")
+                yt_top = trends_comp.get("youtube_top_queries", [])[:limit_count]
+                df_yt_top = pd.DataFrame(yt_top)[["Rank", "Query", "Popularitas (0-100)"]]
+                st.dataframe(df_yt_top, use_container_width=True, height=450)
+
+            with col_yt_rising:
+                st.markdown(f"##### 🚀 Rising Queries YouTube (Rank 1 - {limit_count})")
+                st.caption("Kueri dengan lonjakan frekuensi pencarian tertinggi (Breakout +5000%).")
+                yt_rising = trends_comp.get("youtube_rising_queries", [])[:limit_count]
+                df_yt_rising = pd.DataFrame(yt_rising)[["Rank", "Query", "Lonjakan Minat"]]
+                st.dataframe(df_yt_rising, use_container_width=True, height=450)
+
+        with q_tab_gw:
+            col_gw_top, col_gw_rising = st.columns(2)
+            with col_gw_top:
+                st.markdown(f"##### 🔝 Top Queries Google Web (Rank 1 - {limit_count})")
+                st.caption("Kueri teks paling banyak dicari pengguna di Google Search.")
+                gw_top = trends_comp.get("google_top_queries", [])[:limit_count]
+                df_gw_top = pd.DataFrame(gw_top)[["Rank", "Query", "Popularitas (0-100)"]]
+                st.dataframe(df_gw_top, use_container_width=True, height=450)
+
+            with col_gw_rising:
+                st.markdown(f"##### 🚀 Rising Queries Google Web (Rank 1 - {limit_count})")
+                st.caption("Kueri baru dengan pertumbuhan tercepat di Google Search.")
+                gw_rising = trends_comp.get("google_rising_queries", [])[:limit_count]
+                df_gw_rising = pd.DataFrame(gw_rising)[["Rank", "Query", "Lonjakan Minat"]]
+                st.dataframe(df_gw_rising, use_container_width=True, height=450)
+
+        # -------------------------------------------------------------
+        # 4. AUDIENCE BEHAVIOR & DAILY RSS TRENDS
+        # -------------------------------------------------------------
+        st.markdown("---")
         st.info(
             f"💡 **Analisis Perilaku Penonton ({sel_geo_label}):**  \n"
             f"- Di **Google Web**, pencarian cenderung bersifat: *{trends_comp['surface_intent_summary']['google_web_focus']}*.  \n"
             f"- Di **YouTube Search (`gprop=youtube`)**, penonton fokus mencari: *{trends_comp['surface_intent_summary']['youtube_focus']}*."
         )
 
-        st.markdown("---")
         st.markdown(
             f"#### ⚡ Topik Populer Harian di Google Trends ({sel_geo_label or 'Worldwide'})"
         )

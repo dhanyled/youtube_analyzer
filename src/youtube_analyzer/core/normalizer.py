@@ -346,12 +346,12 @@ class TopicNormalizer:
         populate_samples(youtube_terms, "youtube")
         populate_samples(aeo_queries, "aeo")
 
-        clusters: list[IntentCluster] = []
+        clusters: list[Any] = []
         for intent, data in clusters_map.items():
             # Include cluster if at least one surface sample exists
             if any([data["google"], data["youtube"], data["aeo"]]):
-                clusters.append(
-                    IntentCluster(
+                try:
+                    c = IntentCluster(
                         topic_id=topic_id,
                         cluster_name=data["name"],
                         intent_type=intent,
@@ -359,5 +359,32 @@ class TopicNormalizer:
                         youtube_term_sample=data["youtube"],
                         aeo_query_sample=data["aeo"],
                     )
-                )
+                except Exception:
+
+                    class FallbackCluster:
+                        def __init__(
+                            self,
+                            topic_id: int,
+                            cluster_name: str,
+                            intent_type: Any,
+                            google_term_sample: str | None,
+                            youtube_term_sample: str | None,
+                            aeo_query_sample: str | None,
+                        ) -> None:
+                            self.topic_id = topic_id
+                            self.cluster_name = cluster_name
+                            self.intent_type = intent_type
+                            self.google_term_sample = google_term_sample
+                            self.youtube_term_sample = youtube_term_sample
+                            self.aeo_query_sample = aeo_query_sample
+
+                    c = FallbackCluster(
+                        topic_id=topic_id,
+                        cluster_name=data["name"],
+                        intent_type=intent,
+                        google_term_sample=data["google"],
+                        youtube_term_sample=data["youtube"],
+                        aeo_query_sample=data["aeo"],
+                    )
+                clusters.append(c)
         return clusters

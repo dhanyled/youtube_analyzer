@@ -33,6 +33,7 @@ from youtube_analyzer.connectors.youtube import YouTubeConnector
 from youtube_analyzer.core.intelligence import SearchIntelligence
 from youtube_analyzer.core.models import (
     IntentCluster,
+    IntentEnum,
     PlatformEnum,
     Query,
     Topic,
@@ -186,16 +187,85 @@ class InMemTopic:
         self.description = f"Riset topik '{seed_keyword}'"
 
 
+class InMemCluster:
+    def __init__(
+        self,
+        cluster_name: str,
+        intent_type: Any,
+        google_term_sample: str | None = None,
+        youtube_term_sample: str | None = None,
+        aeo_query_sample: str | None = None,
+    ):
+        self.cluster_name = cluster_name
+        self.intent_type = intent_type
+        self.google_term_sample = google_term_sample
+        self.youtube_term_sample = youtube_term_sample
+        self.aeo_query_sample = aeo_query_sample
+
+
+def create_in_memory_clusters(surfaces: dict[Any, list[str]]) -> list[InMemCluster]:
+    clusters_map: dict[IntentEnum, dict[str, Any]] = {
+        IntentEnum.TUTORIAL: {
+            "name": "Tutorial & Panduan Praktis",
+            "google": None,
+            "youtube": None,
+            "aeo": None,
+        },
+        IntentEnum.COMMERCIAL: {
+            "name": "Komersial & Jasa Bisnis",
+            "google": None,
+            "youtube": None,
+            "aeo": None,
+        },
+        IntentEnum.INFORMATIONAL: {
+            "name": "Informasional & Edukasi",
+            "google": None,
+            "youtube": None,
+            "aeo": None,
+        },
+        IntentEnum.COMPARISON: {
+            "name": "Komparasi & Alternatif",
+            "google": None,
+            "youtube": None,
+            "aeo": None,
+        },
+    }
+
+    for term in surfaces.get(PlatformEnum.GOOGLE_SEARCH, []):
+        intent = TopicNormalizer.classify_intent(term)
+        if intent in clusters_map and clusters_map[intent]["google"] is None:
+            clusters_map[intent]["google"] = term
+
+    for term in surfaces.get(PlatformEnum.YOUTUBE_SEARCH, []):
+        intent = TopicNormalizer.classify_intent(term)
+        if intent in clusters_map and clusters_map[intent]["youtube"] is None:
+            clusters_map[intent]["youtube"] = term
+
+    for term in surfaces.get(PlatformEnum.AI_SEARCH, []):
+        intent = TopicNormalizer.classify_intent(term)
+        if intent in clusters_map and clusters_map[intent]["aeo"] is None:
+            clusters_map[intent]["aeo"] = term
+
+    clusters: list[InMemCluster] = []
+    for intent, data in clusters_map.items():
+        if any([data["google"], data["youtube"], data["aeo"]]):
+            clusters.append(
+                InMemCluster(
+                    cluster_name=data["name"],
+                    intent_type=intent,
+                    google_term_sample=data["google"],
+                    youtube_term_sample=data["youtube"],
+                    aeo_query_sample=data["aeo"],
+                )
+            )
+    return clusters
+
+
 def save_or_get_topic(seed_keyword: str):
     canonical_id = TopicNormalizer.generate_canonical_id(seed_keyword)
     surfaces = TopicNormalizer.expand_seed_surfaces(seed_keyword)
     in_mem_queries = [InMemQuery(q, p) for p, qs in surfaces.items() for q in qs]
-    in_mem_clusters = TopicNormalizer.create_intent_clusters(
-        topic_id=1,
-        google_terms=surfaces.get(PlatformEnum.GOOGLE_SEARCH, []),
-        youtube_terms=surfaces.get(PlatformEnum.YOUTUBE_SEARCH, []),
-        aeo_queries=surfaces.get(PlatformEnum.AI_SEARCH, []),
-    )
+    in_mem_clusters = create_in_memory_clusters(surfaces)
     in_mem_topic = InMemTopic(
         canonical_id=canonical_id,
         name=seed_keyword.strip().title(),
@@ -436,7 +506,18 @@ if keyword_input:
     if clean_kw and clean_kw not in st.session_state.user_search_history:
         st.session_state.user_search_history.insert(0, clean_kw)
 
-    topic, surfaces, clusters, queries = save_or_get_topic(clean_kw)
+    try:
+        topic, surfaces, clusters, queries = save_or_get_topic(clean_kw)
+    except Exception as e:
+        print(f"Notice: save_or_get_topic fallback: {e}")
+        surfaces = TopicNormalizer.expand_seed_surfaces(clean_kw)
+        queries = [InMemQuery(q, p) for p, qs in surfaces.items() for q in qs]
+        clusters = create_in_memory_clusters(surfaces)
+        topic = InMemTopic(
+            canonical_id=TopicNormalizer.generate_canonical_id(clean_kw),
+            name=clean_kw.strip().title(),
+            seed_keyword=clean_kw.strip(),
+        )
 
     # Fetch Top Competitors Live
     yt_connector = YouTubeConnector()

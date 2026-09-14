@@ -271,23 +271,28 @@ def fetch_google_trends_rss(geo: str = "ID") -> list[dict[str, str]]:
 st.sidebar.title("🔍 Search Intelligence")
 st.sidebar.caption("YouTube + Google + AI / AEO Orchestrator")
 st.sidebar.markdown("---")
-st.sidebar.subheader("📚 Riwayat Topik Tersimpan")
+st.sidebar.subheader("📚 Riwayat Riset Anda")
 
-all_topics = get_all_topics()
+if "user_search_history" not in st.session_state:
+    st.session_state.user_search_history = []
+
+user_history = st.session_state.user_search_history
 selected_topic_seed = None
 
-if all_topics:
-    topic_options = [f"{t.canonical_id} - {t.name}" for t in all_topics]
+if user_history:
     selected_option = st.sidebar.selectbox(
-        "Pilih Topik Sebelumnya:", ["-- Masukkan Topik Baru --"] + topic_options
+        "Pilih Riset Sebelumnya:",
+        ["-- Masukkan Topik Baru --"] + user_history,
+        key="history_selector",
     )
     if selected_option != "-- Masukkan Topik Baru --":
-        selected_cid = selected_option.split(" - ")[0]
-        match = next((t for t in all_topics if t.canonical_id == selected_cid), None)
-        if match:
-            selected_topic_seed = match.seed_keyword
+        selected_topic_seed = selected_option
+
+    if st.sidebar.button("🗑️ Bersihkan Riwayat Sesi", use_container_width=True):
+        st.session_state.user_search_history = []
+        st.rerun()
 else:
-    st.sidebar.info("Belum ada topik yang tersimpan di database.")
+    st.sidebar.caption("Topik yang Anda cari pada sesi ini akan tersimpan otomatis di sini.")
 
 
 
@@ -315,7 +320,11 @@ with col_btn:
     run_analysis = st.button("🔥 Analisis Topik", use_container_width=True, type="primary")
 
 if keyword_input:
-    topic, surfaces, clusters, queries = save_or_get_topic(keyword_input)
+    clean_kw = keyword_input.strip()
+    if clean_kw and clean_kw not in st.session_state.user_search_history:
+        st.session_state.user_search_history.insert(0, clean_kw)
+
+    topic, surfaces, clusters, queries = save_or_get_topic(clean_kw)
 
     # Fetch Top Competitors Live
     yt_connector = YouTubeConnector()

@@ -60,6 +60,48 @@ def test_generate_outranking_plan():
     assert plan["recommended_format"] in ["LANDSCAPE", "SHORTS"]
 
 
+def test_smart_heuristic_volcano_vs_climbing_differentiation():
+    kra_plan = SearchIntelligence.generate_outranking_plan(
+        "gunung krakatau",
+        competitors=[
+            {"title": "Anak Krakatau Kembali Mengalami Erupsi", "views": "1M"},
+            {
+                "title": "TRAGEDI KRAKATAU 1883: Hari Ketika Laut Berubah Menjadi Maut",
+                "views": "2M",
+            },
+        ],
+    )
+    sla_plan = SearchIntelligence.generate_outranking_plan(
+        "gunung selamet",
+        competitors=[
+            {
+                "title": "KISAH MEMILUKAN 7 PENDAKI MAHASISWA YANG TERJEBAK DI GUNUNG SLAMET",
+                "views": "1.5M",
+            },
+            {"title": "PENDAKIAN MAUT DI GUNUNG SLAMET", "views": "800K"},
+        ],
+    )
+
+    # They should not be identical templates
+    assert kra_plan["outranking_title"] != sla_plan["outranking_title"]
+    assert "Erupsi" in kra_plan["outranking_title"] or "Bencana" in kra_plan["outranking_title"]
+    assert (
+        "Pendaki" in sla_plan["outranking_title"]
+        or "Bertahan Hidup" in sla_plan["outranking_title"]
+    )
+
+
+def test_generate_outranking_plan_ai_error_graceful_fallback():
+    # Pass an invalid API key config - it should cleanly catch error and fall back
+    plan = SearchIntelligence.generate_outranking_plan(
+        "gunung krakatau",
+        competitors=[{"title": "Erupsi Krakatau", "views": "100K"}],
+        ai_config={"provider": "gemini", "api_key": "invalid_test_key_12345"},
+    )
+    assert "outranking_title" in plan
+    assert len(plan["alternative_titles"]) == 4
+
+
 def test_analyze_ai_competitor_presence():
     sample_competitors = [
         {"rank": 1, "is_ai_generated": False, "ai_badge": "👤 Human"},

@@ -1040,6 +1040,8 @@ class SearchIntelligence:
         cls,
         seed: str,
         competitor: dict[str, Any] | None = None,
+        competitors: list[dict[str, Any]] | None = None,
+        ai_config: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """
         Generate an actionable Outranking Blueprint:
@@ -1047,6 +1049,7 @@ class SearchIntelligence:
         - Full SEO Description with Timestamps & Hashtags
         - Shorts 3-Second Hook Package
         - Format Recommendation (Landscape 16:9 vs Shorts 9:16)
+        - Auto-Detects AI Config (Option 1) vs Smart Heuristic (Option 2)
         """
         clean = seed.strip().title()
         comp_title = competitor.get("title", "") if competitor else ""
@@ -1058,12 +1061,167 @@ class SearchIntelligence:
         clean_tag = "".join(clean.split())
         seed_mod = sum(ord(c) for c in clean) % 2
 
+        all_comps = competitors or ([competitor] if competitor else [])
+
+        # ------------------------------------------------------------------
+        # OPSI 1: AI GENERATOR (AUTO-DETECT JIKA API KEY TERSEDIA)
+        # ------------------------------------------------------------------
+        if ai_config and ai_config.get("api_key"):
+            try:
+                from youtube_analyzer.core.ai_generator import AITitleGenerator
+
+                ai_res = AITitleGenerator.generate_strategy(
+                    seed=seed,
+                    niche=niche,
+                    competitors=all_comps,
+                    provider=ai_config.get("provider", "gemini"),
+                    api_key=ai_config["api_key"],
+                    model_name=ai_config.get("model_name"),
+                    custom_base_url=ai_config.get("custom_base_url"),
+                )
+
+                psych_angles = ai_res.get("psychological_angles", {})
+                alt_titles = [
+                    v.get("title", "")
+                    for v in psych_angles.values()
+                    if isinstance(v, dict) and v.get("title")
+                ]
+                if not alt_titles:
+                    alt_titles = [ai_res.get("outranking_title", "")]
+
+                two_line_hook = ai_res.get(
+                    "two_line_hook",
+                    f"Penasaran tentang {clean}? Simak bedah lengkapnya di video ini!",
+                )
+                timestamps = ai_res.get(
+                    "timestamps",
+                    [
+                        "00:00 - Pembuka & Sorotan Utama",
+                        f"02:00 - Latar Belakang & Pengenalan {clean}",
+                        "06:30 - Kronologi Kunci & Penjelasan Mendalam",
+                        "11:00 - Evaluasi & Solusi Nyata",
+                        "15:00 - Kesimpulan Akhir",
+                    ],
+                )
+                hashtags = ai_res.get(
+                    "hashtags",
+                    [f"#{clean_tag}", f"#{clean_tag}Indonesia", "#VideoPopuler", "#YouTubeSEO"],
+                )
+
+                desc_text = (
+                    f"{two_line_hook}\n\n"
+                    f"📌 Video ini mengupas tuntas fakta, analisis, dan wawasan penting seputar {clean}.\n\n"
+                    f"⏱️ TIMESTAMPS / DAFTAR ISI:\n"
+                    + "\n".join(timestamps)
+                    + f"\n\n🔗 LINK & INFORMASI:\n"
+                    f"- Sumber Informasi & Diskusi: https://example.com\n\n"
+                    f"{' '.join(hashtags)}"
+                )
+
+                shorts_pkg = {
+                    "title": f"Fakta Mengejutkan {clean} yang Pasti Belum Kamu Tahu! #shorts",
+                    "three_second_hook": f"Kamu gak bakal nyangka kalau ada fakta sebesar ini tentang {clean}!",
+                    "script_structure": [
+                        "00-03s: Hook visual pertanyaan menggelitik pikiran",
+                        "03-30s: Tunjukkan 1 fakta inti paling mengejutkan",
+                        "30-45s: Tonton pembahasan lengkapnya di link terkait",
+                    ],
+                    "target_metric": "Viewed vs Swiped Away > 75%",
+                }
+
+                comp_ana = ai_res.get("competitor_analysis", {})
+
+                return {
+                    "seed_keyword": seed,
+                    "target_competitor": {
+                        "title": comp_title,
+                        "channel": comp_channel,
+                        "views": comp_views,
+                        "format": comp_format,
+                    },
+                    "recommended_format": comp_format,
+                    "competitor_analysis": comp_ana,
+                    "competitor_weakness": comp_ana.get("weakness", "Celah judul kompetitor"),
+                    "counter_strategy": comp_ana.get("counter_strategy", "Strategi tandingan kita"),
+                    "outranking_title": ai_res.get("outranking_title", ""),
+                    "title_formula": ai_res.get(
+                        "title_formula",
+                        "Pola Analisis AI: [Hook Emosional] + [Subjek Inti] + [Nilai Diferensiasi Tinggi]",
+                    ),
+                    "detected_niche": niche,
+                    "psychological_angles": psych_angles,
+                    "alternative_titles": alt_titles,
+                    "seo_description": desc_text,
+                    "two_line_hook": two_line_hook,
+                    "timestamps": timestamps,
+                    "hashtags": hashtags,
+                    "shorts_package": shorts_pkg,
+                    "generation_mode": "ai_enhanced",
+                    "ai_provider": ai_config.get("provider", "gemini"),
+                }
+            except Exception as e:
+                import logging
+
+                logging.getLogger(__name__).warning(
+                    f"AI Generator error: {e}. Falling back to Smart Competitor Heuristic."
+                )
+
+        # ------------------------------------------------------------------
+        # OPSI 2: SMART COMPETITOR HEURISTIC (EKSTRAKSI SEMANTIK SERP NYATA)
+        # ------------------------------------------------------------------
         comp_analysis = cls.analyze_competitor_packaging(comp_title, seed, niche)
 
+        # Kumpulkan teks semua judul kompetitor teratas untuk ekstraksi entitas
+        comp_titles = [c.get("title", "") for c in all_comps if c.get("title")]
+        comp_text = " ".join(comp_titles + [seed]).lower()
+
         if niche == "documentary":
-            lowered_seed = seed.strip().lower()
+            is_volcano = any(
+                k in comp_text
+                for k in [
+                    "erupsi",
+                    "meletus",
+                    "letusan",
+                    "1883",
+                    "lahar",
+                    "tsunami",
+                    "vulkanik",
+                    "kawah",
+                    "krakatau",
+                    "bencana",
+                ]
+            )
+            is_mountain_survival = any(
+                k in comp_text
+                for k in [
+                    "pendaki",
+                    "terjebak",
+                    "tersesat",
+                    "jalur",
+                    "pos ",
+                    "hilang",
+                    "survivor",
+                    "survival",
+                    "puncak",
+                    "bambangan",
+                    "slamet",
+                ]
+            )
+            is_folklore_mystery = any(
+                k in comp_text
+                for k in [
+                    "misteri",
+                    "angker",
+                    "pantangan",
+                    "mitos",
+                    "kutukan",
+                    "pesugihan",
+                    "hantu",
+                    "jumat kliwon",
+                ]
+            )
             is_science = any(
-                k in lowered_seed
+                k in comp_text
                 for k in [
                     "planet",
                     "mars",
@@ -1093,7 +1251,159 @@ class SearchIntelligence:
                     "antartika",
                 ]
             )
-            if is_science:
+
+            if is_volcano:
+                angle_curiosity = (
+                    f"Tanda-Tanda Senyap Sebelum Erupsi Dahsyat {clean} yang Terlambat Disadari"
+                    if seed_mod == 0
+                    else f"Apa yang Terjadi di Bawah Kawah {clean} Sebelum Ledakan Terbesar Terjadi?"
+                )
+                angle_stakes = (
+                    f"Detik-Detik Mencekam Bencana {clean}: Rekonstruksi Peristiwa Menit demi Menit"
+                    if seed_mod == 0
+                    else f"Hari Ketika Langit Gelap Total: Kronologi Kedahsyatan Letusan {clean}"
+                )
+                angle_contrarian = (
+                    f"Bukan Sekadar Letusan Biasa: Dampak Global {clean} yang Mengubah Iklim Dunia"
+                    if seed_mod == 0
+                    else f"Banyak yang Mengira Erupsi {clean} Sudah Selesai, Fakta Geologi Membuktikan Sebaliknya"
+                )
+                angle_deep = (
+                    f"Riwayat Panjang Erupsi {clean}: Catatan Sejarah, Karakteristik Letusan & Potensi Masa Depan"
+                    if seed_mod == 0
+                    else f"Dokumenter Utuh Bencana {clean}: Dari Tanda Awal Hingga Dampak Global yang Mengguncang Bumi"
+                )
+
+                outranking_title = f"Kronologi Menit Demi Menit Erupsi {clean}: Rekonstruksi Bencana & Fakta yang Luput dari Berita"
+                title_formula = "Pola Counter-Positioning: [Kronologi Menit-demi-Menit] + [Subjek Erupsi/Bencana] + [Fakta Rekonstruksi Baru]"
+                two_line_hook = (
+                    f"Bagaimana detik-detik peristiwa erupsi {clean} terjadi? "
+                    f"Di video ini kita rekonstruksi arsip sejarah, kesaksian saksi, dan dampak dahsyatnya bagi bumi!"
+                )
+                timestamps = [
+                    "00:00 - Tanda Awal & Gempa Vulkanik",
+                    f"02:30 - Detik-Detik Puncak Erupsi {clean}",
+                    "07:15 - Sebaran Awan Panas & Dampak Sekitar",
+                    "11:45 - Evaluasi Dampak Lingkungan & Geologi",
+                    "15:20 - Kondisi Terkini & Pelajaran Mitigasi",
+                ]
+                hashtags = [
+                    f"#{clean_tag}",
+                    f"#{clean_tag}Erupsi",
+                    "#BencanaAlam",
+                    "#DokumenterGeologi",
+                ]
+                shorts_package = {
+                    "title": f"Detik-Detik Dahsyat Erupsi {clean} yang Bikin Merinding! #shorts",
+                    "three_second_hook": f"Kamu tahu gak seberapa dahsyat letusan {clean} sampai suaranya terdengar ribuan kilometer?",
+                    "script_structure": [
+                        "00-03s: Hook visual kilas peristiwa erupsi",
+                        "03-30s: Ungkap 1 fakta kedahsyatan paling mengejutkan",
+                        "30-45s: Ajakan tonton dokumenter lengkapnya",
+                    ],
+                    "target_metric": "Viewed vs Swiped Away > 75%",
+                }
+
+            elif is_mountain_survival:
+                angle_curiosity = (
+                    f"Kisah Nyata di Balik Tragedi Pendaki {clean}: Detail Kejadian Sebenarnya di Jalur Ekstrem"
+                    if seed_mod == 0
+                    else f"1 Keputusan Fatal yang Mengubah Nasib Para Pendaki di {clean}"
+                )
+                angle_stakes = (
+                    f"Bertahan Hidup di Cuaca Ekstrem {clean}: Detik-Detik Evakuasi Menegangkan Para Pendaki"
+                    if seed_mod == 0
+                    else f"Kronologi Mencekam Evakuasi Pendaki {clean}: Perjuangan Melawan Hipotermia di Pos Kritis"
+                )
+                angle_contrarian = (
+                    f"Bukan Mistis Semata: Ini Kesalahan Fatal Teknis yang Sering Bikin Pendaki Terjebak di {clean}"
+                    if seed_mod == 0
+                    else f"Banyak yang Meremehkan Rute {clean}, Padahal 1 Titik Ini Sangat Mematikan"
+                )
+                angle_deep = (
+                    f"Kupas Tuntas Karakteristik Jalur {clean}: Titik Paling Rawan, Kesiapan Fisik, & Fakta Lapangan"
+                    if seed_mod == 0
+                    else f"Dokumenter Ekspedisi {clean}: Analisa Jalur Pendakian, Bahaya Tersembunyi, & Panduan Bertahan"
+                )
+
+                outranking_title = f"Kisah Nyata Bertahan Hidup di {clean}: Kronologi Lengkap Evakuasi & Evaluasi Jalur Pendakian"
+                title_formula = "Pola Counter-Positioning: [Kisah Nyata Survival] + [Lokasi Gunung/Jalur] + [Kronologi Evakuasi & Edukasi Teknis]"
+                two_line_hook = (
+                    f"Apa yang sebenarnya dialami para pendaki di {clean}? "
+                    f"Di video ini kita bedah kronologi penyelamatan, analisa medan ekstrem, dan evaluasi penting bagi para petualang!"
+                )
+                timestamps = [
+                    "00:00 - Awal Pendakian & Rencana Perjalanan",
+                    f"02:15 - Titik Kritis Jalur Pendakian {clean}",
+                    "06:40 - Detik-Detik Terjebak & Upaya Bertahan Hidup",
+                    "11:10 - Operasi SAR & Kronologi Evakuasi",
+                    "15:00 - Evaluasi Jalur & Panduan Keselamatan",
+                ]
+                hashtags = [
+                    f"#{clean_tag}",
+                    f"#{clean_tag}Pendakian",
+                    "#KisahSurvival",
+                    "#CatatanPendaki",
+                ]
+                shorts_package = {
+                    "title": f"Kisah Menegangkan Pendaki di {clean} yang Harus Kamu Tahu! #shorts",
+                    "three_second_hook": f"Jangan pernah remehkan jalur {clean}, 1 kesalahan kecil ini bisa berakibat fatal!",
+                    "script_structure": [
+                        "00-03s: Hook visual situasi mencekam di gunung",
+                        "03-30s: Ceritakan momen paling menegangkan",
+                        "30-45s: Tonton ulasan lengkap dan evaluasi medannya",
+                    ],
+                    "target_metric": "Viewed vs Swiped Away > 75%",
+                }
+
+            elif is_folklore_mystery:
+                angle_curiosity = (
+                    f"Misteri & Pantangan Turun-Temurun di {clean} yang Jarang Diungkap ke Publik"
+                    if seed_mod == 0
+                    else f"Kejanggalan di {clean} yang Kerap Dialami Saksi Mata tapi Jarang Dibahas"
+                )
+                angle_stakes = (
+                    f"Penelusuran Area Paling Rawan di {clean}: Kesaksian Langsung Warga & Rekam Jejak Lapangan"
+                    if seed_mod == 0
+                    else f"Malam di Titik Keramat {clean}: Catatan Nyata Peristiwa yang Bikin Bergidik"
+                )
+                angle_contrarian = (
+                    f"Membongkar Mitos Seputar {clean}: Penjelasan Rasional & Fakta Sejarah di Balik Cerita Viral"
+                    if seed_mod == 0
+                    else f"Jangan Terkecoh Cerita Berlebihan! Ini Fakta Logis di Balik Keanehan {clean}"
+                )
+                angle_deep = (
+                    f"Asal-Usul & Catatan Nyata {clean}: Memisahkan Antara Cerita Rakyat dan Fakta Lapangan"
+                    if seed_mod == 0
+                    else f"Dokumenter Menyeluruh {clean}: Sejarah Wilayah, Kesaksian Lokal, & Telaah Kritis"
+                )
+
+                outranking_title = f"Fakta Rasional di Balik Misteri {clean}: Kesaksian Warga & Sejarah Asli yang Jarang Dibahas"
+                title_formula = "Pola Counter-Positioning: [Fakta Rasional] + [Subjek Misteri/Lokasi] + [Kesaksian Lapangan Autentik]"
+                two_line_hook = (
+                    f"Penasaran dengan cerita misteri yang beredar di {clean}? "
+                    f"Di video ini kita telusuri fakta sejarah, pengakuan warga lokal, dan penjelasan logisnya!"
+                )
+                timestamps = [
+                    "00:00 - Pengantar Mitos yang Viral",
+                    f"02:00 - Asal Usul Cerita Rakyat Seputar {clean}",
+                    "06:15 - Kesaksian Saksi Mata & Warga Lokal",
+                    "10:30 - Penjelasan Rasional & Fakta Sejarah",
+                    "14:00 - Kesimpulan & Pelajaran Berharga",
+                ]
+                hashtags = [f"#{clean_tag}", f"#{clean_tag}Misteri", "#FaktaMitos", "#CeritaRakyat"]
+                shorts_package = {
+                    "title": f"Misteri Nyata Seputar {clean} yang Bikin Penasaran! #shorts",
+                    "three_second_hook": f"Pernah dengar cerita misteri di {clean}? Ternyata ini fakta di baliknya!",
+                    "script_structure": [
+                        "00-03s: Hook pertanyaan misteri menggelitik",
+                        "03-30s: Ungkap fakta rasionalnya",
+                        "30-45s: Tonton cerita lengkapnya di link terkait",
+                    ],
+                    "target_metric": "Viewed vs Swiped Away > 75%",
+                }
+
+            elif is_science:
                 angle_curiosity = (
                     f"Ada yang Tersembunyi di Bawah Permukaan {clean}: Misteri yang Belum Terpecahkan"
                     if seed_mod == 0
@@ -1637,6 +1947,8 @@ class SearchIntelligence:
             "timestamps": timestamps,
             "hashtags": hashtags,
             "shorts_package": shorts_package,
+            "generation_mode": "smart_heuristic",
+            "ai_provider": None,
         }
 
     @staticmethod

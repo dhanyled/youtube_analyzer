@@ -294,6 +294,87 @@ if user_history:
 else:
     st.sidebar.caption("Topik yang Anda cari pada sesi ini akan tersimpan otomatis di sini.")
 
+# -------------------------------------------------------------
+# Sidebar: Pengaturan AI Generator (Opsional)
+# -------------------------------------------------------------
+st.sidebar.markdown("---")
+with st.sidebar.expander("🤖 Pengaturan AI Generator (Opsional)", expanded=False):
+    ai_provider_label = st.selectbox(
+        "Pilih Provider AI:",
+        [
+            "Google Gemini (Rekomendasi / Kuota Gratis)",
+            "Groq (Super Cepat & Gratis)",
+            "OpenAI (GPT-4o / GPT-4o-mini)",
+            "OpenRouter (Multi-Model)",
+            "Custom OpenAI-Compatible",
+        ],
+        key="sidebar_ai_provider",
+    )
+
+    provider_map = {
+        "Google Gemini (Rekomendasi / Kuota Gratis)": "gemini",
+        "Groq (Super Cepat & Gratis)": "groq",
+        "OpenAI (GPT-4o / GPT-4o-mini)": "openai",
+        "OpenRouter (Multi-Model)": "openrouter",
+        "Custom OpenAI-Compatible": "custom",
+    }
+    sel_provider = provider_map[ai_provider_label]
+
+    default_models = {
+        "gemini": "gemini-1.5-flash",
+        "groq": "llama-3.3-70b-versatile",
+        "openai": "gpt-4o-mini",
+        "openrouter": "google/gemini-2.0-flash-001",
+        "custom": "",
+    }
+
+    env_api_key = (
+        os.getenv("GEMINI_API_KEY", "")
+        if sel_provider == "gemini"
+        else (
+            os.getenv("GROQ_API_KEY", "")
+            if sel_provider == "groq"
+            else (
+                os.getenv("OPENAI_API_KEY", "")
+                if sel_provider == "openai"
+                else os.getenv("AI_API_KEY", "")
+            )
+        )
+    )
+
+    api_key_val = st.text_input(
+        "API Key (Opsional):",
+        type="password",
+        value=st.session_state.get("custom_ai_api_key", env_api_key),
+        placeholder="Tempel API Key Anda di sini...",
+        help="Opsional. Jika diisi, judul tandingan & sudut psikologi di-generate langsung oleh AI. Jika kosong, sistem otomatis memakai Smart Competitor Heuristic.",
+        key="input_ai_api_key",
+    )
+    st.session_state.custom_ai_api_key = api_key_val
+
+    model_val = st.text_input(
+        "Model Name (Opsional):",
+        value=st.session_state.get("custom_ai_model", default_models.get(sel_provider, "")),
+        placeholder=default_models.get(sel_provider, ""),
+        key="input_ai_model",
+    )
+    st.session_state.custom_ai_model = model_val
+
+    custom_url_val = ""
+    if sel_provider == "custom":
+        custom_url_val = st.text_input(
+            "Base URL Endpoint:",
+            placeholder="https://api.example.com/v1",
+            key="input_ai_custom_url",
+        )
+
+    if api_key_val:
+        st.success(f"🟢 **Mode: AI Enhanced ({sel_provider.upper()})**")
+        st.caption("Judul diracik langsung oleh AI membaca data 5 video kompetitor.")
+    else:
+        st.info("🧠 **Mode: Smart Competitor Heuristic**")
+        st.caption("Tanpa API Key, sistem mengekstrak entitas penting dari video riil kompetitor.")
+
 
 # -------------------------------------------------------------
 # Header & Form Pencarian
@@ -330,7 +411,24 @@ if keyword_input:
         competitors = asyncio.run(yt_connector.get_top_competitors(keyword_input, limit=10))
 
     top_comp = competitors[0] if competitors else None
-    outranking_plan = SearchIntelligence.generate_outranking_plan(keyword_input, top_comp)
+
+    # Prepare AI Config if API key provided
+    ai_cfg = None
+    user_key = st.session_state.get("custom_ai_api_key", "").strip()
+    if user_key:
+        ai_cfg = {
+            "provider": sel_provider,
+            "api_key": user_key,
+            "model_name": st.session_state.get("custom_ai_model", "").strip() or None,
+            "custom_base_url": custom_url_val.strip() if custom_url_val else None,
+        }
+
+    outranking_plan = SearchIntelligence.generate_outranking_plan(
+        keyword_input,
+        competitor=top_comp,
+        competitors=competitors,
+        ai_config=ai_cfg,
+    )
 
     # -------------------------------------------------------------
     # 🎯 EXECUTIVE STRATEGIC DECISION CARD (Traffic Light Verdict)
@@ -466,7 +564,14 @@ if keyword_input:
                         f"**💡 Strategi Tandingan Kita:**  \n{comp_ana.get('counter_strategy', '')}"
                     )
 
-        st.markdown("#### 🎯 Formula Judul Tandingan untuk Mengalahkan Video #1:")
+        mode_label = (
+            f"⚡ AI Enhanced ({outranking_plan.get('ai_provider', 'AI').upper()})"
+            if outranking_plan.get("generation_mode") == "ai_enhanced"
+            else "🧠 Smart Competitor SERP Analysis"
+        )
+        st.markdown(
+            f"#### 🎯 Formula Judul Tandingan untuk Mengalahkan Video #1: &nbsp; `{mode_label}`"
+        )
         st.info(f"👉 **{outranking_plan['outranking_title']}**")
         if outranking_plan.get("title_formula"):
             st.caption(f"📐 {outranking_plan['title_formula']}")

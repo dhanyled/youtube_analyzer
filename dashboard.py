@@ -74,36 +74,68 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Injeksi script ke parent container Streamlit Cloud untuk menyembunyikan badge & link profile
+# Injeksi script ke parent & top container Streamlit Cloud untuk menyembunyikan badge & avatar profile
 components.html(
     """
     <script>
     function hideParentBadges() {
+        const windowsToClean = [];
         try {
-            const pdoc = window.parent.document;
-            if (!pdoc) return;
-            const styleId = "hide-github-streamlit-badges";
-            if (!pdoc.getElementById(styleId)) {
-                const s = pdoc.createElement("style");
-                s.id = styleId;
-                s.innerHTML = `
-                    ._viewerBadge_1j65n_23,
-                    ._profileContainer_gzau3_53,
-                    a[href*="streamlit.io/cloud"],
-                    a[href*="share.streamlit.io"],
-                    a[href*="github.com"] {
-                        display: none !important;
-                        visibility: hidden !important;
-                    }
-                `;
-                pdoc.head.appendChild(s);
+            if (window.top) windowsToClean.push(window.top);
+        } catch (e) {}
+        try {
+            let curr = window;
+            while (curr) {
+                windowsToClean.push(curr);
+                if (curr === curr.parent) break;
+                curr = curr.parent;
             }
-        } catch (e) {
-            // cross-origin fallback
-        }
+        } catch (e) {}
+
+        windowsToClean.forEach(win => {
+            try {
+                if (!win || !win.document) return;
+                const pdoc = win.document;
+                const styleId = "hide-github-streamlit-badges";
+                if (!pdoc.getElementById(styleId)) {
+                    const s = pdoc.createElement("style");
+                    s.id = styleId;
+                    s.innerHTML = `
+                        ._stateContainer_1j65n_26,
+                        [class*="_stateContainer_"],
+                        ._profileContainer_gzau3_53,
+                        [class*="_profileContainer_"],
+                        ._viewerBadge_1j65n_23,
+                        [class*="_viewerBadge_"],
+                        ._profilePreview_gzau3_63,
+                        [class*="_profilePreview_"],
+                        ._profileImage_gzau3_78,
+                        [class*="_profileImage_"],
+                        a[href*="streamlit.io/cloud"],
+                        a[href*="share.streamlit.io"],
+                        a[href*="github.com"],
+                        img[src*="avatars.githubusercontent.com"] {
+                            display: none !important;
+                            visibility: hidden !important;
+                            opacity: 0 !important;
+                            pointer-events: none !important;
+                            width: 0 !important;
+                            height: 0 !important;
+                        }
+                    `;
+                    if (pdoc.head) pdoc.head.appendChild(s);
+                    else if (pdoc.body) pdoc.body.appendChild(s);
+                }
+                pdoc.querySelectorAll('._stateContainer_1j65n_26, [class*="_stateContainer_"], ._profileContainer_gzau3_53, [class*="_profileContainer_"], ._viewerBadge_1j65n_23, [class*="_viewerBadge_"], [class*="_profilePreview_"], a[href*="streamlit.io/cloud"], a[href*="share.streamlit.io"], a[href*="github.com"], img[src*="avatars.githubusercontent.com"]').forEach(el => {
+                    el.style.setProperty('display', 'none', 'important');
+                    el.style.setProperty('visibility', 'hidden', 'important');
+                    el.style.setProperty('opacity', '0', 'important');
+                });
+            } catch (e) {}
+        });
     }
     hideParentBadges();
-    setInterval(hideParentBadges, 1000);
+    setInterval(hideParentBadges, 300);
     </script>
     """,
     height=0,
@@ -248,15 +280,7 @@ if all_topics:
 else:
     st.sidebar.info("Belum ada topik yang tersimpan di database.")
 
-st.sidebar.markdown("---")
-st.sidebar.markdown(
-    """
-    **Status Sistem:**
-    - 🟢 **Database:** `SQLite (youtube_analyzer.db)`
-    - 🟢 **Antigravity MCP:** Aktif & Terhubung
-    - ⚡ **Engine:** Python 3.12 + SQLModel
-    """
-)
+
 
 
 # -------------------------------------------------------------

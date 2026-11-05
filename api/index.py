@@ -161,6 +161,51 @@ async def health_check():
     }
 
 
+@app.get("/api/debug/innertube/{video_id}")
+async def debug_innertube(video_id: str):
+    yt = YouTubeConnector()
+    payload = {
+        "context": {
+            "client": {
+                "clientName": "WEB",
+                "clientVersion": yt.INNERTUBE_WEB_CLIENT_VERSION,
+                "hl": "id",
+                "gl": "ID",
+            }
+        },
+        "videoId": video_id,
+    }
+    headers = yt._get_natural_headers(hl="id", gl="ID", device="desktop")
+    headers["Origin"] = "https://www.youtube.com"
+    headers["Referer"] = f"https://www.youtube.com/watch?v={video_id}"
+    headers["X-YouTube-Client-Name"] = "1"
+    headers["X-YouTube-Client-Version"] = yt.INNERTUBE_WEB_CLIENT_VERSION
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp_raw = await client.post(yt.INNERTUBE_PLAYER_URL, json=payload)
+            resp_hdr = await client.post(yt.INNERTUBE_PLAYER_URL, json=payload, headers=headers)
+        return {
+            "raw_status": resp_raw.status_code,
+            "raw_keys": list(resp_raw.json().keys()) if resp_raw.status_code == 200 else [],
+            "raw_playability": resp_raw.json().get("playabilityStatus", {}).get("status")
+            if resp_raw.status_code == 200
+            else None,
+            "raw_keywords": resp_raw.json().get("videoDetails", {}).get("keywords", [])
+            if resp_raw.status_code == 200
+            else [],
+            "hdr_status": resp_hdr.status_code,
+            "hdr_keys": list(resp_hdr.json().keys()) if resp_hdr.status_code == 200 else [],
+            "hdr_playability": resp_hdr.json().get("playabilityStatus", {}).get("status")
+            if resp_hdr.status_code == 200
+            else None,
+            "hdr_keywords": resp_hdr.json().get("videoDetails", {}).get("keywords", [])
+            if resp_hdr.status_code == 200
+            else [],
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
 # ==============================================================================
 # Dashboard Backend Endpoints (Powers the 10-Tab Interactive UI)
 # ==============================================================================

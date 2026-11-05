@@ -131,8 +131,20 @@ class YouTubeStudioConnector:
             from google_auth_oauthlib.flow import InstalledAppFlow
 
             flow = InstalledAppFlow.from_client_secrets_file(secrets_file, SCOPES)
+            prompt_msg = (
+                "\n============================================================\n"
+                "SILAKAN KLIK ATAU SALIN LINK BERIKUT KE BROWSER UNTUK LOGIN:\n"
+                "{url}\n"
+                "============================================================\n"
+            )
             # Run local server flow on an available port
-            creds = flow.run_local_server(port=0, prompt="consent")
+            creds = flow.run_local_server(
+                port=0,
+                prompt="consent",
+                authorization_prompt_message=prompt_msg,
+                success_message="Otorisasi Berhasil! Token YouTube Studio telah tersimpan. Anda boleh menutup tab ini.",
+                open_browser=True,
+            )
             if creds:
                 self.credentials = creds
                 with open(self.token_path, "w", encoding="utf-8") as f:

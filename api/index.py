@@ -182,6 +182,11 @@ class PreUploadRequest(BaseModel):
     ai_config: dict[str, Any] | None = None
 
 
+class CompareChannelsRequest(BaseModel):
+    channels: list[str]
+    my_channel_stats: dict[str, Any] | None = None
+
+
 def _build_surfaces_and_clusters(
     seed_keyword: str, live_suggestions: list[str] | None = None
 ) -> tuple[dict[str, list[dict[str, str]]], list[dict[str, str]], list[str]]:
@@ -351,6 +356,34 @@ async def api_dashboard_pre_upload(req: PreUploadRequest):
         model_name=ai_cfg.get("model_name"),
         custom_base_url=ai_cfg.get("custom_base_url"),
     )
+
+
+@app.get("/api/dashboard/my-channel")
+async def api_dashboard_my_channel():
+    try:
+        from youtube_analyzer.connectors.youtube_studio import YouTubeStudioConnector
+
+        studio = YouTubeStudioConnector()
+        profile = studio.get_channel_profile()
+        videos = studio.get_channel_videos(limit=20) if profile else []
+        return {
+            "authenticated": studio.is_authenticated(),
+            "profile": profile,
+            "videos": videos,
+        }
+    except Exception as e:
+        return {"authenticated": False, "profile": None, "videos": [], "error": str(e)}
+
+
+@app.post("/api/dashboard/compare-channels")
+async def api_dashboard_compare_channels(req: CompareChannelsRequest):
+    if not req.channels:
+        raise HTTPException(status_code=400, detail="Daftar channel kompetitor wajib diisi.")
+    yt_conn = YouTubeConnector()
+    results = await yt_conn.compare_competitor_channels(
+        identifiers=req.channels, my_channel_stats=req.my_channel_stats
+    )
+    return results
 
 
 @app.get("/api/dashboard/trending")

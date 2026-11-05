@@ -1248,6 +1248,325 @@ class YouTubeConnector(BaseConnector):
         # Real data only: return empty list if trending feed unavailable
         return []
 
+    @staticmethod
+    def extract_channel_handle(raw: str) -> str:
+        s = raw.strip()
+        if "youtube.com/" in s or "youtu.be/" in s:
+            m = re.search(r"youtube\.com/@([a-zA-Z0-9_\-\.]+)", s)
+            if m:
+                return f"@{m.group(1)}"
+            m2 = re.search(r"youtube\.com/channel/(UC[a-zA-Z0-9_\-]+)", s)
+            if m2:
+                return m2.group(1)
+        if not s.startswith("@") and not s.startswith("UC"):
+            return f"@{s}"
+        return s
+
+    async def get_channel_summary_and_format_breakdown(
+        self, identifier: str, max_videos: int = 50
+    ) -> dict[str, Any] | None:
+        """Fetch real channel statistics, format breakdown (Landscape vs Shorts), and top video."""
+        clean_id = self.extract_channel_handle(identifier)
+        if not self.api_key:
+            return None
+
+        # 1. Fetch channel profile
+        url = f"{self.API_BASE_URL}/channels"
+        params: dict[str, Any] = {
+            "part": "snippet,statistics,contentDetails",
+            "key": self.api_key,
+        }
+        if clean_id.startswith("UC"):
+            params["id"] = clean_id
+        else:
+            handle_no_at = clean_id.lstrip("@")
+            params["forHandle"] = handle_no_at
+
+        try:
+            async with httpx.AsyncClient(timeout=12.0) as client:
+                resp = await client.get(url, params=params)
+                data = resp.json() if resp.status_code == 200 else {}
+                items = data.get("items", [])
+                if not items and "forHandle" in params:
+                    params["forHandle"] = f"@{params['forHandle']}"
+                    resp = await client.get(url, params=params)
+                    data = resp.json() if resp.status_code == 200 else {}
+                    items = data.get("items", [])
+
+                if not items:
+                    return None
+
+                item = items[0]
+                snip = item.get("snippet", {})
+                stats = item.get("statistics", {})
+                cd = item.get("contentDetails", {})
+
+                ch_id = item.get("id", "")
+                title = snip.get("title", "")
+                custom_url = snip.get("customUrl", f"@{clean_id.lstrip('@')}")
+                subscribers = int(stats.get("subscriberCount", 0))
+                video_count = int(stats.get("videoCount", 0))
+                total_views = int(stats.get("viewCount", 0))
+                thumb = snip.get("thumbnails", {}).get("default", {}).get("url", "")
+                uploads_id = cd.get("relatedPlaylists", {}).get("uploads", "")
+
+                landscape_count = 0
+                portrait_count = 0
+                recent_top_video = None
+                max_recent_views = -1
+
+                # 2. Inspect uploaded videos for Landscape vs Shorts breakdown
+                if uploads_id:
+                    p_resp = await client.get(
+                        f"{self.API_BASE_URL}/playlistItems",
+                        params={
+                            "part": "contentDetails",
+                            "playlistId": uploads_id,
+                            "maxResults": min(max_videos, 50),
+                            "key": self.api_key,
+                        },
+                    )
+                    if p_resp.status_code == 200:
+                        p_items = p_resp.json().get("items", [])
+                        vid_ids = [
+                            pi["contentDetails"]["videoId"]
+                            for pi in p_items
+                            if "contentDetails" in pi and "videoId" in pi["contentDetails"]
+                        ]
+                        if vid_ids:
+                            v_resp = await client.get(
+                                f"{self.API_BASE_URL}/videos",
+                                params={
+                                    "part": "snippet,contentDetails,statistics",
+                                    "id": ",".join(vid_ids),
+                                    "key": self.api_key,
+                                },
+                            )
+                            if v_resp.status_code == 200:
+                                v_items = v_resp.json().get("items", [])
+                                for v in v_items:
+                                    v_snip = v.get("snippet", {})
+                                    v_stats = v.get("statistics", {})
+                                    v_cd = v.get("contentDetails", {})
+                                    v_title = v_snip.get("title", "")
+                                    v_views = int(v_stats.get("viewCount", 0))
+                                    dur_iso = v_cd.get("duration", "")
+                                    dur_text, _ = self._parse_iso_duration(dur_iso)
+                                    dur_sec = self.parse_duration_to_seconds(dur_text)
+
+                                    is_shorts = dur_sec <= 60
+                                    if is_shorts:
+                                        portrait_count += 1
+                                    else:
+                                        landscape_count += 1
+
+                                    if v_views > max_recent_views:
+                                        max_recent_views = v_views
+                                        recent_top_video = {
+                                            "title": v_title,
+                                            "views": v_views,
+                                            "views_display": self._format_views_display(v_views),
+                                            "id": v.get("id"),
+                                            "format": "SHORTS (9:16)"
+                                            if is_shorts
+                                            else "LANDSCAPE (16:9)",
+                                            "url": f"https://www.youtube.com/watch?v={v.get('id')}",
+                                        }
+
+                # 3. All-time top video via search order by viewCount
+                all_time_top = None
+                s_resp = await client.get(
+                    f"{self.API_BASE_URL}/search",
+                    params={
+                        "part": "snippet",
+                        "channelId": ch_id,
+                        "order": "viewCount",
+                        "type": "video",
+                        "maxResults": 1,
+                        "key": self.api_key,
+                    },
+                )
+                if s_resp.status_code == 200 and s_resp.json().get("items"):
+                    top_vid_id = s_resp.json()["items"][0]["id"].get("videoId")
+                    if top_vid_id:
+                        chk = await client.get(
+                            f"{self.API_BASE_URL}/videos",
+                            params={
+                                "part": "snippet,statistics,contentDetails",
+                                "id": top_vid_id,
+                                "key": self.api_key,
+                            },
+                        )
+                        if chk.status_code == 200 and chk.json().get("items"):
+                            vd = chk.json()["items"][0]
+                            at_dur, _ = self._parse_iso_duration(
+                                vd.get("contentDetails", {}).get("duration", "")
+                            )
+                            at_sec = self.parse_duration_to_seconds(at_dur)
+                            at_views = int(vd.get("statistics", {}).get("viewCount", 0))
+                            all_time_top = {
+                                "title": vd.get("snippet", {}).get("title"),
+                                "views": at_views,
+                                "views_display": self._format_views_display(at_views),
+                                "id": top_vid_id,
+                                "format": "SHORTS (9:16)" if at_sec <= 60 else "LANDSCAPE (16:9)",
+                                "url": f"https://www.youtube.com/watch?v={top_vid_id}",
+                            }
+
+                sample_total = landscape_count + portrait_count
+                pct_landscape = (
+                    round((landscape_count / sample_total * 100), 1) if sample_total else 0.0
+                )
+                pct_shorts = (
+                    round((portrait_count / sample_total * 100), 1) if sample_total else 0.0
+                )
+
+                return {
+                    "channel_id": ch_id,
+                    "title": title,
+                    "handle": custom_url,
+                    "thumbnail_url": thumb,
+                    "subscribers": subscribers,
+                    "subscribers_display": f"{subscribers:,}",
+                    "video_count": video_count,
+                    "video_count_display": f"{video_count:,}",
+                    "total_views": total_views,
+                    "total_views_display": f"{total_views:,}",
+                    "sample_analyzed": sample_total,
+                    "landscape_count": landscape_count,
+                    "landscape_percentage": pct_landscape,
+                    "portrait_count": portrait_count,
+                    "portrait_percentage": pct_shorts,
+                    "recent_top_video": recent_top_video,
+                    "all_time_top_video": all_time_top or recent_top_video,
+                }
+        except Exception as e:
+            logger.warning(f"Error fetching competitor channel summary for {identifier}: {e}")
+            return None
+
+    async def compare_competitor_channels(
+        self,
+        identifiers: list[str],
+        my_channel_stats: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Compare multiple competitor channels in parallel and calculate monetization gap & velocity."""
+        clean_ids = [self.extract_channel_handle(i) for i in identifiers if i.strip()]
+        tasks = [self.get_channel_summary_and_format_breakdown(cid) for cid in clean_ids]
+        raw_results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        competitors = [r for r in raw_results if isinstance(r, dict) and r is not None]
+
+        # Auto-load my channel stats if not supplied
+        my_stats = my_channel_stats
+        if not my_stats:
+            try:
+                from youtube_analyzer.connectors.youtube_studio import YouTubeStudioConnector
+
+                studio = YouTubeStudioConnector()
+                prof = studio.get_channel_profile()
+                if prof:
+                    my_stats = prof
+            except Exception:
+                pass
+
+        my_subs = int(my_stats.get("subscribers", 0)) if my_stats else 0
+        my_vids = int(my_stats.get("video_count", 0)) if my_stats else 0
+        my_views = int(my_stats.get("view_count", 0)) if my_stats else 0
+        my_title = my_stats.get("title", "Channel Saya") if my_stats else "Channel Saya"
+        my_handle = my_stats.get("custom_url", "") if my_stats else ""
+
+        # Monetization milestone calculations (YPP Thresholds)
+        gap_500 = max(0, 500 - my_subs)
+        gap_1000 = max(0, 1000 - my_subs)
+        pct_1000 = round(min(100.0, (my_subs / 1000.0) * 100.0), 1)
+
+        # Competitor aggregations
+        avg_subs = (
+            round(sum(c["subscribers"] for c in competitors) / len(competitors))
+            if competitors
+            else 0
+        )
+        avg_vids = (
+            round(sum(c["video_count"] for c in competitors) / len(competitors))
+            if competitors
+            else 0
+        )
+        avg_shorts_pct = (
+            round(sum(c["portrait_percentage"] for c in competitors) / len(competitors), 1)
+            if competitors
+            else 0.0
+        )
+
+        # Strategic Opportunity Score
+        if avg_shorts_pct < 20.0:
+            opp_level = "SANGAT TINGGI (GOLDEN GAP)"
+            opp_note = f"Mayoritas kompetitor hampir tidak membuat Shorts (rata-rata hanya {avg_shorts_pct}%). Ini adalah celah emas untuk merebut penonton mobile dengan Shorts AI!"
+        elif avg_shorts_pct < 40.0:
+            opp_level = "TINGGI"
+            opp_note = "Sebagian kompetitor mulai membuat Shorts, namun konsistensi masih rendah. Anda bisa menyalip dengan frekuensi upload terjadwal."
+        else:
+            opp_level = "MODERAT"
+            opp_note = "Kompetitor aktif di Shorts dan Landscape. Dibutuhkan diferensiasi hook detik 0-3 yang lebih kuat."
+
+        # Sorted benchmarks
+        sorted_by_subs = sorted(competitors, key=lambda x: x["subscribers"])
+        nearest_competitor = None
+        for c in sorted_by_subs:
+            if c["subscribers"] >= my_subs:
+                nearest_competitor = c
+                break
+        if not nearest_competitor and sorted_by_subs:
+            nearest_competitor = sorted_by_subs[0]
+
+        roadmap_phases = [
+            {
+                "phase": "Fase 1: Tembus Target Pertama & Salip Kompetitor Terdekat",
+                "target_subscribers": (
+                    f"{nearest_competitor['subscribers']:,} Subs ({nearest_competitor['title']})"
+                    if nearest_competitor
+                    else "100 Subs"
+                ),
+                "recommended_pace": "5 - 7 Shorts per minggu (fokus topik praktis K3/Lean)",
+                "goal": f"Menyalip kompetitor terdekat ({nearest_competitor['title'] if nearest_competitor else 'level awal'}) dan melatih algoritma YouTube merekomendasikan ceruk channel Anda.",
+            },
+            {
+                "phase": "Fase 2: Tembus 500 Subs (Unlock Fan Funding & YouTube Shopping)",
+                "target_subscribers": "500 Subscribers (Kurang " + str(gap_500) + " lagi)",
+                "recommended_pace": "5 Shorts/minggu + 1 Video Landscape/minggu",
+                "goal": "Membuka fitur YouTube Shopping Affiliate (ikon keranjang belanja di video) & Super Thanks.",
+            },
+            {
+                "phase": "Fase 3: Tembus 1.000 Subs & 4.000 Jam Tayang (Full Monetisasi AdSense)",
+                "target_subscribers": "1.000 Subscribers (Kurang " + str(gap_1000) + " lagi)",
+                "recommended_pace": "Kontinuitas harian Shorts + 2 Video Landscape pilar/minggu",
+                "goal": "Mengaktifkan bagi hasil iklan YouTube AdSense permanen dan membership channel.",
+            },
+        ]
+
+        return {
+            "my_channel": {
+                "title": my_title,
+                "handle": my_handle,
+                "subscribers": my_subs,
+                "subscribers_display": f"{my_subs:,}",
+                "video_count": my_vids,
+                "view_count": my_views,
+                "gap_to_500": gap_500,
+                "gap_to_1000": gap_1000,
+                "percent_progress_1000": pct_1000,
+            },
+            "competitors": competitors,
+            "benchmarks": {
+                "total_competitors_analyzed": len(competitors),
+                "avg_subscribers": avg_subs,
+                "avg_videos": avg_vids,
+                "avg_shorts_percentage": avg_shorts_pct,
+                "opportunity_level": opp_level,
+                "opportunity_note": opp_note,
+            },
+            "monetization_roadmap": roadmap_phases,
+        }
+
 
 # Expose helper function at module level
 parse_duration_to_seconds = YouTubeConnector.parse_duration_to_seconds

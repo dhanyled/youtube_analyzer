@@ -1,0 +1,103 @@
+================================================================================
+PANDUAN & DRAF PENGISIAN FORMULIR GOOGLE OAUTH QUOTA INCREASE
+Form URL: https://support.google.com/code/contact/oauth_quota_increase
+Project: youtube-andonpokayokebizid (YouTube Analyzer & Studio Intelligence)
+================================================================================
+
+PETUNJUK PENTING SEBELUM MENGISI:
+1. Jika aplikasi ini HANYA digunakan oleh Anda sendiri (led.dhany@gmail.com):
+   Sebenarnya Anda TIDAK PERLU menunggu formulir ini disetujui!
+   Di Google Cloud Console, setelah klik "PUBLISH APP", saat login di browser
+   cukup klik "Advanced" (Lanjutan) -> "Go to YouTube Analyzer (unsafe)".
+   Setelah login sekali, refresh token otomatis menjadi LIFETIME permanen.
+
+2. Formulir ini HANYA WAJIB jika:
+   - Anda ingin menghapus tulisan peringatan "Google hasn't verified this app".
+   - Anda ingin menambah kuota pengguna publik lebih dari 100 user.
+   - Google secara eksplisit menolak grant token sebelum form ini diverifikasi.
+
+================================================================================
+DAFTAR PERTANYAAN & JAWABAN FORMULIR (COPY-PASTE READY)
+================================================================================
+
+1. Contact Email Address (Alamat Email Kontak):
+led.dhany@gmail.com
+
+2. Google Cloud Project ID (ID Project GCP):
+youtube-andonpokayokebizid
+
+3. Google Cloud Project Number (Nomor Project):
+241428542932
+
+4. OAuth 2.0 Client ID:
+241428542932-p2bbtalkukr0hnq4ddmtbjlvd5gcrkiv.apps.googleusercontent.com
+
+5. Application Name (Nama Aplikasi):
+YouTube Analyzer & Studio Intelligence Platform
+
+6. Application Home Page URL (URL Website / Dashboard):
+https://youtubeanalyzer-sand.vercel.app/
+
+7. Privacy Policy URL (URL Kebijakan Privasi):
+https://youtubeanalyzer-sand.vercel.app/
+
+8. Affected OAuth Scopes (Pilih / Tuliskan Scopes yang Digunakan):
+- https://www.googleapis.com/auth/youtube.readonly
+- https://www.googleapis.com/auth/yt-analytics.readonly
+- https://www.googleapis.com/auth/youtube.upload
+
+9. Current Limit & Requested Limit (Batas Saat Ini & Kuota yang Diminta):
+Current Limit: Default 100 test user cap / 7-day token expiration
+Requested Limit: Production OAuth Token Grant for Creator Studio Integration (Standard Developer Cap)
+
+10. Detailed Description of the Application (Deskripsi Detail Aplikasi):
+(Salin teks bahasa Inggris di bawah ini agar tim Google Reviewer langsung paham):
+
+"YouTube Analyzer is an internal creator analytics and search intelligence dashboard built for YouTube content creators and digital marketing teams. 
+
+The application provides:
+1. Search Intelligence & Competitor SERP Analysis: Audits top-ranking public video metadata, tags, and audience search volume to optimize video discoverability.
+2. Channel Studio Insights (youtube.readonly & yt-analytics.readonly): Connects to the authenticated creator's own YouTube channel to retrieve video watch time, retention, CTR metrics, and view analytics directly via the official YouTube Analytics API.
+3. Pre-upload Video Audit & Draft Publishing (youtube.upload): Allows the creator to validate titles, descriptions, and tags against YouTube best practices and upload verified video drafts directly into their own YouTube Studio."
+
+11. Why does your application require the requested scopes? (Justifikasi Scope):
+
+- For 'https://www.googleapis.com/auth/youtube.readonly':
+"Required to fetch the creator's channel profile (channel ID, title, subscriber count, total video count) and read the creator's uploaded video playlist to perform metadata quality checks."
+
+- For 'https://www.googleapis.com/auth/yt-analytics.readonly':
+"Required to retrieve private channel performance metrics such as Click-Through Rate (CTR), Average View Duration (AVD), and traffic source breakdown for the creator's own published videos."
+
+- For 'https://www.googleapis.com/auth/youtube.upload':
+"Required to publish optimized video drafts, custom thumbnails, and structured descriptions directly to the creator's own YouTube channel from the pre-upload staging workflow."
+
+12. Step-by-Step Instructions on How Reviewers Can Test the App:
+
+1. Open https://youtubeanalyzer-sand.vercel.app/ in any web browser.
+2. The user navigates to the 'Channel YouTube Studio Saya' tab.
+3. The user initiates the Google OAuth connection to grant permission for their own YouTube channel.
+4. Google OAuth Consent Screen appears requesting access to read channel data, analytics, and upload video drafts.
+5. Upon authorization, the user is redirected back to the dashboard.
+6. The dashboard displays the creator's channel statistics (subscribers, views) and allows the creator to audit their recent video performance.
+7. No third-party data is harvested or shared; all credentials and tokens remain strictly under the creator's control.
+
+13. Data Storage & User Privacy Statement (Pernyataan Privasi & Penyimpanan Data):
+"We strictly comply with the Google API Services User Data Policy, including the Limited Use requirements.
+1. Token Storage: OAuth access and refresh tokens are securely stored in private server-side environment storage / encrypted local config, accessible solely by the authorized creator.
+2. Data Sharing: No user data, video transcripts, or analytics data is ever transferred, sold, or shared with third parties or advertising brokers.
+3. Data Retention: Users can revoke authorization at any time through their Google Account Security page (https://myaccount.google.com/permissions), which immediately invalidates and deletes the stored session tokens."
+
+14. YouTube Demo Video (Jika Google Meminta Link Video Demo):
+(Jika Google meminta tautan video YouTube tidak publik / Unlisted yang menunjukkan cara kerja OAuth):
+"Please record a short 1-minute screen recording using OBS/Loom showing:
+1. Opening the dashboard https://youtubeanalyzer-sand.vercel.app/
+2. Clicking Login / Connect with Google
+3. The OAuth screen showing Client ID 241428542932... in the browser URL bar
+4. Approving scopes and returning to the dashboard showing channel name.
+Upload to YouTube as 'Unlisted' and paste the link in this field."
+
+================================================================================
+SELESAI. Semua data di atas sudah disesuaikan dengan Project GCP Anda:
+Project ID: youtube-andonpokayokebizid
+Email: led.dhany@gmail.com
+================================================================================

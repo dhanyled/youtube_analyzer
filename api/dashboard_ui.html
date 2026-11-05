@@ -337,13 +337,122 @@
       </div>
     </section>
 
-    <!-- ================= TAB 3: CHANNEL YOUTUBE STUDIO SAYA ================= -->
+    <!-- ================= TAB 3: CHANNEL YOUTUBE STUDIO SAYA & KOMPETITOR BENCHMARK ================= -->
     <section id="tab_channel" class="tab-panel hidden space-y-6">
-      <div>
-        <h2 class="text-lg font-bold text-white">📊 Channel YouTube Studio Saya (Inspeksi & Batch Audit)</h2>
-        <p class="text-xs text-slate-400">Analisis performa video channel Anda atau uji validasi Schema.org VideoObject untuk Google Rich Results.</p>
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h2 class="text-lg font-bold text-white">📊 Channel YouTube Studio Saya & Matriks Benchmark Kompetitor</h2>
+          <p class="text-xs text-slate-400">Pantau performa channel Anda, bandingkan dengan multi-kompetitor, dan hitung roadmap menuju target monetisasi.</p>
+        </div>
+        <button onclick="loadMyChannelData()" class="self-start text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-1.5 rounded-lg flex items-center gap-1.5">🔄 Segarkan Data Channel</button>
       </div>
 
+      <!-- Channel Profile Header Banner -->
+      <div id="myChannelCard" class="bg-[#161b26] border border-slate-800 rounded-xl p-5">
+        <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div class="flex items-center gap-4">
+            <img id="myChannelAvatar" src="https://yt3.ggpht.com/iwN4pZai48Bu4Mv4iLvfp4W5YyMwo4-AHFdZ1Q9qAHzRjHlAyALprSA3Dn-PROP3p0ME1p5OKQ=s800-c-k-c0x00ffffff-no-rj" class="w-14 h-14 rounded-full border-2 border-red-500/40 bg-slate-800 object-cover" alt="Avatar">
+            <div>
+              <div class="flex items-center gap-2">
+                <h3 id="myChannelTitle" class="text-base font-bold text-white">Ardiyanto Ramadhan</h3>
+                <span id="myChannelAuthBadge" class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800">🟢 Terhubung Resmi (Lifetime Token)</span>
+              </div>
+              <p id="myChannelHandle" class="text-xs text-slate-400">@mrleddhany</p>
+            </div>
+          </div>
+          <div class="grid grid-cols-3 gap-3 w-full md:w-auto text-center text-xs">
+            <div class="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800">
+              <span class="text-slate-400 block text-[11px]">Subscribers</span>
+              <b id="myChannelSubs" class="text-white text-sm font-extrabold">14</b>
+            </div>
+            <div class="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800">
+              <span class="text-slate-400 block text-[11px]">Total Video</span>
+              <b id="myChannelVids" class="text-white text-sm font-extrabold">19</b>
+            </div>
+            <div class="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800">
+              <span class="text-slate-400 block text-[11px]">Total Views</span>
+              <b id="myChannelViews" class="text-emerald-400 text-sm font-extrabold">8.894</b>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MULTI-COMPETITOR COMPARISON BENCHMARK & MONETIZATION ROADMAP -->
+      <div class="bg-[#161b26] border border-slate-800 rounded-xl p-5 space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+          <div>
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">⚔️ Bandingkan Multi-Channel Kompetitor & Roadmap Target Monetisasi</h3>
+            <p class="text-xs text-slate-400">Masukkan satu atau beberapa URL/Handle channel kompetitor (pisahkan dengan baris baru atau koma). Sistem akan membedah rasio format video (Landscape vs Shorts) dan menghitung gap menuju syarat monetisasi YouTube.</p>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1.5">Daftar Channel Kompetitor (Handle atau URL YouTube):</label>
+          <textarea id="multiCompetitorsInput" rows="4" class="w-full bg-[#0e1117] border border-slate-700 rounded-lg p-3 text-xs text-white font-mono focus:border-red-500 focus:outline-none" placeholder="https://www.youtube.com/@MidiatamaAcademy&#10;https://www.youtube.com/@SHIFTIndonesia&#10;https://www.youtube.com/@sscx3467&#10;https://www.youtube.com/@PQMConsultants&#10;https://www.youtube.com/@ppm_consulting">https://www.youtube.com/@MidiatamaAcademy
+https://www.youtube.com/@SHIFTIndonesia
+https://www.youtube.com/@sscx3467
+https://www.youtube.com/@PQMConsultants
+https://www.youtube.com/@ppm_consulting</textarea>
+          <div class="flex items-center justify-between mt-2">
+            <span class="text-[11px] text-slate-500">💡 Anda bisa menambahkan channel kompetitor lain kapan saja.</span>
+            <button onclick="runMultiChannelComparison()" id="btnCompareChannels" class="bg-red-600 hover:bg-red-500 text-white font-bold text-xs px-5 py-2.5 rounded-lg flex items-center gap-1.5 transition">⚔️ Analisis Semua Kompetitor & Hitung Roadmap</button>
+          </div>
+        </div>
+
+        <!-- Comparative Results Container -->
+        <div id="multiCompResults" class="space-y-5 hidden pt-2">
+          <!-- Summary Cards -->
+          <div id="compSummaryRow" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3"></div>
+
+          <!-- Competitor Comparison Table -->
+          <div class="overflow-x-auto border border-slate-800 rounded-xl">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-900/90 text-slate-400 border-b border-slate-800">
+                <tr>
+                  <th class="p-3">Rank</th>
+                  <th class="p-3">Nama Channel</th>
+                  <th class="p-3">Subscribers</th>
+                  <th class="p-3">Total Video</th>
+                  <th class="p-3">Total Views</th>
+                  <th class="p-3">Distribusi Format</th>
+                  <th class="p-3">Video Terbanyak Dilihat (Top Performer)</th>
+                </tr>
+              </thead>
+              <tbody id="multiCompTableBody" class="divide-y divide-slate-800"></tbody>
+            </table>
+          </div>
+
+          <!-- Strategic Monetization Roadmap & Gap Calculator -->
+          <div class="bg-gradient-to-r from-red-950/20 via-[#161b26] to-sky-950/20 border border-slate-800 rounded-xl p-5 space-y-4">
+            <div class="flex items-center justify-between">
+              <div>
+                <h4 class="text-sm font-bold text-amber-400">🎯 Roadmap & Kecepatan Konten Menuju Target Monetisasi YouTube</h4>
+                <p class="text-xs text-slate-400">Analisis gap channel Anda (<span id="roadChannelName" class="text-white font-semibold">Ardiyanto Ramadhan</span>) terhadap syarat YouTube Partner Program (YPP).</p>
+              </div>
+              <span id="roadOppBadge" class="px-2.5 py-1 rounded bg-amber-500/10 text-amber-300 border border-amber-500/30 text-xs font-bold">GOLDEN GAP</span>
+            </div>
+
+            <!-- Progress Bar to 1,000 Subs -->
+            <div class="space-y-1.5">
+              <div class="flex justify-between text-xs">
+                <span class="text-slate-300">Progress Menuju 1.000 Subscribers (Monetisasi Iklan Penuh):</span>
+                <b id="roadSubsProgressText" class="text-emerald-400">14 / 1.000 Subs (1.4%)</b>
+              </div>
+              <div class="w-full bg-slate-900 rounded-full h-2.5 overflow-hidden border border-slate-800">
+                <div id="roadSubsProgressBar" class="bg-emerald-500 h-2.5 rounded-full transition-all duration-500" style="width: 1.4%"></div>
+              </div>
+            </div>
+
+            <!-- 3-Phase Roadmap Cards -->
+            <div id="roadPhasesContainer" class="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2"></div>
+
+            <!-- Golden Celah Note -->
+            <div id="roadOppNote" class="p-3.5 rounded-lg bg-amber-950/30 border border-amber-800/50 text-xs text-amber-200"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Audit & Schema Embedding Row -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
         <div class="bg-[#161b26] border border-slate-800 rounded-xl p-5 space-y-3">
           <h3 class="text-sm font-bold text-white">⚡ Audit Cepat Video Channel via URL / ID</h3>
@@ -362,6 +471,30 @@
             <button onclick="showGscGuide()" class="bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold px-4 py-2 rounded-lg">🔍 Cek Panduan</button>
           </div>
           <div id="gscGuideOutput" class="hidden p-3 rounded-lg bg-sky-950/40 border border-sky-800 text-xs text-sky-200"></div>
+        </div>
+      </div>
+
+      <!-- My Uploaded Videos Table -->
+      <div class="bg-[#161b26] border border-slate-800 rounded-xl p-5 space-y-3">
+        <div class="flex items-center justify-between">
+          <h3 class="text-sm font-bold text-white flex items-center gap-2">📹 Video Terbaru di Channel Saya</h3>
+          <span id="myVideosCountBadge" class="text-xs text-slate-400">19 Video Terdaftar</span>
+        </div>
+        <div class="overflow-x-auto border border-slate-800 rounded-xl">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-900/90 text-slate-400 border-b border-slate-800">
+              <tr>
+                <th class="p-3">Judul Video</th>
+                <th class="p-3">Views</th>
+                <th class="p-3">Likes</th>
+                <th class="p-3">Durasi</th>
+                <th class="p-3">Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="myVideosTableBody" class="divide-y divide-slate-800">
+              <tr><td colspan="5" class="p-4 text-center text-slate-500">Memuat video channel...</td></tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </section>
@@ -1258,6 +1391,142 @@
       box.innerHTML = `📋 <b>Target Halaman:</b> <code>${escapeHtml(u || 'https://domain-anda.com')}</code><br>1. Salin kode JSON-LD VideoObject dari hasil Audit Video.<br>2. Tempel di blok HTML artikel Anda.<br>3. Submit URL di Google Search Console agar Key Moments terindeks.`;
     }
 
+    // Tab 3: My Channel Data & Multi-Channel Competitor Comparison
+    let myChannelProfileCache = null;
+
+    async function loadMyChannelData() {
+      try {
+        const res = await fetch('/api/dashboard/my-channel');
+        const d = await res.json();
+        if (d && d.profile) {
+          const p = d.profile;
+          myChannelProfileCache = p;
+          document.getElementById('myChannelTitle').textContent = p.title || 'Channel Saya';
+          document.getElementById('myChannelHandle').textContent = p.custom_url || '';
+          document.getElementById('myChannelSubs').textContent = p.subscribers_display || p.subscribers || '0';
+          document.getElementById('myChannelVids').textContent = p.video_count_display || p.video_count || '0';
+          document.getElementById('myChannelViews').textContent = p.view_count_display || p.view_count || '0';
+          if (p.thumbnail_url) {
+            document.getElementById('myChannelAvatar').src = p.thumbnail_url;
+          }
+          document.getElementById('roadChannelName').textContent = p.title || 'Channel Saya';
+        }
+        
+        // Render My Videos
+        const vids = d.videos || [];
+        document.getElementById('myVideosCountBadge').textContent = `${vids.length} Video Terdaftar`;
+        const vBody = document.getElementById('myVideosTableBody');
+        if (vids.length) {
+          vBody.innerHTML = vids.map(v => `
+            <tr class="hover:bg-slate-800/40">
+              <td class="p-3 font-medium text-white flex items-center gap-2.5">
+                <img src="${escapeHtml(v.thumbnail_url || '')}" class="w-12 h-7 rounded bg-slate-800 object-cover" alt="thumb">
+                <a href="${escapeHtml(v.url || '#')}" target="_blank" class="hover:text-red-400 line-clamp-1 underline">${escapeHtml(v.title)}</a>
+              </td>
+              <td class="p-3 text-emerald-400 font-semibold">${escapeHtml(v.views_display || v.views)}</td>
+              <td class="p-3 text-slate-300">${escapeHtml(v.likes_display || v.likes || 0)}</td>
+              <td class="p-3 text-slate-400 font-mono text-[11px]">${escapeHtml(v.duration || '0:00')} <span class="px-1.5 py-0.5 rounded text-[10px] ${v.is_shorts ? 'bg-amber-950 text-amber-300' : 'bg-slate-800 text-slate-300'}">${v.format || ''}</span></td>
+              <td class="p-3">
+                <button onclick="document.getElementById('auditVideoUrl').value='${escapeHtml(v.url)}'; switchTab('tab_audit', document.querySelectorAll('.tab-btn')[1]); runVideoAudit();" class="text-[11px] bg-red-600/80 hover:bg-red-600 text-white font-semibold px-2.5 py-1 rounded">⚡ Audit Video</button>
+              </td>
+            </tr>
+          `).join('');
+        } else {
+          vBody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-400">Belum ada video yang ditemukan dari channel ini.</td></tr>`;
+        }
+      } catch (e) {
+        console.warn('Error loading my channel data:', e);
+      }
+    }
+
+    async function runMultiChannelComparison() {
+      const rawText = document.getElementById('multiCompetitorsInput').value.trim();
+      if (!rawText) return;
+      const lines = rawText.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
+      if (!lines.length) return;
+
+      const btn = document.getElementById('btnCompareChannels');
+      btn.textContent = '⏳ Menganalisis...';
+      btn.disabled = true;
+
+      try {
+        const payload = {
+          channels: lines,
+          my_channel_stats: myChannelProfileCache
+        };
+        const res = await fetch('/api/dashboard/compare-channels', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const d = await res.json();
+        const comps = d.competitors || [];
+        const b = d.benchmarks || {};
+        const myCh = d.my_channel || {};
+        const road = d.monetization_roadmap || [];
+
+        document.getElementById('multiCompResults').classList.remove('hidden');
+
+        // Render Summary
+        document.getElementById('compSummaryRow').innerHTML = `
+          <div class="bg-[#0e1117] border border-slate-800 rounded-xl p-3.5"><span class="text-xs text-slate-400">Total Kompetitor</span><div class="text-lg font-bold text-white">${b.total_competitors_analyzed || comps.length} Channel</div><span class="text-[11px] text-slate-400">Analisis Real-Time</span></div>
+          <div class="bg-[#0e1117] border border-slate-800 rounded-xl p-3.5"><span class="text-xs text-slate-400">Rata-rata Subscribers</span><div class="text-lg font-bold text-white">${(b.avg_subscribers || 0).toLocaleString()}</div><span class="text-[11px] text-emerald-400">Benchmark Industri</span></div>
+          <div class="bg-[#0e1117] border border-slate-800 rounded-xl p-3.5"><span class="text-xs text-slate-400">Adopsi Format Shorts</span><div class="text-lg font-bold text-amber-400">${b.avg_shorts_percentage || 0}%</div><span class="text-[11px] text-slate-400">Sangat Rendah (Celah Emas)</span></div>
+          <div class="bg-[#0e1117] border border-slate-800 rounded-xl p-3.5"><span class="text-xs text-slate-400">Peluang Penetrasi AI</span><div class="text-lg font-bold text-emerald-400">${escapeHtml(b.opportunity_level || 'SANGAT TINGGI')}</div><span class="text-[11px] text-slate-400">Potensi Viral Shorts</span></div>
+        `;
+
+        // Render Competitors Table
+        document.getElementById('multiCompTableBody').innerHTML = comps.map((c, i) => `
+          <tr class="hover:bg-slate-800/40">
+            <td class="p-3 font-bold text-amber-400">#${i + 1}</td>
+            <td class="p-3">
+              <div class="font-bold text-white flex items-center gap-2">
+                <img src="${escapeHtml(c.thumbnail_url || '')}" class="w-6 h-6 rounded-full bg-slate-800 object-cover" alt="icon">
+                <a href="https://www.youtube.com/${escapeHtml(c.handle)}" target="_blank" class="hover:text-red-400 underline">${escapeHtml(c.title)}</a>
+              </div>
+              <span class="text-[11px] text-slate-400 block">${escapeHtml(c.handle)}</span>
+            </td>
+            <td class="p-3 text-white font-semibold">${escapeHtml(c.subscribers_display)}</td>
+            <td class="p-3 text-slate-300 font-mono">${escapeHtml(c.video_count_display)}</td>
+            <td class="p-3 text-emerald-400 font-semibold">${escapeHtml(c.total_views_display)}</td>
+            <td class="p-3">
+              <span class="text-[11px] block text-slate-300">📺 Landscape: <b>${c.landscape_percentage}%</b> (${c.landscape_count})</span>
+              <span class="text-[11px] block ${c.portrait_count > 0 ? 'text-amber-400' : 'text-slate-500'}">📱 Shorts: <b>${c.portrait_percentage}%</b> (${c.portrait_count})</span>
+            </td>
+            <td class="p-3">
+              ${c.all_time_top_video ? `
+                <a href="${escapeHtml(c.all_time_top_video.url)}" target="_blank" class="text-white hover:text-red-400 font-medium line-clamp-1 underline">${escapeHtml(c.all_time_top_video.title)}</a>
+                <span class="text-[11px] text-emerald-400 font-semibold">🔥 ${escapeHtml(c.all_time_top_video.views_display)} views</span> <span class="px-1.5 py-0.2 rounded bg-slate-800 text-[10px] text-slate-300">${escapeHtml(c.all_time_top_video.format)}</span>
+              ` : '<span class="text-slate-500">-</span>'}
+            </td>
+          </tr>
+        `).join('');
+
+        // Progress Bar & Roadmap
+        document.getElementById('roadSubsProgressText').textContent = `${myCh.subscribers_display || myCh.subscribers} / 1.000 Subs (${myCh.percent_progress_1000}%)`;
+        document.getElementById('roadSubsProgressBar').style.width = `${Math.max(2, myCh.percent_progress_1000)}%`;
+        document.getElementById('roadOppBadge').textContent = b.opportunity_level || 'GOLDEN GAP';
+        document.getElementById('roadOppNote').innerHTML = `💡 <b>Catatan Intelijen Kompetitor:</b> ${escapeHtml(b.opportunity_note || '')}`;
+
+        // 3-Phase Roadmap Cards
+        document.getElementById('roadPhasesContainer').innerHTML = road.map((p, idx) => `
+          <div class="p-3.5 rounded-xl bg-[#0e1117] border border-slate-800 space-y-2">
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold ${idx === 0 ? 'bg-amber-950 text-amber-300 border border-amber-800' : idx === 1 ? 'bg-sky-950 text-sky-300 border border-sky-800' : 'bg-emerald-950 text-emerald-300 border border-emerald-800'}">${escapeHtml(p.phase.split(':')[0])}</span>
+            <h5 class="text-xs font-bold text-white">${escapeHtml(p.phase.split(':')[1] || p.phase)}</h5>
+            <div class="text-[11px] text-slate-400"><b class="text-slate-300">Target:</b> ${escapeHtml(p.target_subscribers)}</div>
+            <div class="text-[11px] text-emerald-400 font-medium"><b class="text-slate-300">Pacing:</b> ${escapeHtml(p.recommended_pace)}</div>
+            <p class="text-[11px] text-slate-400 pt-1 border-t border-slate-800/80">${escapeHtml(p.goal)}</p>
+          </div>
+        `).join('');
+
+      } catch (err) {
+        console.error('Error running multi-channel comparison:', err);
+      } finally {
+        btn.textContent = '⚔️ Analisis Semua Kompetitor & Hitung Roadmap';
+        btn.disabled = false;
+      }
+    }
+
     // 5. Tab 4: Trending Feed
     async function loadTrendingFeed() {
       const gl = document.getElementById('trendGl').value;
@@ -1367,6 +1636,7 @@
     // Initialize on load
     window.addEventListener('DOMContentLoaded', () => {
       loadHistory();
+      loadMyChannelData();
       runFullAnalysis();
     });
   </script>

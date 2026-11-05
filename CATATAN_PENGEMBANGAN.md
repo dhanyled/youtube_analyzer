@@ -1,6 +1,6 @@
 # 🛡️ Catatan Pengembangan & Arsitektur (Technical Post-Mortem & SOP)
 **YouTube SERP & Trend Intelligence Platform**
-*Pembaruan Terakhir: September 2026*
+*Pembaruan Terakhir: 5 November 2026*
 
 ---
 
@@ -94,3 +94,26 @@ Setelah perubahan CSS/JS untuk menghilangkan elemen watermark atau avatar profil
    - Gunakan fungsi pembantu terpusat `_render_query_table(data_list, label)` yang menjamin fallback kolom:
      `["Rank", "Query", "Popularitas (0-100)", "Lonjakan Minat"]`.
    - Batasi data hingga maksimal 50 query sesuai kuota representasi SERP terlengkap.
+
+
+---
+
+## 5. 🚀 Arsitektur Full Interactive Dashboard di Vercel Serverless (`v2.0.0`)
+
+### 5.1. Latar Belakang & Solusi
+- **Masalah**: Vercel tidak mendukung proses WebSocket persisten bawaan Streamlit (`dashboard.py`), sehingga URL `https://youtubeanalyzer-sand.vercel.app/` sebelumnya hanya menampilkan kartu status API kecil (`v1.1.0`).
+- **Solusi Permanen (`v2.0.0` - Commit `0001f26`)**:
+  Membangun **Full Interactive Executive Dashboard UI** (`api/dashboard_ui.html`) yang dilayani langsung pada rute utama `GET /` oleh FastAPI (`api/index.py`) dan terhubung penuh ke engine `src/youtube_analyzer/`.
+
+### 5.2. Daftar Endpoint Dashboard & WebMCP di Vercel (`api/index.py`)
+1. `GET /`: Merender UI Dashboard Interaktif lengkap (Sidebar Riwayat & Pengaturan AI + Traffic Light Verdict + 4 Kartu Skor + 10 Tab Analisis).
+2. `POST /api/dashboard/analyze`: Menjalankan live scraping 10 kompetitor YouTube, kalkulasi Opportunity Score, RPM Niche, AI Ratio, Outranking Title & 4 Psychological Angles, Spy Competitor Tags, Content Gaps, Outlier Multiplier, Faceless Viability, Shorts Clipping, Storyboard AI, dan Cross-Surface Intent Matrix.
+3. `POST /api/dashboard/audit-video`: Mengaudit video YouTube Publik/Unlisted via URL/ID (ekstraksi metadata, transkrip `youtube-transcript-api`, skor audit, dan paket revamp SEO).
+4. `POST /api/dashboard/pre-upload`: Merancang paket metadata peluncuran SEO dari poin-poin naskah draft sebelum di-upload.
+5. `GET /api/dashboard/trending`: Live explorer YouTube Trending Feed berdasarkan perangkat (`desktop`/`mobile`), negara (`gl`), bahasa (`hl`), dan kategori.
+6. `GET /api/dashboard/trends`: Komparasi tren Google Web vs YouTube Search (`gprop=youtube`) beserta feed real-time Google Daily Trends RSS.
+7. `POST /api/shotlist`, `POST /api/admin/verify`, `GET /api/webmcp/tools`, `POST /api/webmcp/call`: Jembatan Serverless & WebMCP untuk Google Flow Dracin Studio dan Chrome DevTools AI Agent.
+
+### 5.3. Konfigurasi Bundling Vercel (`vercel.json` & `api/requirements.txt`)
+- `vercel.json` menyertakan `"includeFiles": "{src/**,api/*.html}"` agar seluruh modul `src/youtube_analyzer` dan template `api/dashboard_ui.html` ikut ter-bundle ke dalam fungsi serverless Vercel.
+- `api/requirements.txt` dijaga tetap ramping (< 45MB, tanpa `streamlit`/`pyarrow`) agar selalu lolos batas 250MB AWS Lambda/Vercel dan memiliki *cold-start* instan (< 1 detik).

@@ -1,3 +1,4 @@
+import asyncio
 import os
 import sys
 import xml.etree.ElementTree as ET
@@ -38,7 +39,7 @@ except Exception as e:
 
 app = FastAPI(
     title="YouTube Search & Competitor Intelligence (Vercel Cloud + WebMCP)",
-    version="2.0.0",
+    version="2.1.0",
     docs_url="/docs",
     redoc_url=None,
 )
@@ -152,7 +153,7 @@ async def health_check():
     return {
         "status": "ok",
         "service": "youtube-analyzer-serverless",
-        "version": "2.0.1",
+        "version": "2.1.0",
         "cors_enabled": True,
         "engine_loaded": YouTubeConnector is not None,
         "import_error": IMPORT_ERROR_MSG,
@@ -181,19 +182,25 @@ class PreUploadRequest(BaseModel):
     ai_config: dict[str, Any] | None = None
 
 
-def _build_surfaces_and_clusters(seed_keyword: str) -> tuple[dict[str, list[dict[str, str]]], list[dict[str, str]], list[str]]:
+def _build_surfaces_and_clusters(
+    seed_keyword: str, live_suggestions: list[str] | None = None
+) -> tuple[dict[str, list[dict[str, str]]], list[dict[str, str]], list[str]]:
     if not TopicNormalizer or not PlatformEnum:
         return {"google": [], "youtube": [], "ai": []}, [], []
 
     raw_surfaces = TopicNormalizer.expand_seed_surfaces(seed_keyword)
     g_terms = raw_surfaces.get(PlatformEnum.GOOGLE_SEARCH, [])
-    yt_terms = raw_surfaces.get(PlatformEnum.YOUTUBE_SEARCH, [])
     ai_terms = raw_surfaces.get(PlatformEnum.AI_SEARCH, [])
+    # YouTube surface = real live YouTube Autocomplete when available
+    yt_terms = (
+        list(dict.fromkeys(live_suggestions))
+        if live_suggestions
+        else raw_surfaces.get(PlatformEnum.YOUTUBE_SEARCH, [])
+    )
 
     surfaces_out = {
         "google": [
-            {"term": t, "intent": TopicNormalizer.classify_intent(t).value.upper()}
-            for t in g_terms
+            {"term": t, "intent": TopicNormalizer.classify_intent(t).value.upper()} for t in g_terms
         ],
         "youtube": [
             {"term": t, "intent": TopicNormalizer.classify_intent(t).value.upper()}
@@ -229,20 +236,23 @@ def _build_surfaces_and_clusters(seed_keyword: str) -> tuple[dict[str, list[dict
 
 @app.post("/api/dashboard/analyze")
 async def api_dashboard_analyze(req: AnalyzeRequest):
-    kw = (req.keyword or "Google Ads untuk UMKM").strip()
+    kw = (req.keyword or "").strip()
+    if not kw:
+        raise HTTPException(status_code=400, detail="Keyword wajib diisi.")
     yt_conn = YouTubeConnector()
-    competitors = await yt_conn.get_top_competitors(kw, limit=10)
+    competitors, live_suggestions = await asyncio.gather(
+        yt_conn.get_top_competitors(kw, limit=10),
+        yt_conn.get_autocomplete(kw),
+    )
     top_comp = competitors[0] if competitors else None
 
-    surfaces_out, clusters_out, all_queries = _build_surfaces_and_clusters(kw)
+    surfaces_out, clusters_out, _ = _build_surfaces_and_clusters(kw, live_suggestions)
 
     rpm_data = SearchIntelligence.estimate_rpm(kw)
     kw_metrics = SearchIntelligence.estimate_keyword_metrics(kw, competitors)
     ai_presence = SearchIntelligence.analyze_ai_competitor_presence(competitors)
     comp_spy = (
-        await yt_conn.spy_competitor_tags(competitors, limit_competitors=5)
-        if competitors
-        else {}
+        await yt_conn.spy_competitor_tags(competitors, limit_competitors=5) if competitors else {}
     )
     outranking_plan = SearchIntelligence.generate_outranking_plan(
         kw,
@@ -252,7 +262,7 @@ async def api_dashboard_analyze(req: AnalyzeRequest):
     )
     if comp_spy.get("recommended_tags_copy"):
         outranking_plan["video_tags"] = comp_spy["recommended_tags_copy"]
-    content_gaps = SearchIntelligence.detect_content_gaps(kw, competitors, all_queries)
+    content_gaps = SearchIntelligence.detect_content_gaps(kw, competitors, live_suggestions or None)
     outlier_analysis = SearchIntelligence.analyze_competitor_outliers(competitors)
     faceless_info = SearchIntelligence.analyze_faceless_viability(kw, rpm_data)
     clipping_ideas = SearchIntelligence.generate_clipping_opportunities(
@@ -278,6 +288,12 @@ async def api_dashboard_analyze(req: AnalyzeRequest):
         "flow_shotlist": flow_shotlist,
         "surfaces": surfaces_out,
         "clusters": clusters_out,
+        "live_autocomplete": live_suggestions,
+        "data_provenance": {
+            "competitors": "youtube_live_serp" if competitors else "unavailable",
+            "autocomplete": "youtube_suggest_live" if live_suggestions else "unavailable",
+            "tags": "creator_studio_tags_via_innertube",
+        },
     }
 
 
@@ -285,9 +301,7 @@ async def api_dashboard_analyze(req: AnalyzeRequest):
 async def api_dashboard_audit_video(req: AuditVideoRequest):
     vid_id = YouTubeConnector.extract_video_id(req.video_url.strip())
     if not vid_id:
-        raise HTTPException(
-            status_code=400, detail="Format URL atau Video ID YouTube tidak valid."
-        )
+        raise HTTPException(status_code=400, detail="Format URL atau Video ID YouTube tidak valid.")
 
     yt_conn = YouTubeConnector()
     vid_meta = await yt_conn.get_video_details(vid_id)
@@ -298,9 +312,7 @@ async def api_dashboard_audit_video(req: AuditVideoRequest):
         )
 
     vid_transcript = yt_conn.get_video_transcript(vid_id)
-    rel_competitors = await yt_conn.get_top_competitors(
-        vid_meta.get("title", vid_id), limit=5
-    )
+    rel_competitors = await yt_conn.get_top_competitors(vid_meta.get("title", vid_id), limit=5)
 
     ai_cfg = req.ai_config or {}
     audit_res = AITitleGenerator.audit_and_revamp(
@@ -347,9 +359,7 @@ async def api_dashboard_trending(
     device: str = "desktop",
 ):
     yt_conn = YouTubeConnector()
-    feed = await yt_conn.get_trending_feed(
-        gl=gl, hl=hl, category=category, device=device, limit=10
-    )
+    feed = await yt_conn.get_trending_feed(gl=gl, hl=hl, category=category, device=device, limit=10)
     return {"trending": feed}
 
 
@@ -369,14 +379,8 @@ async def _fetch_google_trends_rss(geo: str = "ID") -> list[dict[str, str]]:
                 for it in root.findall(".//item")[:10]:
                     title_elem = it.find("title")
                     title = title_elem.text if title_elem is not None else ""
-                    approx = it.find(
-                        "{https://trends.google.co.id/trending/rss}approx_traffic"
-                    )
-                    traffic = (
-                        approx.text
-                        if (approx is not None and approx.text)
-                        else "Trending"
-                    )
+                    approx = it.find("{https://trends.google.co.id/trending/rss}approx_traffic")
+                    traffic = approx.text if (approx is not None and approx.text) else "Trending"
                     link_elem = it.find("link")
                     link = link_elem.text if link_elem is not None else ""
                     if title:
@@ -432,53 +436,67 @@ async def call_webmcp_tool(payload: WebMCPCallRequest):
     name = payload.name
     args = payload.arguments
 
+    if SearchIntelligence is None or YouTubeConnector is None:
+        raise HTTPException(
+            status_code=503, detail=f"Engine YouTube Analyzer tidak termuat: {IMPORT_ERROR_MSG}"
+        )
+
     if name == "generate_flow_shotlist":
-        seed = args.get("seed_keyword", "Keluarga")
+        seed = str(args.get("seed_keyword", "")).strip()
+        if not seed:
+            raise HTTPException(status_code=400, detail="seed_keyword wajib diisi.")
         fmt = args.get("format_type", "SHORTS")
         scenes = int(args.get("num_scenes", 6))
         return execute_flow_shotlist(seed, fmt, scenes)
 
     elif name == "generate_video_ideas":
-        seed = args.get("seed_keyword", "Teknologi")
-        if SearchIntelligence and hasattr(SearchIntelligence, "generate_video_ideas"):
-            try:
-                return SearchIntelligence.generate_video_ideas(seed=seed)
-            except Exception:
-                pass
+        seed = str(args.get("seed_keyword", "")).strip()
+        if not seed:
+            raise HTTPException(status_code=400, detail="seed_keyword wajib diisi.")
+        yt_conn = YouTubeConnector()
+        competitors, suggestions = await asyncio.gather(
+            yt_conn.get_top_competitors(seed, limit=10),
+            yt_conn.get_autocomplete(seed),
+        )
+        plan = SearchIntelligence.generate_outranking_plan(
+            seed, competitor=competitors[0] if competitors else None, competitors=competitors
+        )
         return {
             "seed": seed,
-            "hooks": [
-                f"Jangan lakukan ini saat membahas {seed}!",
-                f"Rahasia tersembunyi {seed} yang jarang diungkap orang.",
-                f"Setelah tahu trik {seed} ini, hidup Anda akan berubah.",
-            ],
+            "live_autocomplete": suggestions,
+            "outranking_title": plan.get("outranking_title"),
+            "alternative_titles": plan.get("alternative_titles", []),
+            "two_line_hook": plan.get("two_line_hook"),
+            "shorts_package": plan.get("shorts_package"),
+            "content_gaps": SearchIntelligence.detect_content_gaps(
+                seed, competitors, suggestions or None
+            ),
+            "competitors_analyzed": len(competitors),
         }
 
     elif name == "get_youtube_trending":
-        country = args.get("country", "ID")
-        return {
-            "region": country,
-            "trending_topics": [
-                f"Tren Hiburan & Cerita Viral {country}",
-                f"Review Produk & Rekomendasi Terhangat {country}",
-                f"Tutorial & Solusi Praktis {country}",
-            ],
-        }
+        country = str(args.get("country", "ID")).upper()
+        yt_conn = YouTubeConnector()
+        feed = await yt_conn.get_trending_feed(gl=country, hl="id", limit=10)
+        return {"region": country, "trending": feed, "count": len(feed)}
 
     elif name == "analyze_faceless_niche_viability":
-        seed = args.get("seed_keyword", "Cerita Misteri")
+        seed = str(args.get("seed_keyword", "")).strip()
+        if not seed:
+            raise HTTPException(status_code=400, detail="seed_keyword wajib diisi.")
+        yt_conn = YouTubeConnector()
+        competitors = await yt_conn.get_top_competitors(seed, limit=10)
+        rpm_data = SearchIntelligence.estimate_rpm(seed)
         return {
             "niche": seed,
-            "viability_score": 88,
-            "cpm_tier": "High ($8 - $14)",
-            "competition": "Medium",
-            "recommendation": "Sangat cocok untuk format 9:16 Shorts/Reels dan drama vertikal 1 menit.",
+            "faceless": SearchIntelligence.analyze_faceless_viability(seed, rpm_data),
+            "rpm_estimate": rpm_data,
+            "keyword_metrics": SearchIntelligence.estimate_keyword_metrics(seed, competitors),
+            "ai_presence": SearchIntelligence.analyze_ai_competitor_presence(competitors),
         }
 
     else:
-        raise HTTPException(
-            status_code=404, detail=f"WebMCP tool '{name}' tidak dikenal."
-        )
+        raise HTTPException(status_code=404, detail=f"WebMCP tool '{name}' tidak dikenal.")
 
 
 class ShotlistRequest(BaseModel):
@@ -489,31 +507,13 @@ class ShotlistRequest(BaseModel):
 
 
 def execute_flow_shotlist(seed: str, format_type: str, num_scenes: int):
-    if SearchIntelligence and hasattr(SearchIntelligence, "generate_flow_shotlist"):
-        try:
-            return SearchIntelligence.generate_flow_shotlist(
-                seed=seed, format_type=format_type, num_scenes=num_scenes
-            )
-        except Exception as e:
-            print("Error executing SearchIntelligence:", e)
-
-    return {
-        "seed_keyword": seed,
-        "format_type": format_type,
-        "aspect_ratio": "9:16" if format_type == "SHORTS" else "16:9",
-        "scenes_count": num_scenes,
-        "scenes": [
-            {
-                "scene_id": f"Scene {i+1}",
-                "timing": f"Beat {i+1} ({i*10}-{(i+1)*10}s)",
-                "duration_seconds": 10,
-                "visual_action": f"Adegan dramatis seputar {seed} dengan visual cinematik tajam dan emosi intens.",
-                "camera_motion": "Dramatic Push-In (35mm Cine Lens)",
-                "dialogue": f"Kalimat emosional pembuka adegan {i+1} tentang {seed}.",
-            }
-            for i in range(num_scenes)
-        ],
-    }
+    if SearchIntelligence is None:
+        raise HTTPException(
+            status_code=503, detail=f"Engine YouTube Analyzer tidak termuat: {IMPORT_ERROR_MSG}"
+        )
+    return SearchIntelligence.generate_flow_shotlist(
+        seed=seed, format_type=format_type, num_scenes=num_scenes
+    )
 
 
 @app.post("/api/shotlist")

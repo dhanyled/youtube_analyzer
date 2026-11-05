@@ -288,7 +288,9 @@ KEMBALIKAN HANYA FORMAT JSON MURNI TANPA PENJELASAN LAIN dengan struktur persis 
             c_title = comp.get("title", "Tanpa Judul")
             c_views = comp.get("views", "N/A")
             c_channel = comp.get("channel", "Kompetitor")
-            comp_summaries.append(f'{i}. Judul: "{c_title}" | Views: {c_views} | Channel: {c_channel}')
+            comp_summaries.append(
+                f'{i}. Judul: "{c_title}" | Views: {c_views} | Channel: {c_channel}'
+            )
         comp_context = "\n".join(comp_summaries) if comp_summaries else "Tidak ada data kompetitor."
 
         transcript_preview = (
@@ -303,7 +305,7 @@ KITA SEDANG MENG-AUDIT & ME-REVAMP VIDEO YOUTUBE BERIKUT:
 - Judul Video Saat Ini: "{title}"
 - Channel: {channel} | Durasi: {duration} | Views: {views}
 - Deskripsi Saat Ini:
-\"\"\"{desc[:1000] if desc else '(Kosong)'}\"\"\"
+\"\"\"{desc[:1000] if desc else "(Kosong)"}\"\"\"
 - Tags Saat Ini: {tags_str}
 
 KONTEN / TRANSKRIP ASLI YANG DIBICARAKAN DALAM VIDEO (Cuplikan):
@@ -397,7 +399,9 @@ KEMBALIKAN HANYA FORMAT JSON MURNI TANPA MARKDOWN LAIN dengan struktur persis se
             c_title = comp.get("title", "Tanpa Judul")
             c_views = comp.get("views", "N/A")
             c_channel = comp.get("channel", "Kompetitor")
-            comp_summaries.append(f'{i}. Judul: "{c_title}" | Views: {c_views} | Channel: {c_channel}')
+            comp_summaries.append(
+                f'{i}. Judul: "{c_title}" | Views: {c_views} | Channel: {c_channel}'
+            )
         comp_context = "\n".join(comp_summaries) if comp_summaries else "Tidak ada data kompetitor."
 
         return f"""Kamu adalah YouTube SEO Strategist & Launch Director tingkat dunia dengan spesialisasi Click-Through-Rate (CTR), NLP Hooks, dan Google Search SEO.
@@ -493,7 +497,10 @@ KEMBALIKAN HANYA FORMAT JSON MURNI TANPA MARKDOWN LAIN dengan struktur persis se
             return cls.call_gemini(prompt=prompt, api_key=api_key, model=model)
         elif "groq" in provider_clean:
             return cls.call_openai_compatible(
-                prompt=prompt, api_key=api_key, base_url="https://api.groq.com/openai/v1", model=model
+                prompt=prompt,
+                api_key=api_key,
+                base_url="https://api.groq.com/openai/v1",
+                model=model,
             )
         elif "openrouter" in provider_clean:
             return cls.call_openai_compatible(
@@ -549,9 +556,7 @@ KEMBALIKAN HANYA FORMAT JSON MURNI TANPA MARKDOWN LAIN dengan struktur persis se
             "Rangkuman & Langkah Selanjutnya",
         ]
         target_labels = (
-            chapter_labels
-            if (chapter_labels and len(chapter_labels) >= 3)
-            else default_labels
+            chapter_labels if (chapter_labels and len(chapter_labels) >= 3) else default_labels
         )
 
         # 1. Try deriving from real transcript if available
@@ -576,11 +581,7 @@ KEMBALIKAN HANYA FORMAT JSON MURNI TANPA MARKDOWN LAIN dengan struktur persis se
 
                     res = ["00:00 - " + target_labels[0]]
                     for i, (ts_sec, _) in enumerate(picked[1:], 1):
-                        label = (
-                            target_labels[i]
-                            if i < len(target_labels)
-                            else f"Babak {i+1}"
-                        )
+                        label = target_labels[i] if i < len(target_labels) else f"Babak {i + 1}"
                         res.append(f"{_fmt_ts(ts_sec)} - {label}")
                     return res
 
@@ -612,9 +613,7 @@ KEMBALIKAN HANYA FORMAT JSON MURNI TANPA MARKDOWN LAIN dengan struktur persis se
         transcript_data = transcript_data or {}
         competitors = competitors or []
         transcript_text = (
-            transcript_data.get("timestamped_text")
-            or transcript_data.get("full_text")
-            or ""
+            transcript_data.get("timestamped_text") or transcript_data.get("full_text") or ""
         )
         prompt = cls.build_audit_prompt(video_details, transcript_text, competitors)
 
@@ -681,7 +680,9 @@ KEMBALIKAN HANYA FORMAT JSON MURNI TANPA MARKDOWN LAIN dengan struktur persis se
             tags_flaws = "Belum ada tags di YouTube Studio maupun hashtag di deskripsi. Sangat disarankan memasang 15–20 keyword turunan relevan."
 
         clean_topic = raw_title.split("-")[0].split("|")[0].strip()
-        outranking_title = f"Bongkar Fakta {clean_topic}: Analisis Tuntas & Strategi yang Terbukti Efektif"
+        outranking_title = (
+            f"Bongkar Fakta {clean_topic}: Analisis Tuntas & Strategi yang Terbukti Efektif"
+        )
 
         raw_dur = video_details.get("duration", "10:00")
         timestamps_list = cls.generate_synchronized_timestamps(
@@ -703,7 +704,7 @@ KEMBALIKAN HANYA FORMAT JSON MURNI TANPA MARKDOWN LAIN dengan struktur persis se
 
         # Gather real competitor tags if provided
         comp_tags = []
-        for c in (competitors or []):
+        for c in competitors or []:
             if c.get("tags"):
                 comp_tags.extend(c.get("tags", []))
         comp_tags = list(dict.fromkeys(t.strip() for t in comp_tags if t and t.strip()))
@@ -813,7 +814,7 @@ KEMBALIKAN HANYA FORMAT JSON MURNI TANPA MARKDOWN LAIN dengan struktur persis se
 
         # Competitor tags integration if available
         comp_tags = []
-        for c in (competitors or []):
+        for c in competitors or []:
             if c.get("tags"):
                 comp_tags.extend(c.get("tags", []))
         comp_tags = list(dict.fromkeys(t.strip() for t in comp_tags if t and t.strip()))

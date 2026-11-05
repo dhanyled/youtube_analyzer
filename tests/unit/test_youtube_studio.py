@@ -45,4 +45,6 @@ def test_diagnose_channel_videos():
     assert len(diag["underperforming_gems"]) >= 1
     assert any(g["video_id"] == "v3" for g in diag["underperforming_gems"])
     v3_gem = next(g for g in diag["underperforming_gems"] if g["video_id"] == "v3")
-    assert "tags" in v3_gem["weakness_reason"].lower() or "views" in v3_gem["weakness_reason"].lower()
+    assert (
+        "tags" in v3_gem["weakness_reason"].lower() or "views" in v3_gem["weakness_reason"].lower()
+    )

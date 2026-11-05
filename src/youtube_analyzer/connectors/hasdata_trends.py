@@ -56,9 +56,7 @@ class HasDataTrendsConnector(BaseConnector):
         """Convenience method specifically for YouTube Search trends."""
         return await self.search(query=query, geo=geo, property_type="youtube")
 
-    async def compare_google_vs_youtube(
-        self, query: str, geo: str = "ID"
-    ) -> dict[str, Any]:
+    async def compare_google_vs_youtube(self, query: str, geo: str = "ID") -> dict[str, Any]:
         """Compare trending search demand between Google Web and YouTube Search."""
         web_trends = await self.search(query=query, geo=geo, property_type="web")
         yt_trends = await self.search(query=query, geo=geo, property_type="youtube")
@@ -247,9 +245,7 @@ class HasDataTrendsConnector(BaseConnector):
         Strictly returns 100% real Google Trends queries via pytrends.
         Never generates fake niche template patterns or artificial percentages.
         """
-        real_q = self._fetch_pytrends_top_and_rising(
-            query, geo=geo, property_type=property_type
-        )
+        real_q = self._fetch_pytrends_top_and_rising(query, geo=geo, property_type=property_type)
         if real_q and (real_q.get("top") or real_q.get("rising")):
             return real_q
 

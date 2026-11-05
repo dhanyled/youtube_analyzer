@@ -28,7 +28,14 @@ def test_hasdata_returns_real_data_when_present():
     """Verify that real Google Trends data is preserved and returned accurately."""
     connector = HasDataTrendsConnector(api_key=None)
     mock_ot = [{"Tanggal": "2026-01-01", "Minat Penelusuran": 75, "Properti": "YouTube Search"}]
-    mock_reg = [{"Wilayah": "Bali", "Kode": "ID-BA", "Indeks Minat": 100, "Tingkat Minat": "🔥 Sangat Tinggi"}]
+    mock_reg = [
+        {
+            "Wilayah": "Bali",
+            "Kode": "ID-BA",
+            "Indeks Minat": 100,
+            "Tingkat Minat": "🔥 Sangat Tinggi",
+        }
+    ]
     mock_q = {
         "top": [
             {

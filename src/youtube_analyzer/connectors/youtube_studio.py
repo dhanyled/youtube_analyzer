@@ -93,9 +93,7 @@ class YouTubeStudioConnector:
             except Exception as e:
                 logger.warning(f"Could not remove token file: {e}")
 
-    def authenticate_interactive(
-        self, client_secrets_file: str | None = None
-    ) -> tuple[bool, str]:
+    def authenticate_interactive(self, client_secrets_file: str | None = None) -> tuple[bool, str]:
         """Run interactive local server OAuth flow (opens browser to authenticate)."""
         secrets_file = client_secrets_file or CLIENT_SECRET_FILE
         if not os.path.exists(secrets_file):
@@ -278,11 +276,11 @@ class YouTubeStudioConnector:
 
                 studio_tags = [t.strip() for t in snip.get("tags", []) if t and t.strip()]
                 desc_hashtags = [
-                    f"#{w}"
-                    for w in re.findall(r"#([a-zA-Z0-9_\u00c0-\u00ff]+)", v_desc)
-                    if w
+                    f"#{w}" for w in re.findall(r"#([a-zA-Z0-9_\u00c0-\u00ff]+)", v_desc) if w
                 ]
-                unified_tags = studio_tags if studio_tags else [h.lstrip("#") for h in desc_hashtags]
+                unified_tags = (
+                    studio_tags if studio_tags else [h.lstrip("#") for h in desc_hashtags]
+                )
 
                 pub_at = snip.get("publishedAt", "")
 
@@ -403,9 +401,13 @@ class YouTubeStudioConnector:
                         f"Kolom Tags YouTube Studio masih kosong (0 tags), baru ada {desc_hash_count} hashtag di deskripsi"
                     )
                 elif studio_tags_count == 0 and desc_hash_count == 0:
-                    weakness_reason.append("Belum ada tags di Studio maupun hashtag di deskripsi (minim SEO)")
+                    weakness_reason.append(
+                        "Belum ada tags di Studio maupun hashtag di deskripsi (minim SEO)"
+                    )
                 elif studio_tags_count < 5:
-                    weakness_reason.append(f"Hanya ada {studio_tags_count} tags di Studio (disarankan 15-20 kata kunci)")
+                    weakness_reason.append(
+                        f"Hanya ada {studio_tags_count} tags di Studio (disarankan 15-20 kata kunci)"
+                    )
 
                 if v_views < avg_views * 0.5:
                     weakness_reason.append("Views jauh di bawah rata-rata channel")

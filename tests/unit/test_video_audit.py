@@ -71,6 +71,7 @@ def test_generate_video_schema_jsonld():
         timestamps_text="00:00 - Intro\n02:15 - Tips 1\n05:40 - Tips 2",
     )
     import json
+
     parsed = json.loads(schema_str)
     assert parsed["@type"] == "VideoObject"
     assert parsed["name"] == "Rahasia Belajar Koding Pemula"
@@ -207,18 +208,23 @@ def test_schema_upload_date_dynamic():
 
 def test_gemini_default_model_and_fallbacks():
     from youtube_analyzer.core.ai_generator import DEFAULT_MODELS
+
     assert DEFAULT_MODELS["gemini"] == "gemini-flash-lite-latest"
 
 
 def test_detect_video_format_landscape_vs_shorts():
     yt = YouTubeConnector()
     # Explicit #shorts in title -> SHORTS
-    is_sh, fmt = yt.detect_video_format(video_id="vid1", title="Trik Koding Cepat #shorts", duration_seconds=45)
+    is_sh, fmt = yt.detect_video_format(
+        video_id="vid1", title="Trik Koding Cepat #shorts", duration_seconds=45
+    )
     assert is_sh is True
     assert fmt == "SHORTS"
 
     # Longer than 180s -> always LANDSCAPE
-    is_sh, fmt = yt.detect_video_format(video_id="vid2", title="Tutorial Panjang", duration_seconds=600)
+    is_sh, fmt = yt.detect_video_format(
+        video_id="vid2", title="Tutorial Panjang", duration_seconds=600
+    )
     assert is_sh is False
     assert fmt == "LANDSCAPE"
 
@@ -231,6 +237,3 @@ def test_detect_video_format_landscape_vs_shorts():
     )
     assert is_sh is False
     assert fmt == "LANDSCAPE"
-
-
-

@@ -300,10 +300,28 @@ class TopicNormalizer:
                 f"fakta menarik seputar {lowered}",
             ]
 
+        def _dedupe_words(text: str) -> str:
+            """Remove repeated words (e.g. 'saham pemula pemula' -> 'saham pemula')."""
+            seen: set[str] = set()
+            out: list[str] = []
+            for w in text.split():
+                key = w.lower().strip("?")
+                if key in seen:
+                    continue
+                seen.add(key)
+                out.append(w)
+            result = " ".join(out)
+            if text.endswith("?") and not result.endswith("?"):
+                result += "?"
+            return result
+
+        def _clean(variants: list[str]) -> list[str]:
+            return list(dict.fromkeys(_dedupe_words(v) for v in variants))
+
         return {
-            PlatformEnum.GOOGLE_SEARCH: list(dict.fromkeys(google_variants)),
-            PlatformEnum.YOUTUBE_SEARCH: list(dict.fromkeys(youtube_variants)),
-            PlatformEnum.AI_SEARCH: list(dict.fromkeys(aeo_variants)),
+            PlatformEnum.GOOGLE_SEARCH: _clean(google_variants),
+            PlatformEnum.YOUTUBE_SEARCH: _clean(youtube_variants),
+            PlatformEnum.AI_SEARCH: _clean(aeo_variants),
         }
 
     @classmethod

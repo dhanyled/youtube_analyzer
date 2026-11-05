@@ -114,7 +114,6 @@ class YouTubeConnector(BaseConnector):
         # Real data only: if no suggestions found from YouTube, return empty list (no fake/dummy suggestions)
         return []
 
-
     _shorts_cache: dict[str, bool] = {}
 
     @classmethod
@@ -152,7 +151,9 @@ class YouTubeConnector(BaseConnector):
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
                 }
                 with httpx.Client(follow_redirects=False, timeout=2.5) as client:
-                    resp = client.head(f"https://www.youtube.com/shorts/{video_id}", headers=headers)
+                    resp = client.head(
+                        f"https://www.youtube.com/shorts/{video_id}", headers=headers
+                    )
                     if resp.status_code == 303:
                         cls._shorts_cache[video_id] = False
                         return False, "LANDSCAPE"
@@ -307,6 +308,85 @@ class YouTubeConnector(BaseConnector):
                 "error": f"Tidak dapat mengambil transkrip: {e}",
             }
 
+    INNERTUBE_PLAYER_URL = "https://www.youtube.com/youtubei/v1/player?prettyPrint=false"
+    INNERTUBE_WEB_CLIENT_VERSION = "2.20250312.04.00"
+
+    async def _fetch_innertube_player(self, video_id: str) -> dict[str, Any] | None:
+        """Fetch real video metadata + creator Studio tags via YouTube Innertube player API."""
+        payload = {
+            "context": {
+                "client": {
+                    "clientName": "WEB",
+                    "clientVersion": self.INNERTUBE_WEB_CLIENT_VERSION,
+                    "hl": "id",
+                    "gl": "ID",
+                }
+            },
+            "videoId": video_id,
+        }
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.post(self.INNERTUBE_PLAYER_URL, json=payload)
+            if resp.status_code != 200:
+                return None
+            data = resp.json()
+        except Exception as e:
+            logger.warning(f"Innertube player failed for '{video_id}': {e}")
+            return None
+
+        v_det = data.get("videoDetails") or {}
+        if not v_det.get("videoId") or not v_det.get("title"):
+            return None
+        mf = (data.get("microformat") or {}).get("playerMicroformatRenderer") or {}
+
+        def _to_int(val: Any) -> int:
+            try:
+                return int(val)
+            except (TypeError, ValueError):
+                return 0
+
+        title = str(v_det.get("title", ""))
+        raw_views = _to_int(v_det.get("viewCount"))
+        length_sec = _to_int(v_det.get("lengthSeconds"))
+        if length_sec > 0:
+            h, rem = divmod(length_sec, 3600)
+            m, s = divmod(rem, 60)
+            dur_text = f"{h}:{m:02d}:{s:02d}" if h > 0 else f"{m:02d}:{s:02d}"
+        else:
+            dur_text = "N/A"
+
+        tags = [str(t).strip() for t in (v_det.get("keywords") or []) if str(t).strip()]
+        tags = list(dict.fromkeys(tags))
+        thumb_url = f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg"
+        is_shorts, format_type = self.detect_video_format(
+            video_id=video_id,
+            title=title,
+            duration_seconds=length_sec,
+            thumbnail_url=thumb_url,
+        )
+        published = str(mf.get("publishDate") or mf.get("uploadDate") or "")[:10]
+        return {
+            "video_id": video_id,
+            "url": f"https://www.youtube.com/watch?v={video_id}",
+            "title": title,
+            "description": str(v_det.get("shortDescription", "")),
+            "tags": tags,
+            "channel": str(v_det.get("author", "")),
+            "channel_id": str(v_det.get("channelId", "")),
+            "published_at": published,
+            "views": raw_views,
+            "views_display": self._format_views_display(raw_views) if raw_views else "N/A",
+            "likes": _to_int(mf.get("likeCount")),
+            "comments": 0,
+            "duration": dur_text,
+            "duration_seconds": length_sec,
+            "is_shorts": is_shorts,
+            "format": format_type,
+            "category": str(mf.get("category", "")),
+            "thumbnail_url": thumb_url,
+            "data_source": "INNERTUBE_PLAYER",
+        }
+
     async def get_video_details(self, video_id: str) -> dict[str, Any] | None:
         """Fetch complete video details (title, description, tags, stats, duration) via YouTube API or scraper."""
         if self.api_key:
@@ -370,6 +450,12 @@ class YouTubeConnector(BaseConnector):
             except Exception:
                 pass
 
+        # Preferred keyless path: YouTube Innertube player endpoint (works from cloud IPs,
+        # returns the creator's real Studio tags in videoDetails.keywords)
+        innertube = await self._fetch_innertube_player(video_id)
+        if innertube:
+            return innertube
+
         # Robust live scraping from YouTube HTML and ytInitialPlayerResponse
         try:
             url = f"https://www.youtube.com/watch?v={video_id}"
@@ -412,7 +498,9 @@ class YouTubeConnector(BaseConnector):
                     # Description
                     description = v_det.get("shortDescription")
                     if not description:
-                        m_desc = re.search(r'<meta property="og:description" content="(.*?)">', html)
+                        m_desc = re.search(
+                            r'<meta property="og:description" content="(.*?)">', html
+                        )
                         description = m_desc.group(1) if m_desc else ""
 
                     # Channel / Author
@@ -430,7 +518,9 @@ class YouTubeConnector(BaseConnector):
                         except (ValueError, TypeError):
                             pass
                     if raw_views == 0:
-                        m_views = re.search(r'<meta itemprop="interactionCount" content="(\d+)">', html)
+                        m_views = re.search(
+                            r'<meta itemprop="interactionCount" content="(\d+)">', html
+                        )
                         if m_views:
                             try:
                                 raw_views = int(m_views.group(1))
@@ -472,7 +562,9 @@ class YouTubeConnector(BaseConnector):
                     }
                     tags = v_det.get("keywords", [])
                     if not tags:
-                        og_tags = re.findall(r'<meta property="og:video:tag" content="(.*?)">', html)
+                        og_tags = re.findall(
+                            r'<meta property="og:video:tag" content="(.*?)">', html
+                        )
                         if og_tags:
                             tags = [t.strip() for t in og_tags if t.strip()]
                     if not tags:
@@ -519,9 +611,13 @@ class YouTubeConnector(BaseConnector):
 
                     # Likes count extraction if available in accessibility data
                     likes = 0
-                    m_like = re.search(r'like this video along with ([\d,]+) other people', html, re.IGNORECASE)
+                    m_like = re.search(
+                        r"like this video along with ([\d,]+) other people", html, re.IGNORECASE
+                    )
                     if not m_like:
-                        m_like = re.search(r'sukai video ini bersama ([\d\.]+) orang lainnya', html, re.IGNORECASE)
+                        m_like = re.search(
+                            r"sukai video ini bersama ([\d\.]+) orang lainnya", html, re.IGNORECASE
+                        )
                     if m_like:
                         try:
                             likes = int(m_like.group(1).replace(",", "").replace(".", ""))
@@ -538,7 +634,9 @@ class YouTubeConnector(BaseConnector):
                         "channel_id": channel_id,
                         "published_at": published_at,
                         "views": raw_views,
-                        "views_display": self._format_views_display(raw_views) if raw_views else "N/A",
+                        "views_display": self._format_views_display(raw_views)
+                        if raw_views
+                        else "N/A",
                         "likes": likes,
                         "comments": 0,
                         "duration": dur_text,
@@ -553,9 +651,7 @@ class YouTubeConnector(BaseConnector):
 
         return None
 
-    async def _fetch_competitors_via_api(
-        self, query: str, limit: int = 10
-    ) -> list[dict[str, Any]]:
+    async def _fetch_competitors_via_api(self, query: str, limit: int = 10) -> list[dict[str, Any]]:
         """Fetch live, 100% real competitor rankings via YouTube Data API v3."""
         try:
             async with httpx.AsyncClient(timeout=12.0) as client:
@@ -686,7 +782,9 @@ class YouTubeConnector(BaseConnector):
         and generates ready-to-use YouTube Studio tags.
         """
         if isinstance(competitors_or_query, str):
-            competitors = await self.get_top_competitors(competitors_or_query, limit=limit_competitors)
+            competitors = await self.get_top_competitors(
+                competitors_or_query, limit=limit_competitors
+            )
         else:
             competitors = list(competitors_or_query)[:limit_competitors]
 
@@ -715,36 +813,11 @@ class YouTubeConnector(BaseConnector):
         target_comps = competitors[:limit_competitors]
         await asyncio.gather(*[_ensure_comp_tags(c) for c in target_comps])
 
-        TITLE_STOPWORDS = {
-            "dan", "di", "ke", "dari", "yang", "untuk", "dengan", "pada", "ini", "itu",
-            "atau", "juga", "agar", "biar", "tidak", "gak", "bisa", "cara", "tutorial",
-            "panduan", "lengkap", "terbaru", "pemula", "2024", "2025", "2026", "bagaimana",
-            "apa", "kenapa", "mengapa", "dalam", "saat", "oleh", "sebagai", "adalah",
-            "the", "and", "for", "with", "how", "to", "in", "of", "on", "at", "by", "from",
-        }
-
         for comp in target_comps:
             v_id = comp.get("video_id") or self.extract_video_id(comp.get("url", ""))
+            # Real data only: use the creator's actual Studio tags. If the creator did not
+            # set any tags, report zero tags honestly (never fabricate tags from title n-grams).
             tags = comp.get("tags") or []
-
-            # If YouTube hides watch-page keywords (e.g. datacenter IP / creator left tags empty),
-            # extract high-signal bigrams & keyphrases from the competitor's actual ranking title
-            if not tags:
-                raw_title = comp.get("title", "")
-                words = [
-                    w.lower()
-                    for w in re.findall(r"[a-zA-Z0-9]{3,}", raw_title)
-                    if w.lower() not in TITLE_STOPWORDS and not w.isdigit()
-                ]
-                derived_phrases: list[str] = []
-                # 2-word and 3-word topical phrases from title
-                for i in range(len(words) - 1):
-                    bigram = f"{words[i]} {words[i+1]}"
-                    derived_phrases.append(bigram)
-                    if i + 2 < len(words):
-                        trigram = f"{words[i]} {words[i+1]} {words[i+2]}"
-                        derived_phrases.append(trigram)
-                tags = derived_phrases[:8] if derived_phrases else words[:6]
 
             # Deduplicate tags within the same video (case-insensitive)
             seen_in_vid: set[str] = set()
@@ -758,15 +831,18 @@ class YouTubeConnector(BaseConnector):
                     seen_in_vid.add(t_low)
                     clean_tags.append(t_str)
 
-            competitor_breakdown.append({
-                "rank": comp.get("rank", 1),
-                "title": comp.get("title", ""),
-                "channel": comp.get("channel", ""),
-                "views": comp.get("views", ""),
-                "video_id": v_id,
-                "tags_count": len(clean_tags),
-                "tags": clean_tags,
-            })
+            competitor_breakdown.append(
+                {
+                    "rank": comp.get("rank", 1),
+                    "title": comp.get("title", ""),
+                    "channel": comp.get("channel", ""),
+                    "views": comp.get("views", ""),
+                    "video_id": v_id,
+                    "tags_count": len(clean_tags),
+                    "tags": clean_tags,
+                    "tags_source": "creator_studio_tags" if clean_tags else "creator_set_no_tags",
+                }
+            )
 
             for t_str in clean_tags:
                 t_low = t_str.lower()
@@ -826,7 +902,6 @@ class YouTubeConnector(BaseConnector):
             "recommended_tags_csv": recommended_csv,
             "best_practices": best_practices,
         }
-
 
     def _parse_youtube_search_html(self, html: str, limit: int = 10) -> list[dict[str, Any]]:
         """Extract videoRenderers from ytInitialData embedded in YouTube HTML."""
@@ -903,9 +978,8 @@ class YouTubeConnector(BaseConnector):
                     # Detect format: explicit #shorts in title or shorts URL
                     dur_sec = self.parse_duration_to_seconds(duration_text)
                     is_shorts = (
-                        (dur_sec <= 60 and ("#shorts" in title.lower() or "#short" in title.lower()))
-                        or "/shorts/" in vid_id
-                    )
+                        dur_sec <= 60 and ("#shorts" in title.lower() or "#short" in title.lower())
+                    ) or "/shorts/" in vid_id
                     format_type = "SHORTS" if is_shorts else "LANDSCAPE"
 
                     # Check AI keywords in title or channel

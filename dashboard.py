@@ -409,15 +409,11 @@ def fetch_trends_comparison_cached(keyword: str, geo: str = "ID") -> dict[str, A
             keyword, geo=geo, property_type="youtube"
         )
     if "youtube_top_queries" not in res or not res["youtube_top_queries"]:
-        yt_q = connector.get_top_and_rising_queries(
-            keyword, geo=geo, property_type="youtube"
-        )
+        yt_q = connector.get_top_and_rising_queries(keyword, geo=geo, property_type="youtube")
         res["youtube_top_queries"] = yt_q["top"]
         res["youtube_rising_queries"] = yt_q["rising"]
     if "google_top_queries" not in res or not res["google_top_queries"]:
-        gw_q = connector.get_top_and_rising_queries(
-            keyword, geo=geo, property_type="web"
-        )
+        gw_q = connector.get_top_and_rising_queries(keyword, geo=geo, property_type="web")
         res["google_top_queries"] = gw_q["top"]
         res["google_rising_queries"] = gw_q["rising"]
     return res
@@ -625,7 +621,7 @@ if keyword_input:
     if not competitors or kw_metrics["rating"] == "INSUFFICIENT_DATA":
         st.warning(
             f"### ⚠️ DATA KOMPETITOR LIVE TIDAK DITEMUKAN\n"
-            f"Tidak ada video yang berhasil di-scrape secara live untuk kata kunci **\"{keyword_input}\"** di YouTube SERP saat ini.  \n"
+            f'Tidak ada video yang berhasil di-scrape secara live untuk kata kunci **"{keyword_input}"** di YouTube SERP saat ini.  \n'
             f"Sistem **hanya menampilkan data riil** dan menolak menghasilkan angka perkiraan fiktif.  \n"
             f"💡 *Saran:* Pastikan koneksi internet stabil, gunakan kata kunci yang lebih umum, atau periksa langsung hasil di YouTube."
         )
@@ -817,10 +813,16 @@ if keyword_input:
         # Competitor Tags Spy Box
         if competitors:
             yt_conn_spy = YouTubeConnector()
-            comp_spy = asyncio.run(yt_conn_spy.spy_competitor_tags(competitors, limit_competitors=5))
+            comp_spy = asyncio.run(
+                yt_conn_spy.spy_competitor_tags(competitors, limit_competitors=5)
+            )
             if comp_spy.get("top_tags_by_frequency"):
-                with st.expander("🕵️ Intip Tags Kompetitor Ranking #1-5 & Best Practice Tagging", expanded=False):
-                    st.markdown(f"**Dianalisis secara live dari {comp_spy['competitors_analyzed']} video ranking teratas di YouTube:**")
+                with st.expander(
+                    "🕵️ Intip Tags Kompetitor Ranking #1-5 & Best Practice Tagging", expanded=False
+                ):
+                    st.markdown(
+                        f"**Dianalisis secara live dari {comp_spy['competitors_analyzed']} video ranking teratas di YouTube:**"
+                    )
                     c_tag_col1, c_tag_col2 = st.columns([3, 2])
                     with c_tag_col1:
                         st.markdown("##### 🏆 Tags Paling Sering Digunakan Kompetitor:")
@@ -850,8 +852,9 @@ if keyword_input:
             comp_df = pd.DataFrame(competitors)[valid_cols]
             st.dataframe(comp_df, width="stretch", hide_index=True)
         else:
-            st.info("ℹ️ Tidak ada video kompetitor live yang ditemukan untuk kata kunci ini di YouTube SERP.")
-
+            st.info(
+                "ℹ️ Tidak ada video kompetitor live yang ditemukan untuk kata kunci ini di YouTube SERP."
+            )
 
     # ==================== TAB 2: VIDEO OPTIMIZATION STUDIO (AUDIT & REVAMP) ====================
     with tab_audit:
@@ -874,7 +877,10 @@ if keyword_input:
         st.markdown("---")
 
         if "Mode 1" in opt_mode:
-            with st.expander("💡 Mengapa Menggunakan 'Unlisted' (Bukan 'Private') untuk Video Baru?", expanded=False):
+            with st.expander(
+                "💡 Mengapa Menggunakan 'Unlisted' (Bukan 'Private') untuk Video Baru?",
+                expanded=False,
+            ):
                 st.markdown(
                     """
                     > **🌟 Pro Creator Best Practice: Rahasia Status Unlisted (Tidak Publik)**
@@ -950,9 +956,13 @@ if keyword_input:
                     effective_url = default_audit_url
                 extracted_id = YouTubeConnector.extract_video_id(effective_url)
                 if not extracted_id:
-                    st.error("❌ Format URL atau Video ID tidak valid. Mohon masukkan link YouTube yang valid.")
+                    st.error(
+                        "❌ Format URL atau Video ID tidak valid. Mohon masukkan link YouTube yang valid."
+                    )
                 else:
-                    with st.spinner("Mengambil metadata riil video, subtitle/transkrip, dan data kompetitor YouTube..."):
+                    with st.spinner(
+                        "Mengambil metadata riil video, subtitle/transkrip, dan data kompetitor YouTube..."
+                    ):
                         yt_conn = YouTubeConnector()
                         vid_meta = asyncio.run(yt_conn.get_video_details(extracted_id))
                         if not vid_meta:
@@ -1005,7 +1015,9 @@ if keyword_input:
                             caption=f"Channel: {v_det.get('channel', 'N/A')}",
                         )
                     likes_val = v_det.get("likes", 0)
-                    likes_display = f"{likes_val:,}" if likes_val > 0 else "Tersedia via YouTube Studio / API"
+                    likes_display = (
+                        f"{likes_val:,}" if likes_val > 0 else "Tersedia via YouTube Studio / API"
+                    )
                     pub_date = v_det.get("published_at", "")[:10] or "N/A"
                     st.caption(
                         f"⏱️ **Durasi:** {v_det.get('duration', 'N/A')} ({v_det.get('format', 'LANDSCAPE')})  \n"
@@ -1132,14 +1144,23 @@ if keyword_input:
                 audit_comps = st.session_state.get("video_audit_competitors", [])
                 if audit_comps:
                     yt_conn_audit_spy = YouTubeConnector()
-                    comp_spy_audit = asyncio.run(yt_conn_audit_spy.spy_competitor_tags(audit_comps, limit_competitors=5))
+                    comp_spy_audit = asyncio.run(
+                        yt_conn_audit_spy.spy_competitor_tags(audit_comps, limit_competitors=5)
+                    )
                     if comp_spy_audit.get("top_tags_by_frequency"):
-                        with st.expander("🕵️ Intip Tags Kompetitor Ranking #1-5 untuk Video Ini & Best Practice", expanded=False):
-                            st.markdown(f"**Dianalisis secara live dari {comp_spy_audit['competitors_analyzed']} video kompetitor sejenis:**")
+                        with st.expander(
+                            "🕵️ Intip Tags Kompetitor Ranking #1-5 untuk Video Ini & Best Practice",
+                            expanded=False,
+                        ):
+                            st.markdown(
+                                f"**Dianalisis secara live dari {comp_spy_audit['competitors_analyzed']} video kompetitor sejenis:**"
+                            )
                             c_tag_col1, c_tag_col2 = st.columns([3, 2])
                             with c_tag_col1:
                                 st.markdown("##### 🏆 Tags Paling Sering Digunakan Kompetitor:")
-                                comp_tag_df = pd.DataFrame(comp_spy_audit["top_tags_by_frequency"][:15])
+                                comp_tag_df = pd.DataFrame(
+                                    comp_spy_audit["top_tags_by_frequency"][:15]
+                                )
                                 st.dataframe(comp_tag_df, width="stretch", hide_index=True)
                             with c_tag_col2:
                                 st.markdown("##### 📋 Rekomendasi Tag Terkuat Kompetitor:")
@@ -1151,10 +1172,7 @@ if keyword_input:
 
                 g_seo = a_res.get("google_seo_strategy", "")
                 if g_seo:
-                    st.markdown(
-                        f"#### 🌐 Strategi Tembus Google Search & Key Moments:\n"
-                        f"💡 {g_seo}"
-                    )
+                    st.markdown(f"#### 🌐 Strategi Tembus Google Search & Key Moments:\n💡 {g_seo}")
 
                 st.markdown("---")
                 schema_jsonld = AITitleGenerator.generate_video_schema_jsonld(
@@ -1166,12 +1184,18 @@ if keyword_input:
                     upload_date=v_det.get("published_at", ""),
                     timestamps_text=full_desc,
                 )
-                with st.expander("🏷️ Schema.org VideoObject JSON-LD (Google Search Carousel & Key Moments)", expanded=False):
+                with st.expander(
+                    "🏷️ Schema.org VideoObject JSON-LD (Google Search Carousel & Key Moments)",
+                    expanded=False,
+                ):
                     st.caption(
                         "Salin kode `<script>` di bawah ini dan tempelkan ke artikel blog atau landing page website tempat video ini di-embed. "
                         "Ini memungkinkan Google Web Search menampilkan video Anda dengan thumbnail besar dan garis waktu babak (Key Moments)!"
                     )
-                    st.code(f"<script type=\"application/ld+json\">\n{schema_jsonld}\n</script>", language="html")
+                    st.code(
+                        f'<script type="application/ld+json">\n{schema_jsonld}\n</script>',
+                        language="html",
+                    )
 
         else:
             # Mode 2: Video Belum Upload
@@ -1216,13 +1240,19 @@ if keyword_input:
                 key="pre_notes_textarea",
             )
 
-            btn_run_pre = st.button("🚀 Racik Paket Peluncuran SEO", type="primary", key="btn_run_pre")
+            btn_run_pre = st.button(
+                "🚀 Racik Paket Peluncuran SEO", type="primary", key="btn_run_pre"
+            )
 
             if btn_run_pre:
                 if not pre_topic or not pre_notes:
-                    st.warning("⚠️ Mohon isi Topik Utama dan Poin-Poin Bahasan video terlebih dahulu.")
+                    st.warning(
+                        "⚠️ Mohon isi Topik Utama dan Poin-Poin Bahasan video terlebih dahulu."
+                    )
                 else:
-                    with st.spinner("Menganalisis naskah, memeriksa SERP kompetitor live, dan meracik paket peluncuran..."):
+                    with st.spinner(
+                        "Menganalisis naskah, memeriksa SERP kompetitor live, dan meracik paket peluncuran..."
+                    ):
                         yt_conn = YouTubeConnector()
                         comp_for_draft = asyncio.run(
                             yt_conn.get_top_competitors(pre_topic, limit=5)
@@ -1309,12 +1339,17 @@ if keyword_input:
                     duration=pre_duration,
                     timestamps_text=p_desc,
                 )
-                with st.expander("🏷️ Schema.org VideoObject JSON-LD (Siap Pasang di Website/Blog)", expanded=False):
+                with st.expander(
+                    "🏷️ Schema.org VideoObject JSON-LD (Siap Pasang di Website/Blog)", expanded=False
+                ):
                     st.caption(
                         "Kode Schema resmi Google untuk dipasang di artikel web tempat video di-embed. "
                         "Ganti 'VIDEO_ID_ANDA' dengan ID video sebenarnya setelah video di-upload ke YouTube."
                     )
-                    st.code(f"<script type=\"application/ld+json\">\n{p_schema_jsonld}\n</script>", language="html")
+                    st.code(
+                        f'<script type="application/ld+json">\n{p_schema_jsonld}\n</script>',
+                        language="html",
+                    )
 
     # ==================== TAB 3: CHANNEL YOUTUBE STUDIO SAYA ====================
     with tab_channel:
@@ -1339,7 +1374,9 @@ if keyword_input:
 
                 has_client_secret = os.path.exists("client_secret.json")
                 if has_client_secret:
-                    st.success("🟢 **Kredensial OAuth Ditemukan & Siap Digunakan (`client_secret.json`)!**")
+                    st.success(
+                        "🟢 **Kredensial OAuth Ditemukan & Siap Digunakan (`client_secret.json`)!**"
+                    )
                     st.caption("Project: `youtube-andonpokayokebizid` | Tipe: Desktop App")
 
                 btn_login_google = st.button(
@@ -1357,7 +1394,10 @@ if keyword_input:
                             st.error(msg)
 
                 st.write("")
-                with st.expander("⚙️ Pengaturan Kredensial OAuth (Ganti File / Edit Manual)", expanded=not has_client_secret):
+                with st.expander(
+                    "⚙️ Pengaturan Kredensial OAuth (Ganti File / Edit Manual)",
+                    expanded=not has_client_secret,
+                ):
                     auth_tab_file, auth_tab_manual = st.tabs(
                         ["📁 Unggah client_secret.json", "✏️ Input Client ID & Secret Manual"]
                     )
@@ -1402,13 +1442,17 @@ if keyword_input:
                                 }
                                 with open("client_secret.json", "w", encoding="utf-8") as f:
                                     json.dump(client_config, f, indent=2)
-                                st.success("✅ Kredensial OAuth berhasil disimpan ke client_secret.json!")
+                                st.success(
+                                    "✅ Kredensial OAuth berhasil disimpan ke client_secret.json!"
+                                )
                                 st.rerun()
                             else:
                                 st.warning("Mohon isi Client ID dan Client Secret.")
 
             with c_auth2:
-                with st.expander("📖 Panduan Singkat Membuat OAuth Client ID di GCP", expanded=True):
+                with st.expander(
+                    "📖 Panduan Singkat Membuat OAuth Client ID di GCP", expanded=True
+                ):
                     st.markdown(
                         """
                         **Langkah di Google Cloud Console (`youtube-andonpokayokebizid`):**
@@ -1462,10 +1506,26 @@ if keyword_input:
                 if analytics_summary.get("available"):
                     st.markdown("### 📈 Ringkasan Performa Channel (28 Hari Terakhir)")
                     a_m1, a_m2, a_m3, a_m4 = st.columns(4)
-                    a_m1.metric("Penayangan (28 Hari)", analytics_summary.get("views_28d_display", "0"), border=True)
-                    a_m2.metric("Waktu Tonton", analytics_summary.get("watch_hours_display", "0 jam"), border=True)
-                    a_m3.metric("Rata-Rata Durasi Tonton", analytics_summary.get("avg_view_duration_display", "0:00"), border=True)
-                    a_m4.metric("Pertumbuhan Subscriber", f"+{analytics_summary.get('subs_gained', 0)}", border=True)
+                    a_m1.metric(
+                        "Penayangan (28 Hari)",
+                        analytics_summary.get("views_28d_display", "0"),
+                        border=True,
+                    )
+                    a_m2.metric(
+                        "Waktu Tonton",
+                        analytics_summary.get("watch_hours_display", "0 jam"),
+                        border=True,
+                    )
+                    a_m3.metric(
+                        "Rata-Rata Durasi Tonton",
+                        analytics_summary.get("avg_view_duration_display", "0:00"),
+                        border=True,
+                    )
+                    a_m4.metric(
+                        "Pertumbuhan Subscriber",
+                        f"+{analytics_summary.get('subs_gained', 0)}",
+                        border=True,
+                    )
                     st.markdown("---")
 
                 with st.spinner("Memuat inventaris video channel Anda..."):
@@ -1473,7 +1533,9 @@ if keyword_input:
                     ch_diag = ch_studio.diagnose_channel_videos(ch_videos)
 
                 underperforming = ch_diag.get("underperforming_gems", [])
-                st.markdown("### 🚨 Deteksi Cerdas: Video yang Perlu Diperbaiki (Underperforming Gems)")
+                st.markdown(
+                    "### 🚨 Deteksi Cerdas: Video yang Perlu Diperbaiki (Underperforming Gems)"
+                )
                 st.caption(
                     "Algoritma kami memindai video di channel Anda yang memiliki views tertinggal jauh, "
                     "minim tags, atau judul kurang hook NLP sehingga potensi impresinya terbuang sia-sia."
@@ -1487,10 +1549,14 @@ if keyword_input:
                             with u_c1:
                                 if uv.get("thumbnail_url"):
                                     st.image(uv["thumbnail_url"])
-                                st.caption(f"⏱️ {uv.get('duration', 'N/A')} | 👁️ {uv.get('views_display', '0')}")
+                                st.caption(
+                                    f"⏱️ {uv.get('duration', 'N/A')} | 👁️ {uv.get('views_display', '0')}"
+                                )
                             with u_c2:
                                 st.markdown(f"**{uv.get('title', '')}**")
-                                st.markdown(f"⚠️ **Diagnosis Kelemahan:** *{uv.get('weakness_reason', '')}*")
+                                st.markdown(
+                                    f"⚠️ **Diagnosis Kelemahan:** *{uv.get('weakness_reason', '')}*"
+                                )
                                 studio_cnt = len(uv.get("studio_tags", []))
                                 hash_cnt = len(uv.get("desc_hashtags", []))
                                 st.caption(
@@ -1498,7 +1564,9 @@ if keyword_input:
                                 )
                             with u_c3:
                                 st.write("")
-                                if st.button("⚡ Audit & Revamp", key=f"btn_revamp_{uv['video_id']}"):
+                                if st.button(
+                                    "⚡ Audit & Revamp", key=f"btn_revamp_{uv['video_id']}"
+                                ):
                                     st.session_state["quick_audit_url"] = uv["url"]
                                     st.session_state["trigger_auto_audit"] = True
                                     st.success(
@@ -1510,11 +1578,12 @@ if keyword_input:
                 st.markdown("---")
 
                 st.markdown(f"### 📋 Inventaris Video Channel ({len(ch_videos)} Video)")
-                filter_kw = st.text_input("🔍 Cari Judul Video di Channel Anda:", key="filter_ch_videos")
+                filter_kw = st.text_input(
+                    "🔍 Cari Judul Video di Channel Anda:", key="filter_ch_videos"
+                )
 
                 filtered_vids = [
-                    v for v in ch_videos
-                    if not filter_kw or filter_kw.lower() in v["title"].lower()
+                    v for v in ch_videos if not filter_kw or filter_kw.lower() in v["title"].lower()
                 ]
 
                 if filtered_vids:
@@ -1555,7 +1624,9 @@ if keyword_input:
                 with g_c2:
                     st.write("")
                     st.write("")
-                    btn_check_schema = st.button("🔍 Panduan Status Video di GSC", key="btn_check_schema_gsc")
+                    btn_check_schema = st.button(
+                        "🔍 Panduan Status Video di GSC", key="btn_check_schema_gsc"
+                    )
 
                 if btn_check_schema:
                     if test_web_url:
@@ -1765,7 +1836,11 @@ if keyword_input:
 
             outlier_analysis = SearchIntelligence.analyze_competitor_outliers(competitors)
             oc1, oc2, oc3 = st.columns(3)
-            oc1.metric("Median Views Kompetitor", f"{outlier_analysis['median_views']:,} Views", border=True)
+            oc1.metric(
+                "Median Views Kompetitor",
+                f"{outlier_analysis['median_views']:,} Views",
+                border=True,
+            )
             oc2.metric(
                 "Multiplier Tertinggi",
                 f"{outlier_analysis['highest_multiplier']}x",
@@ -1789,7 +1864,9 @@ if keyword_input:
                 )
 
             st.markdown("##### 📊 Analisis Multiplier Semua Video Kompetitor:")
-            st.dataframe(pd.DataFrame(outlier_analysis["outlier_items"]), width="stretch", hide_index=True)
+            st.dataframe(
+                pd.DataFrame(outlier_analysis["outlier_items"]), width="stretch", hide_index=True
+            )
 
             st.markdown("---")
             st.markdown("#### 🤖 Faceless Niche Finder")
@@ -2169,7 +2246,9 @@ if keyword_input:
             diff_mom = latest_val - prev_val
 
             mo1, mo2, mo3, mo4 = st.columns(4)
-            mo1.metric("Rata-rata YouTube (12 Bln)", f"{yt_avg} / 100", "Minat Penonton", border=True)
+            mo1.metric(
+                "Rata-rata YouTube (12 Bln)", f"{yt_avg} / 100", "Minat Penonton", border=True
+            )
             mo2.metric("Puncak Minat YouTube", f"{yt_peak} / 100", "Peak Demand", border=True)
             mo3.metric("Rata-rata Google Web", f"{gw_avg} / 100", "Pencarian Teks", border=True)
             mo4.metric(
@@ -2212,7 +2291,9 @@ if keyword_input:
                     hide_index=True,
                 )
         else:
-            st.info("ℹ️ Tidak ada data sebaran minat wilayah dari Google Trends untuk kata kunci ini.")
+            st.info(
+                "ℹ️ Tidak ada data sebaran minat wilayah dari Google Trends untuk kata kunci ini."
+            )
 
         # -------------------------------------------------------------
         # 3. TOP & RISING QUERIES (HINGGA 50 KUERI)
@@ -2246,7 +2327,6 @@ if keyword_input:
                     val = it.get("Lonjakan Minat") or it.get("value") or "-"
                     formatted.append({"Rank": rank, "Query": q_text, "Lonjakan Minat": str(val)})
             st.dataframe(pd.DataFrame(formatted), width="stretch", height=450, hide_index=True)
-
 
         q_tab_yt, q_tab_gw = st.tabs(
             ["📺 YouTube Search (`gprop=youtube`)", "🌐 Google Web Search"]

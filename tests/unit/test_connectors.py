@@ -1,6 +1,6 @@
 """Unit tests for search connectors (HasData & YouTube) ensuring 100% real data integrity."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -128,3 +128,50 @@ async def test_youtube_connector_natural_headers():
     mobile_headers = YouTubeConnector._get_natural_headers(hl="id", gl="ID", device="mobile")
     assert mobile_headers["Sec-Ch-Ua-Mobile"] == "?1"
     assert mobile_headers["Sec-Ch-Ua-Platform"] == '"Android"'
+
+
+def test_youtube_connector_parse_count_text():
+    """Verify numeric string parsing for YouTube stats."""
+    connector = YouTubeConnector(api_key=None)
+    assert connector._parse_count_text("14 subscriber") == 14
+    assert connector._parse_count_text("6,17 rb subscriber") == 6170
+    assert connector._parse_count_text("1,8 rb video") == 1800
+    assert connector._parse_count_text("2,9 rb subscriber") == 2900
+    assert connector._parse_count_text("1.2 jt subscriber") == 1200000
+    assert connector._parse_count_text("543 x ditonton") == 543
+    assert connector._parse_count_text("Belum ditonton") == 0
+    assert connector._parse_count_text("") == 0
+    assert connector._parse_count_text(None) == 0
+
+
+@pytest.mark.asyncio
+async def test_get_channel_summary_fallback_to_scrape():
+    """Verify that when API key is None, channel summary automatically falls back to public scraping."""
+    connector = YouTubeConnector(api_key="")
+    connector.api_key = None
+    mock_summary = {
+        "channel_id": "UC_TEST",
+        "title": "Test Channel",
+        "handle": "@testchannel",
+        "subscribers": 5000,
+        "video_count": 50,
+        "sample_analyzed": 10,
+        "landscape_count": 8,
+        "landscape_percentage": 80.0,
+        "portrait_count": 2,
+        "portrait_percentage": 20.0,
+        "recent_top_video": {"title": "Top Video", "views": 1000},
+        "all_time_top_video": {"title": "Top Video", "views": 1000},
+        "videos": [],
+    }
+    with patch.object(
+        connector, "_scrape_channel_public", new_callable=AsyncMock
+    ) as mock_scrape:
+        mock_scrape.return_value = mock_summary
+        res = await connector.get_channel_summary_and_format_breakdown("@testchannel")
+        assert res is not None
+        assert res["title"] == "Test Channel"
+        assert res["subscribers"] == 5000
+        assert res["landscape_count"] == 8
+        assert res["portrait_percentage"] == 20.0
+

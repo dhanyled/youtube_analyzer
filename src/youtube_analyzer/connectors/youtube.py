@@ -1263,13 +1263,309 @@ class YouTubeConnector(BaseConnector):
             return f"@{s}"
         return s
 
+    def _parse_count_text(self, txt: str) -> int:
+        """Parse subscriber/view/video count string (e.g. '6,17 rb subscriber', '1.2M views') into integer."""
+        if not txt:
+            return 0
+        t = (
+            txt.lower()
+            .replace("subscriber", "")
+            .replace("subscribers", "")
+            .replace("video", "")
+            .replace("videos", "")
+            .replace("ditonton", "")
+            .replace("tayangan", "")
+            .replace("views", "")
+            .replace("x", "")
+            .replace("\xa0", " ")
+            .strip()
+        )
+        if not t or "belum" in t:
+            return 0
+        mul = 1
+        if "rb" in t or "k" in t:
+            mul = 1000
+            t = t.replace("rb", "").replace("k", "").strip()
+        elif "jt" in t or "m" in t or "juta" in t:
+            mul = 1000000
+            t = t.replace("juta", "").replace("jt", "").replace("m", "").strip()
+        elif "b" in t or "miliar" in t:
+            mul = 1000000000
+            t = t.replace("miliar", "").replace("b", "").strip()
+        t = t.replace(",", ".").strip()
+        try:
+            return int(float(t) * mul)
+        except Exception:
+            return 0
+
+    async def _scrape_channel_public(
+        self, clean_id: str, max_videos: int = 50
+    ) -> dict[str, Any] | None:
+        """Zero-quota public scraping fallback for channel stats and format breakdown."""
+        handle = clean_id if clean_id.startswith("@") or clean_id.startswith("UC") else f"@{clean_id}"
+        base_path = f"channel/{handle}" if handle.startswith("UC") else handle
+        vid_url = f"https://www.youtube.com/{base_path}/videos"
+        shorts_url = f"https://www.youtube.com/{base_path}/shorts"
+
+        headers = self._get_natural_headers(hl="id", gl="ID", device="desktop")
+
+        try:
+            async with httpx.AsyncClient(timeout=14.0) as client:
+                r_vid, r_sho = await asyncio.gather(
+                    client.get(vid_url, headers=headers, follow_redirects=True),
+                    client.get(shorts_url, headers=headers, follow_redirects=True),
+                    return_exceptions=True,
+                )
+
+                if isinstance(r_vid, Exception) or r_vid.status_code != 200:
+                    logger.warning(f"Failed to fetch public channel page for {handle}")
+                    return None
+
+                m = re.search(r"var ytInitialData\s*=\s*({.+?});</script>", r_vid.text)
+                if not m:
+                    return None
+                data = json.loads(m.group(1))
+
+                meta = data.get("metadata", {}).get("channelMetadataRenderer", {})
+                title = meta.get("title", handle)
+                ch_id = meta.get("externalId", "")
+
+                header = data.get("header", {}).get("pageHeaderRenderer", {})
+                content_meta = header.get("content", {}).get("pageHeaderViewModel", {})
+                metadata_rows = (
+                    content_meta.get("metadata", {})
+                    .get("contentMetadataViewModel", {})
+                    .get("metadataRows", [])
+                )
+
+                subs_text = ""
+                vids_text = ""
+                for row in metadata_rows:
+                    for part in row.get("metadataParts", []):
+                        txt = part.get("text", {}).get("content", "")
+                        if "subscriber" in txt.lower():
+                            subs_text = txt
+                        elif "video" in txt.lower():
+                            vids_text = txt
+
+                subscribers = self._parse_count_text(subs_text)
+                video_count = self._parse_count_text(vids_text)
+
+                avatar_sources = (
+                    content_meta.get("image", {})
+                    .get("decoratedAvatarViewModel", {})
+                    .get("avatar", {})
+                    .get("avatarViewModel", {})
+                    .get("image", {})
+                    .get("sources", [])
+                )
+                thumb = avatar_sources[-1].get("url", "") if avatar_sources else ""
+                if not thumb:
+                    avatar_runs = meta.get("avatar", {}).get("thumbnails", [])
+                    thumb = avatar_runs[-1].get("url", "") if avatar_runs else ""
+
+                # Extract videos from contents
+                lockups: list[dict[str, Any]] = []
+
+                def find_lockups(obj: Any) -> None:
+                    if isinstance(obj, dict):
+                        if "lockupViewModel" in obj:
+                            lockups.append(obj["lockupViewModel"])
+                        for v in obj.values():
+                            find_lockups(v)
+                    elif isinstance(obj, list):
+                        for item in obj:
+                            find_lockups(item)
+
+                find_lockups(data.get("contents", {}))
+
+                landscape_count = 0
+                portrait_count = 0
+                recent_top_video = None
+                max_recent_views = -1
+                parsed_videos: list[dict[str, Any]] = []
+                seen_vids: set[str] = set()
+
+                for lk in lockups:
+                    vid_id = ""
+                    try:
+                        vid_id = lk["rendererContext"]["commandContext"]["onTap"][
+                            "innertubeCommand"
+                        ]["watchEndpoint"]["videoId"]
+                    except Exception:
+                        pass
+                    if not vid_id or vid_id in seen_vids:
+                        continue
+                    seen_vids.add(vid_id)
+
+                    v_title = ""
+                    try:
+                        v_title = lk["metadata"]["lockupMetadataViewModel"]["title"]["content"]
+                    except Exception:
+                        pass
+
+                    dur_text = ""
+                    try:
+                        badges = lk["contentImage"]["thumbnailViewModel"]["overlays"][0][
+                            "thumbnailBottomOverlayViewModel"
+                        ]["badges"]
+                        for b in badges:
+                            dur_text = b.get("thumbnailBadgeViewModel", {}).get("text", "")
+                            if dur_text:
+                                break
+                    except Exception:
+                        pass
+
+                    view_str = ""
+                    try:
+                        rows = lk["metadata"]["lockupMetadataViewModel"]["metadata"][
+                            "contentMetadataViewModel"
+                        ]["metadataRows"]
+                        if rows and "metadataParts" in rows[0]:
+                            parts = rows[0]["metadataParts"]
+                            if parts:
+                                view_str = parts[0].get("text", {}).get("content", "")
+                                if not view_str or view_str == "0":
+                                    view_str = parts[0].get("accessibilityLabel", "0")
+                    except Exception:
+                        pass
+
+                    v_views = self._parse_count_text(view_str)
+                    dur_sec = self.parse_duration_to_seconds(dur_text)
+                    is_shorts = 0 < dur_sec <= 60
+                    if is_shorts:
+                        portrait_count += 1
+                    else:
+                        landscape_count += 1
+
+                    v_thumb = ""
+                    try:
+                        sources = lk["contentImage"]["thumbnailViewModel"]["image"]["sources"]
+                        if sources:
+                            v_thumb = sources[-1].get("url", "")
+                    except Exception:
+                        pass
+
+                    vid_info = {
+                        "id": vid_id,
+                        "title": v_title,
+                        "views": v_views,
+                        "views_display": f"{v_views:,}" if v_views > 0 else view_str,
+                        "likes": 0,
+                        "likes_display": "-",
+                        "duration": dur_text,
+                        "thumbnail_url": v_thumb
+                        or f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg",
+                        "is_shorts": is_shorts,
+                        "format": "SHORTS (9:16)" if is_shorts else "LANDSCAPE (16:9)",
+                        "url": f"https://www.youtube.com/watch?v={vid_id}",
+                    }
+                    parsed_videos.append(vid_info)
+
+                    if v_views > max_recent_views:
+                        max_recent_views = v_views
+                        recent_top_video = vid_info
+
+                # Also inspect shorts tab if available
+                if not isinstance(r_sho, Exception) and r_sho.status_code == 200:
+                    m_sho = re.search(r"var ytInitialData\s*=\s*({.+?});</script>", r_sho.text)
+                    if m_sho:
+                        sho_data = json.loads(m_sho.group(1))
+                        sho_lockups: list[dict[str, Any]] = []
+
+                        def find_sho(obj: Any) -> None:
+                            if isinstance(obj, dict):
+                                if "shortsLockupViewModel" in obj:
+                                    sho_lockups.append(obj["shortsLockupViewModel"])
+                                for v in obj.values():
+                                    find_sho(v)
+                            elif isinstance(obj, list):
+                                for item in obj:
+                                    find_sho(item)
+
+                        find_sho(sho_data.get("contents", {}))
+
+                        for slk in sho_lockups:
+                            sho_url = (
+                                slk.get("onTap", {})
+                                .get("innertubeCommand", {})
+                                .get("commandMetadata", {})
+                                .get("webCommandMetadata", {})
+                                .get("url", "")
+                            )
+                            s_vid_id = sho_url.replace("/shorts/", "").split("?")[0].strip()
+                            if not s_vid_id or s_vid_id in seen_vids:
+                                continue
+                            seen_vids.add(s_vid_id)
+                            portrait_count += 1
+                            s_title = (
+                                slk.get("overlayMetadata", {})
+                                .get("primaryText", {})
+                                .get("content", "")
+                            )
+                            s_views_txt = (
+                                slk.get("overlayMetadata", {})
+                                .get("secondaryText", {})
+                                .get("content", "")
+                            )
+                            s_views = self._parse_count_text(s_views_txt)
+                            sho_info = {
+                                "id": s_vid_id,
+                                "title": s_title,
+                                "views": s_views,
+                                "views_display": f"{s_views:,}" if s_views > 0 else s_views_txt,
+                                "likes": 0,
+                                "likes_display": "-",
+                                "duration": "0:59",
+                                "thumbnail_url": f"https://i.ytimg.com/vi/{s_vid_id}/hqdefault.jpg",
+                                "is_shorts": True,
+                                "format": "SHORTS (9:16)",
+                                "url": f"https://www.youtube.com/shorts/{s_vid_id}",
+                            }
+                            parsed_videos.append(sho_info)
+                            if s_views > max_recent_views:
+                                max_recent_views = s_views
+                                recent_top_video = sho_info
+
+                sample_total = len(parsed_videos)
+                pct_landscape = (
+                    round((landscape_count / sample_total) * 100, 1) if sample_total > 0 else 0.0
+                )
+                pct_shorts = (
+                    round((portrait_count / sample_total) * 100, 1) if sample_total > 0 else 0.0
+                )
+
+                return {
+                    "channel_id": ch_id,
+                    "title": title,
+                    "handle": handle,
+                    "thumbnail_url": thumb,
+                    "subscribers": subscribers,
+                    "subscribers_display": f"{subscribers:,}",
+                    "video_count": video_count,
+                    "video_count_display": f"{video_count:,}",
+                    "total_views": 0,
+                    "total_views_display": "-",
+                    "sample_analyzed": sample_total,
+                    "landscape_count": landscape_count,
+                    "landscape_percentage": pct_landscape,
+                    "portrait_count": portrait_count,
+                    "portrait_percentage": pct_shorts,
+                    "recent_top_video": recent_top_video,
+                    "all_time_top_video": recent_top_video,
+                    "videos": parsed_videos[:max_videos],
+                }
+        except Exception as e:
+            logger.warning(f"Error scraping public channel {handle}: {e}")
+            return None
+
     async def get_channel_summary_and_format_breakdown(
         self, identifier: str, max_videos: int = 50
     ) -> dict[str, Any] | None:
         """Fetch real channel statistics, format breakdown (Landscape vs Shorts), and top video."""
         clean_id = self.extract_channel_handle(identifier)
         if not self.api_key:
-            return None
+            return await self._scrape_channel_public(clean_id, max_videos=max_videos)
 
         # 1. Fetch channel profile
         url = f"{self.API_BASE_URL}/channels"
@@ -1295,7 +1591,10 @@ class YouTubeConnector(BaseConnector):
                     items = data.get("items", [])
 
                 if not items:
-                    return None
+                    logger.info(
+                        f"Channel not found via API for {clean_id}, falling back to public scrape."
+                    )
+                    return await self._scrape_channel_public(clean_id, max_videos=max_videos)
 
                 item = items[0]
                 snip = item.get("snippet", {})
@@ -1459,8 +1758,10 @@ class YouTubeConnector(BaseConnector):
                     "videos": parsed_videos,
                 }
         except Exception as e:
-            logger.warning(f"Error fetching competitor channel summary for {identifier}: {e}")
-            return None
+            logger.warning(
+                f"Error fetching competitor channel summary for {identifier}: {e}. Falling back to public scraping."
+            )
+            return await self._scrape_channel_public(clean_id, max_videos=max_videos)
 
     async def compare_competitor_channels(
         self,

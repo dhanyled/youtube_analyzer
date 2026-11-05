@@ -9,13 +9,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
-# Add src to sys.path so we can import youtube_analyzer modules
+# Add api/ and src/ to sys.path so we can import youtube_analyzer modules in both local and Vercel serverless environments
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(CURRENT_DIR)
 SRC_DIR = os.path.join(PROJECT_ROOT, "src")
-if SRC_DIR not in sys.path:
-    sys.path.insert(0, SRC_DIR)
+for p in [CURRENT_DIR, SRC_DIR]:
+    if p not in sys.path:
+        sys.path.insert(0, p)
 
+IMPORT_ERROR_MSG: str | None = None
 try:
     from youtube_analyzer.connectors.hasdata_trends import HasDataTrendsConnector
     from youtube_analyzer.connectors.youtube import YouTubeConnector
@@ -24,6 +26,7 @@ try:
     from youtube_analyzer.core.models import IntentEnum, PlatformEnum
     from youtube_analyzer.core.normalizer import TopicNormalizer
 except Exception as e:
+    IMPORT_ERROR_MSG = str(e)
     print("Import warning in api/index.py:", e)
     SearchIntelligence = None  # type: ignore
     YouTubeConnector = None  # type: ignore
@@ -149,8 +152,10 @@ async def health_check():
     return {
         "status": "ok",
         "service": "youtube-analyzer-serverless",
-        "version": "2.0.0",
+        "version": "2.0.1",
         "cors_enabled": True,
+        "engine_loaded": YouTubeConnector is not None,
+        "import_error": IMPORT_ERROR_MSG,
         "webmcp_tools_count": len(WEBMCP_TOOLS_CATALOG),
     }
 

@@ -974,16 +974,21 @@ https://www.youtube.com/@ppm_consulting</textarea>
       }
     }
 
+    let trendingLoaded = false;
+    let trendsLoaded = false;
+
     function switchTab(tabId, btnEl) {
       document.querySelectorAll('.tab-panel').forEach(el => el.classList.add('hidden'));
       document.getElementById(tabId)?.classList.remove('hidden');
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       if (btnEl) btnEl.classList.add('active');
 
-      if (tabId === 'tab_trending' && !document.getElementById('trendingTableBody').children.length) {
+      if (tabId === 'tab_trending' && !trendingLoaded) {
+        trendingLoaded = true;
         loadTrendingFeed();
       }
-      if (tabId === 'tab_trends' && !document.getElementById('dailyRssTableBody').children.length) {
+      if (tabId === 'tab_trends' && !trendsLoaded) {
+        trendsLoaded = true;
         loadTrendsComparison();
       }
     }
@@ -1020,6 +1025,7 @@ https://www.youtube.com/@ppm_consulting</textarea>
       if (!kw) return;
       saveToHistory(kw);
       document.getElementById('preTopicInput').value = kw;
+      trendsLoaded = false;
 
       const banner = document.getElementById('loadingBanner');
       const btn = document.getElementById('btnAnalyze');
@@ -1214,7 +1220,8 @@ https://www.youtube.com/@ppm_consulting</textarea>
       // Tab 7: Landscape Blueprint
       document.getElementById('landscapeIntroText').textContent = `Potensi AdSense RPM ${rpm.rpm_range_usd || '$2-$5'} (${(rpm.detected_niche || 'general').toUpperCase()}).`;
       document.getElementById('landscapeTitleCode').textContent = plan.outranking_title || '';
-      document.getElementById('landscapeTimestampsList').innerHTML = (plan.timestamps || []).map(ts => `<li>• ${escapeHtml(ts)}</li>`).join('');
+      const tsList = (plan.longform_timestamps && plan.longform_timestamps.length) ? plan.longform_timestamps : (plan.timestamps || []);
+      document.getElementById('landscapeTimestampsList').innerHTML = tsList.map(ts => `<li>• ${escapeHtml(ts)}</li>`).join('');
 
       // Tab 8: Shorts Blueprint
       const sp = plan.shorts_package || {};

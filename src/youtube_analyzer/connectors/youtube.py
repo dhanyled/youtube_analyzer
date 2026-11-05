@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 class YouTubeConnector(BaseConnector):
     """Connector for YouTube Search, Autocomplete & Competitor Spy."""
 
+    API_BASE_URL = "https://www.googleapis.com/youtube/v3"
     SUGGEST_URL = "https://suggestqueries.google.com/complete/search"
     SEARCH_URL = "https://www.youtube.com/results"
 
@@ -1314,6 +1315,7 @@ class YouTubeConnector(BaseConnector):
                 portrait_count = 0
                 recent_top_video = None
                 max_recent_views = -1
+                parsed_videos: list[dict[str, Any]] = []
 
                 # 2. Inspect uploaded videos for Landscape vs Shorts breakdown
                 if uploads_id:
@@ -1360,18 +1362,33 @@ class YouTubeConnector(BaseConnector):
                                     else:
                                         landscape_count += 1
 
+                                    vid_info = {
+                                        "title": v_title,
+                                        "views": v_views,
+                                        "views_display": self._format_views_display(v_views),
+                                        "likes": int(v_stats.get("likeCount", 0)),
+                                        "likes_display": self._format_views_display(
+                                            int(v_stats.get("likeCount", 0))
+                                        ),
+                                        "duration": dur_text,
+                                        "thumbnail_url": v_snip.get("thumbnails", {})
+                                        .get("medium", {})
+                                        .get("url")
+                                        or v_snip.get("thumbnails", {})
+                                        .get("default", {})
+                                        .get("url", ""),
+                                        "id": v.get("id"),
+                                        "is_shorts": is_shorts,
+                                        "format": "SHORTS (9:16)"
+                                        if is_shorts
+                                        else "LANDSCAPE (16:9)",
+                                        "url": f"https://www.youtube.com/watch?v={v.get('id')}",
+                                    }
+                                    parsed_videos.append(vid_info)
+
                                     if v_views > max_recent_views:
                                         max_recent_views = v_views
-                                        recent_top_video = {
-                                            "title": v_title,
-                                            "views": v_views,
-                                            "views_display": self._format_views_display(v_views),
-                                            "id": v.get("id"),
-                                            "format": "SHORTS (9:16)"
-                                            if is_shorts
-                                            else "LANDSCAPE (16:9)",
-                                            "url": f"https://www.youtube.com/watch?v={v.get('id')}",
-                                        }
+                                        recent_top_video = vid_info
 
                 # 3. All-time top video via search order by viewCount
                 all_time_top = None
@@ -1439,6 +1456,7 @@ class YouTubeConnector(BaseConnector):
                     "portrait_percentage": pct_shorts,
                     "recent_top_video": recent_top_video,
                     "all_time_top_video": all_time_top or recent_top_video,
+                    "videos": parsed_videos,
                 }
         except Exception as e:
             logger.warning(f"Error fetching competitor channel summary for {identifier}: {e}")

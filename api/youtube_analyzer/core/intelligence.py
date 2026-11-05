@@ -2401,6 +2401,9 @@ class SearchIntelligence:
         comp_dur = competitor.get("duration", "10:00") if competitor else "10:00"
         max_sec = parse_duration_to_seconds(comp_dur)
 
+        longform_timestamps = AITitleGenerator.generate_synchronized_timestamps(
+            clean, "15:00" if max_sec <= 60 else comp_dur
+        )
         if comp_format == "SHORTS" or "short" in str(comp_format).lower() or max_sec <= 60:
             timestamps = []
         else:
@@ -2469,6 +2472,7 @@ class SearchIntelligence:
             "seo_description": full_description,
             "two_line_hook": two_line_hook,
             "timestamps": timestamps,
+            "longform_timestamps": longform_timestamps,
             "hashtags": hashtags,
             "video_tags": video_tags_str,
             "shorts_package": shorts_package,

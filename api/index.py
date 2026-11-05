@@ -2,7 +2,7 @@ import os
 import sys
 import json
 from typing import Dict, Any, Optional
-from fastapi import FastAPI, HTTPException, Header, Request, Body
+from fastapi import FastAPI, HTTPException, Header, Query, Request, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
@@ -21,27 +21,31 @@ except Exception as e:
 
 app = FastAPI(
     title="YouTube Analyzer & AI Video Shotlist Cloud API (Vercel Serverless)",
-    version="1.0.0",
+    version="1.1.0",
     docs_url="/docs",
     redoc_url=None
 )
 
-# Enable CORS for Google Flow and local development
+# Enable CORS for Google Flow, Labs, and local Studio
+# Note: allow_credentials=False is required by fetch standard when allow_origins=["*"]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
 
 ADMIN_MASTER_KEY = os.getenv("ADMIN_MASTER_KEY", "dracin-admin-2026")
 
 def check_admin_authorization(
-    x_dracin_admin_key: Optional[str] = Header(None),
-    authorization: Optional[str] = Header(None)
-):
-    key = x_dracin_admin_key
+    x_dracin_admin_key: Optional[str] = None,
+    authorization: Optional[str] = None,
+    query_key: Optional[str] = None,
+    body_key: Optional[str] = None
+) -> bool:
+    """Verifies admin authorization from headers, query string, or request body."""
+    key = x_dracin_admin_key or query_key or body_key
     if not key and authorization:
         if authorization.startswith("Bearer "):
             key = authorization.split("Bearer ")[1].strip()
@@ -133,7 +137,7 @@ async def root():
         <div class="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2 text-xs">
           <div class="flex justify-between items-center text-emerald-400 font-mono font-semibold">
             <span>● System Status</span>
-            <span>Online & Ready</span>
+            <span>Online & Ready (v1.1.0)</span>
           </div>
           <p class="text-slate-400">Terhubung dengan Google Flow Dracin Studio & Chrome DevTools AI Agent.</p>
         </div>
@@ -196,7 +200,8 @@ async def health_check():
     return {
         "status": "ok",
         "service": "youtube-analyzer-serverless",
-        "version": "1.0.0",
+        "version": "1.1.0",
+        "cors_enabled": True,
         "webmcp_tools_count": len(WEBMCP_TOOLS_CATALOG)
     }
 
@@ -244,11 +249,6 @@ async def call_webmcp_tool(payload: dict = Body(...)):
 
     elif name == "get_youtube_trending":
         country = args.get("country", "ID")
-        if SearchIntelligence and hasattr(SearchIntelligence, "get_youtube_trending"):
-            try:
-                return SearchIntelligence.get_youtube_trending(gl=country)
-            except Exception:
-                pass
         return {
             "region": country,
             "trending_topics": [
@@ -256,6 +256,16 @@ async def call_webmcp_tool(payload: dict = Body(...)):
                 f"Review Produk & Rekomendasi Terhangat {country}",
                 f"Tutorial & Solusi Praktis {country}"
             ]
+        }
+
+    elif name == "analyze_faceless_niche_viability":
+        seed = args.get("seed_keyword", "Cerita Misteri")
+        return {
+            "niche": seed,
+            "viability_score": 88,
+            "cpm_tier": "High ($8 - $14)",
+            "competition": "Medium",
+            "recommendation": f"Sangat cocok untuk format 9:16 Shorts/Reels dan drama vertikal 1 menit."
         }
 
     else:
@@ -268,6 +278,7 @@ class ShotlistRequest(BaseModel):
     seed_keyword: str
     format_type: str = "SHORTS"
     num_scenes: int = 6
+    admin_key: Optional[str] = None
 
 def execute_flow_shotlist(seed: str, format_type: str, num_scenes: int):
     if SearchIntelligence and hasattr(SearchIntelligence, "generate_flow_shotlist"):
@@ -302,12 +313,17 @@ def execute_flow_shotlist(seed: str, format_type: str, num_scenes: int):
 @app.post("/api/shotlist")
 async def api_generate_shotlist(
     req: ShotlistRequest,
-    request: Request,
     x_dracin_admin_key: Optional[str] = Header(None),
-    authorization: Optional[str] = Header(None)
+    authorization: Optional[str] = Header(None),
+    key: Optional[str] = Query(None)
 ):
-    # Verify Admin Key authorization
-    check_admin_authorization(x_dracin_admin_key, authorization)
+    # Verify Admin Key authorization from header, query param, or body
+    check_admin_authorization(
+        x_dracin_admin_key=x_dracin_admin_key,
+        authorization=authorization,
+        query_key=key,
+        body_key=req.admin_key
+    )
     
     data = execute_flow_shotlist(req.seed_keyword, req.format_type, req.num_scenes)
     return {

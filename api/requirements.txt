@@ -1,0 +1,8 @@
+# Lightweight Serverless Dependencies for Vercel Deployment (<45MB)
+# Excludes heavy packages like pyarrow, pydeck, and streamlit to stay under Vercel 250MB limit
+fastapi>=0.110.0
+uvicorn>=0.29.0
+pydantic>=2.5.0
+httpx>=0.27.0
+python-dotenv>=1.0.0
+sqlmodel>=0.0.22

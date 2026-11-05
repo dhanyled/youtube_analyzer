@@ -1,0 +1,1374 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <title>🚀 YouTube Search & Competitor Intelligence</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+    .tab-btn.active {
+      border-bottom: 2px solid #ef4444;
+      color: #f87171;
+      background: rgba(239, 68, 68, 0.08);
+    }
+    .subtab-btn.active {
+      border-bottom: 2px solid #38bdf8;
+      color: #38bdf8;
+      background: rgba(56, 189, 248, 0.08);
+    }
+    pre, code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+  </style>
+</head>
+<body class="bg-[#0e1117] text-slate-100 min-h-screen flex flex-col md:flex-row font-sans antialiased">
+
+  <!-- ================= SIDEBAR (Streamlit Style) ================= -->
+  <aside class="w-full md:w-80 bg-[#161b26] border-b md:border-b-0 md:border-r border-slate-800/80 p-5 flex-shrink-0 flex flex-col justify-between md:min-h-screen">
+    <div class="space-y-5">
+      <div>
+        <div class="flex items-center space-x-2.5">
+          <span class="text-2xl">🔍</span>
+          <h2 class="text-lg font-bold text-white tracking-tight">Search Intelligence</h2>
+        </div>
+        <p class="text-xs text-slate-400 mt-1">YouTube + Google + AI / AEO Orchestrator</p>
+      </div>
+
+      <hr class="border-slate-800">
+
+      <!-- Riwayat Riset -->
+      <div class="space-y-2.5">
+        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+          <span>📚</span> Riwayat Riset Anda
+        </h3>
+        <select id="historySelector" onchange="onSelectHistory(this.value)" class="w-full bg-[#0e1117] border border-slate-700/80 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-red-500">
+          <option value="">-- Masukkan Topik Baru --</option>
+        </select>
+        <div class="flex justify-between items-center">
+          <span id="historyHint" class="text-[11px] text-slate-400">Tersimpan otomatis di sesi browser.</span>
+          <button onclick="clearHistory()" class="text-[11px] text-slate-400 hover:text-red-400 underline">🗑️ Bersihkan</button>
+        </div>
+      </div>
+
+      <hr class="border-slate-800">
+
+      <!-- Pengaturan AI Generator -->
+      <div class="space-y-3 bg-[#0e1117]/70 p-3.5 rounded-xl border border-slate-800/90">
+        <button onclick="toggleSidebarAI()" class="w-full flex justify-between items-center text-xs font-bold text-slate-200">
+          <span>🤖 Pengaturan AI Generator (Opsional)</span>
+          <span id="aiToggleIcon" class="text-slate-400">▼</span>
+        </button>
+
+        <div id="aiConfigPanel" class="space-y-3 pt-2 hidden">
+          <div>
+            <label class="block text-[11px] text-slate-400 mb-1">Pilih Provider AI:</label>
+            <select id="aiProvider" onchange="onProviderChange()" class="w-full bg-[#161b26] border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200">
+              <option value="gemini">Google Gemini (Rekomendasi / Gratis)</option>
+              <option value="groq">Groq (Super Cepat & Gratis)</option>
+              <option value="openai">OpenAI (GPT-4o / GPT-4o-mini)</option>
+              <option value="openrouter">OpenRouter (Multi-Model)</option>
+              <option value="custom">Custom OpenAI-Compatible</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[11px] text-slate-400 mb-1">API Key (Opsional):</label>
+            <input id="aiApiKey" type="password" oninput="updateAiBadge()" placeholder="Tempel API Key Anda di sini..." class="w-full bg-[#161b26] border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200">
+          </div>
+          <div>
+            <label class="block text-[11px] text-slate-400 mb-1">Model Name (Opsional):</label>
+            <input id="aiModelName" type="text" value="gemini-flash-lite-latest" class="w-full bg-[#161b26] border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200">
+          </div>
+          <div id="customUrlWrapper" class="hidden">
+            <label class="block text-[11px] text-slate-400 mb-1">Base URL Endpoint:</label>
+            <input id="aiCustomUrl" type="text" placeholder="https://api.groq.com/openai/v1" class="w-full bg-[#161b26] border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200">
+          </div>
+        </div>
+
+        <div id="aiModeStatus" class="p-2.5 rounded-lg bg-sky-950/40 border border-sky-800/50 text-[11px] text-sky-300">
+          🧠 <b>Mode: Smart Competitor Heuristic</b><br>
+          <span class="text-slate-400">Tanpa API Key, sistem mengekstrak entitas penting dari video riil kompetitor.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="pt-6 border-t border-slate-800/80 mt-6 space-y-2 text-[11px] text-slate-500">
+      <div class="flex items-center justify-between text-emerald-400 font-mono">
+        <span>● Cloud Engine + WebMCP</span>
+        <span>v2.0 Ready</span>
+      </div>
+      <div class="flex justify-between items-center">
+        <span>By @leddhany</span>
+        <a href="/docs" class="text-red-400 hover:underline font-mono">API Docs →</a>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ================= MAIN CONTENT ================= -->
+  <main class="flex-1 p-5 md:p-8 overflow-y-auto max-w-7xl mx-auto w-full space-y-6">
+
+    <!-- Header -->
+    <div>
+      <h1 class="text-2xl md:text-3xl font-extrabold text-white tracking-tight">🚀 YouTube Search & Competitor Intelligence</h1>
+      <p class="text-xs md:text-sm text-slate-400 mt-1">Pusat riset kata kunci, intip kompetitor ranking #1, pemisahan format Landscape vs Shorts, dan optimasi SEO YouTube.</p>
+    </div>
+
+    <!-- Search Bar -->
+    <div class="flex flex-col sm:flex-row gap-3 items-stretch sm:items-end bg-[#161b26] p-4 rounded-xl border border-slate-800/90 shadow-lg">
+      <div class="flex-1">
+        <label class="block text-xs font-medium text-slate-300 mb-1.5">Masukkan Kata Kunci Seed / Topik Konten:</label>
+        <input id="seedKeywordInput" type="text" value="Google Ads untuk UMKM" onkeydown="if(event.key==='Enter') runFullAnalysis()" placeholder="Contoh: Google Ads UMKM, Saham Pemula, Ide Usaha Modal 1 Juta" class="w-full bg-[#0e1117] border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-red-500">
+      </div>
+      <button id="btnAnalyze" onclick="runFullAnalysis()" class="bg-red-600 hover:bg-red-500 active:bg-red-700 text-white font-semibold px-6 py-2.5 rounded-lg text-sm transition flex items-center justify-center gap-2 shadow-md">
+        <span>🔍</span> <span id="btnAnalyzeText">Analisis Topik</span>
+      </button>
+    </div>
+
+    <!-- Loading Spinner Banner -->
+    <div id="loadingBanner" class="hidden p-4 rounded-xl bg-slate-900/90 border border-slate-700 flex items-center gap-3 text-sm text-amber-300">
+      <svg class="animate-spin h-5 w-5 text-red-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+      </svg>
+      <span id="loadingBannerText">Mengintip video kompetitor ranking teratas di YouTube & menghitung metrik algoritma...</span>
+    </div>
+
+    <!-- Strategic Verdict Card -->
+    <div id="verdictBanner" class="p-5 rounded-xl border bg-emerald-950/30 border-emerald-700/60 space-y-1.5">
+      <h3 id="verdictTitle" class="text-base md:text-lg font-bold text-emerald-300">🟢 Memuat Analisis Strategis...</h3>
+      <p id="verdictBody" class="text-xs md:text-sm text-slate-300 leading-relaxed"></p>
+    </div>
+
+    <!-- 4 Metric Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="bg-[#161b26] border border-slate-800 rounded-xl p-4 space-y-1">
+        <span class="text-xs text-slate-400">Skor Peluang Algoritma (SERP Score)</span>
+        <div id="metricScore" class="text-2xl font-extrabold text-white">- / 100</div>
+        <span id="metricScoreSub" class="inline-block text-[11px] px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800/60">Peringkat: -</span>
+      </div>
+      <div class="bg-[#161b26] border border-slate-800 rounded-xl p-4 space-y-1">
+        <span class="text-xs text-slate-400">Adopsi Video AI di SERP</span>
+        <div id="metricAiCount" class="text-2xl font-extrabold text-white">- / - Video</div>
+        <span id="metricAiSub" class="inline-block text-[11px] px-2 py-0.5 rounded bg-sky-950 text-sky-400 border border-sky-800/60">100% Kreator Manusia</span>
+      </div>
+      <div class="bg-[#161b26] border border-slate-800 rounded-xl p-4 space-y-1">
+        <span class="text-xs text-slate-400">Estimasi Pencarian & Persaingan</span>
+        <div id="metricVolume" class="text-2xl font-extrabold text-white">~0 /bln</div>
+        <span id="metricCompSub" class="inline-block text-[11px] px-2 py-0.5 rounded bg-amber-950 text-amber-400 border border-amber-800/60">Tingkat Persaingan: -/100</span>
+      </div>
+      <div class="bg-[#161b26] border border-slate-800 rounded-xl p-4 space-y-1">
+        <span id="metricRpmTitle" class="text-xs text-slate-400">Estimasi RPM (NICHE)</span>
+        <div id="metricRpmVal" class="text-2xl font-extrabold text-white">$0.00</div>
+        <span id="metricRpmSub" class="inline-block text-[11px] px-2 py-0.5 rounded bg-purple-950 text-purple-400 border border-purple-800/60">Range: -</span>
+      </div>
+    </div>
+
+    <!-- ================= 10 NAVIGATION TABS ================= -->
+    <div class="border-b border-slate-800 flex overflow-x-auto gap-1 text-xs font-semibold text-slate-400">
+      <button onclick="switchTab('tab_spy', this)" class="tab-btn active px-3.5 py-2.5 whitespace-nowrap rounded-t-lg transition">🕵️‍♂️ Intip Kompetitor & AI</button>
+      <button onclick="switchTab('tab_audit', this)" class="tab-btn px-3.5 py-2.5 whitespace-nowrap rounded-t-lg transition">🛠️ Studio Optimasi Video (Audit & Revamp)</button>
+      <button onclick="switchTab('tab_channel', this)" class="tab-btn px-3.5 py-2.5 whitespace-nowrap rounded-t-lg transition">📊 Channel YouTube Studio Saya</button>
+      <button onclick="switchTab('tab_trending', this)" class="tab-btn px-3.5 py-2.5 whitespace-nowrap rounded-t-lg transition">🔥 YouTube Trending Feed</button>
+      <button onclick="switchTab('tab_research', this)" class="tab-btn px-3.5 py-2.5 whitespace-nowrap rounded-t-lg transition">🔬 Riset Kesenjangan Konten (Content Gap)</button>
+      <button onclick="switchTab('tab_flow', this)" class="tab-btn px-3.5 py-2.5 whitespace-nowrap rounded-t-lg transition">🎬 Studio Storyboard Video AI</button>
+      <button onclick="switchTab('tab_landscape', this)" class="tab-btn px-3.5 py-2.5 whitespace-nowrap rounded-t-lg transition">📺 Rencana Video Landscape (16:9)</button>
+      <button onclick="switchTab('tab_shorts', this)" class="tab-btn px-3.5 py-2.5 whitespace-nowrap rounded-t-lg transition">📱 Rencana Video Shorts (9:16)</button>
+      <button onclick="switchTab('tab_keywords', this)" class="tab-btn px-3.5 py-2.5 whitespace-nowrap rounded-t-lg transition">🌐 Cross-Surface Keywords</button>
+      <button onclick="switchTab('tab_trends', this)" class="tab-btn px-3.5 py-2.5 whitespace-nowrap rounded-t-lg transition">📈 Tren Google vs YouTube</button>
+    </div>
+
+    <!-- ================= TAB 1: COMPETITOR SPY & AI ================= -->
+    <section id="tab_spy" class="tab-panel space-y-6">
+      <div>
+        <h2 class="text-lg font-bold text-white">👑 Video yang Sedang Ranking di YouTube Saat Ini</h2>
+        <p class="text-xs text-slate-400">Data live hasil pencarian YouTube dilengkapi deteksi label AI / Altered Content.</p>
+      </div>
+
+      <!-- Top #1 Benchmark Card -->
+      <div id="topCompCard" class="bg-[#161b26] border border-slate-800 rounded-xl p-4 space-y-3">
+        <div id="topCompHeader" class="text-xs font-bold text-amber-400 uppercase tracking-wider">🏆 Benchmark Video Ranking #1</div>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
+          <div><span class="text-slate-400 block">Judul Video:</span><b id="topCompTitle" class="text-white">-</b></div>
+          <div><span class="text-slate-400 block">Channel:</span><b id="topCompChannel" class="text-slate-200">-</b></div>
+          <div><span class="text-slate-400 block">Jumlah Views:</span><b id="topCompViews" class="text-emerald-400">-</b></div>
+          <div><span class="text-slate-400 block">Tipe Pembuat Konten:</span><code id="topCompBadge" class="px-2 py-0.5 bg-slate-800 rounded text-amber-300">-</code></div>
+        </div>
+      </div>
+
+      <!-- AI Presence Alert -->
+      <div id="aiPresenceBox" class="p-4 rounded-xl bg-sky-950/30 border border-sky-800/60 text-xs space-y-1 text-sky-200"></div>
+
+      <!-- Title Gap Analysis -->
+      <div id="compGapBox" class="bg-[#161b26] border border-slate-800 rounded-xl p-4 space-y-3">
+        <h4 class="text-xs font-bold text-slate-200 uppercase">🎯 Bedah Celah Judul Video #1 & Strategi Tandingan Kita</h4>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+          <div class="p-3 rounded-lg bg-amber-950/20 border border-amber-800/40">
+            <b class="text-amber-400 block mb-1">⚠️ Celah Judul Kompetitor:</b>
+            <p id="compWeakness" class="text-slate-300">-</p>
+          </div>
+          <div class="p-3 rounded-lg bg-emerald-950/20 border border-emerald-800/40">
+            <b class="text-emerald-400 block mb-1">💡 Strategi Tandingan Kita:</b>
+            <p id="compCounter" class="text-slate-300">-</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Outranking Title -->
+      <div class="space-y-2">
+        <div class="flex items-center justify-between">
+          <h4 class="text-sm font-bold text-white">🎯 Formula Judul Tandingan untuk Mengalahkan Video #1:</h4>
+          <span id="genModeBadge" class="text-[11px] font-mono px-2.5 py-0.5 rounded bg-slate-800 text-amber-400">🧠 Smart Competitor SERP Analysis</span>
+        </div>
+        <div class="p-4 rounded-xl bg-emerald-950/30 border border-emerald-700/60 flex items-center justify-between gap-3">
+          <div>
+            <div id="outrankingTitleText" class="text-base font-bold text-emerald-300">-</div>
+            <div id="outrankingFormulaText" class="text-xs text-slate-400 mt-1">📐 -</div>
+          </div>
+          <button onclick="copyTextById('outrankingTitleText')" class="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg text-slate-200 flex-shrink-0">📋 Salin</button>
+        </div>
+      </div>
+
+      <!-- 4 Psychological Angles -->
+      <div class="space-y-2">
+        <h5 class="text-xs font-bold text-slate-300 uppercase">🎭 Alternatif Variasi Judul Berdasarkan 4 Sudut Psikologi Penonton:</h5>
+        <div id="psychAnglesGrid" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+      </div>
+
+      <!-- SEO Description & Tags -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div class="space-y-2">
+          <div class="flex justify-between items-center">
+            <h4 class="text-sm font-bold text-white">📝 Deskripsi SEO Siap Pakai (Timestamps & Hashtags):</h4>
+            <button onclick="copyValueById('seoDescTextarea')" class="text-xs bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded text-slate-300">📋 Salin Deskripsi</button>
+          </div>
+          <textarea id="seoDescTextarea" rows="8" class="w-full bg-[#161b26] border border-slate-700 rounded-xl p-3 text-xs text-slate-200 font-mono"></textarea>
+        </div>
+        <div class="space-y-4">
+          <div class="space-y-2">
+            <div class="flex justify-between items-center">
+              <h4 class="text-sm font-bold text-white">🏷️ Video Tags Siap Salin (Kolom Tags Studio):</h4>
+              <button onclick="copyTextById('videoTagsCode')" class="text-xs bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded text-slate-300">📋 Salin Tags</button>
+            </div>
+            <pre id="videoTagsCode" class="bg-[#161b26] border border-slate-700 rounded-xl p-3 text-xs text-amber-300 whitespace-pre-wrap break-words"></pre>
+          </div>
+          <div class="space-y-2">
+            <h4 class="text-xs font-bold text-slate-300 uppercase">🕵️ Tags Paling Sering Dipakai Kompetitor #1-5:</h4>
+            <div id="spyTagsContainer" class="bg-[#161b26] border border-slate-800 rounded-xl p-3 text-xs max-h-40 overflow-y-auto"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Competitors Table -->
+      <div class="space-y-2">
+        <h4 class="text-sm font-bold text-white">📊 Daftar Semua Kompetitor Halaman 1 YouTube (Human vs AI):</h4>
+        <div class="overflow-x-auto bg-[#161b26] border border-slate-800 rounded-xl">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-900/90 text-slate-400 border-b border-slate-800">
+              <tr>
+                <th class="p-3">Rank</th>
+                <th class="p-3">Judul Video</th>
+                <th class="p-3">Channel</th>
+                <th class="p-3">Views</th>
+                <th class="p-3">Durasi</th>
+                <th class="p-3">Format</th>
+                <th class="p-3">AI Badge</th>
+                <th class="p-3">Status</th>
+              </tr>
+            </thead>
+            <tbody id="competitorsTableBody" class="divide-y divide-slate-800/60"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= TAB 2: STUDIO OPTIMASI VIDEO (AUDIT & REVAMP) ================= -->
+    <section id="tab_audit" class="tab-panel hidden space-y-6">
+      <div>
+        <h2 class="text-lg font-bold text-white">🛠️ Studio Optimasi Video (Audit & Revamp SEO)</h2>
+        <p class="text-xs text-slate-400">Audit video yang sudah ada di YouTube (Publik/Unlisted) atau siapkan paket metadata sebelum video di-upload.</p>
+      </div>
+
+      <div class="flex gap-3 border-b border-slate-800 pb-3">
+        <button onclick="switchAuditMode('mode1')" id="btnAuditMode1" class="px-4 py-2 rounded-lg text-xs font-bold bg-red-600 text-white">🔗 Mode 1: Video Sudah Upload / Unlisted</button>
+        <button onclick="switchAuditMode('mode2')" id="btnAuditMode2" class="px-4 py-2 rounded-lg text-xs font-bold bg-[#161b26] text-slate-300 border border-slate-700">📝 Mode 2: Video Belum Upload (Draft Naskah)</button>
+      </div>
+
+      <!-- Mode 1: Existing Video -->
+      <div id="auditMode1Panel" class="space-y-5">
+        <div class="flex flex-col sm:flex-row gap-3 items-stretch sm:items-end bg-[#161b26] p-4 rounded-xl border border-slate-800">
+          <div class="flex-1">
+            <label class="block text-xs text-slate-300 mb-1">Masukkan URL Video YouTube atau Video ID (Publik / Unlisted):</label>
+            <input id="auditVideoUrl" type="text" placeholder="Contoh: https://www.youtube.com/watch?v=dQw4w9WgXcQ" class="w-full bg-[#0e1117] border border-slate-700 rounded-lg px-3.5 py-2 text-xs text-white">
+          </div>
+          <button onclick="runVideoAudit()" id="btnRunAudit" class="bg-red-600 hover:bg-red-500 text-white font-semibold px-5 py-2 rounded-lg text-xs">🔍 Audit & Revamp</button>
+        </div>
+        <div id="auditResultContainer" class="space-y-4 hidden"></div>
+      </div>
+
+      <!-- Mode 2: Pre-Upload Draft -->
+      <div id="auditMode2Panel" class="space-y-5 hidden">
+        <div class="bg-[#161b26] p-4 rounded-xl border border-slate-800 space-y-4">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <label class="block text-xs text-slate-300 mb-1">Topik Utama / Judul Sementara:</label>
+              <input id="preTopicInput" type="text" placeholder="Contoh: Cara Iklan Google Ads Modal 50 Ribu" class="w-full bg-[#0e1117] border border-slate-700 rounded-lg px-3 py-2 text-xs text-white">
+            </div>
+            <div>
+              <label class="block text-xs text-slate-300 mb-1">Format Video:</label>
+              <select id="preFormatSelect" class="w-full bg-[#0e1117] border border-slate-700 rounded-lg px-3 py-2 text-xs text-white">
+                <option value="LANDSCAPE (16:9)">LANDSCAPE (16:9)</option>
+                <option value="SHORTS (9:16)">SHORTS (9:16)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs text-slate-300 mb-1">Estimasi Durasi:</label>
+              <input id="preDurationInput" type="text" value="12:00" class="w-full bg-[#0e1117] border border-slate-700 rounded-lg px-3 py-2 text-xs text-white">
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs text-slate-300 mb-1">Poin-Poin Bahasan / Ringkasan Naskah Isi Video:</label>
+            <textarea id="preNotesTextarea" rows="5" placeholder="1. Masalah boncos saat pasang iklan pertama kali&#10;2. Setting akun Google Ads mode Expert&#10;3. Pemilihan kata kunci niat beli tinggi" class="w-full bg-[#0e1117] border border-slate-700 rounded-lg p-3 text-xs text-white"></textarea>
+          </div>
+          <button onclick="runPreUploadPlan()" id="btnRunPreUpload" class="bg-red-600 hover:bg-red-500 text-white font-semibold px-5 py-2 rounded-lg text-xs">🚀 Racik Paket Peluncuran SEO</button>
+        </div>
+        <div id="preUploadResultContainer" class="space-y-4 hidden"></div>
+      </div>
+    </section>
+
+    <!-- ================= TAB 3: CHANNEL YOUTUBE STUDIO SAYA ================= -->
+    <section id="tab_channel" class="tab-panel hidden space-y-6">
+      <div>
+        <h2 class="text-lg font-bold text-white">📊 Channel YouTube Studio Saya (Inspeksi & Batch Audit)</h2>
+        <p class="text-xs text-slate-400">Analisis performa video channel Anda atau uji validasi Schema.org VideoObject untuk Google Rich Results.</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div class="bg-[#161b26] border border-slate-800 rounded-xl p-5 space-y-3">
+          <h3 class="text-sm font-bold text-white">⚡ Audit Cepat Video Channel via URL / ID</h3>
+          <p class="text-xs text-slate-400">Masukkan URL video dari channel Anda untuk langsung membedah skor judul, deskripsi, transkrip, dan rekomendasi judul pengganti.</p>
+          <div class="flex gap-2">
+            <input id="quickChannelVideoUrl" type="text" placeholder="https://www.youtube.com/watch?v=..." class="flex-1 bg-[#0e1117] border border-slate-700 rounded-lg px-3 py-2 text-xs text-white">
+            <button onclick="quickAuditFromChannelTab()" class="bg-red-600 hover:bg-red-500 text-white text-xs font-bold px-4 py-2 rounded-lg">⚡ Audit Sekarang</button>
+          </div>
+        </div>
+
+        <div class="bg-[#161b26] border border-slate-800 rounded-xl p-5 space-y-3">
+          <h3 class="text-sm font-bold text-white">🌐 Inspeksi Video Schema & Web Embedding (GSC)</h3>
+          <p class="text-xs text-slate-400">Pastikan halaman website/blog tempat Anda meng-embed video memiliki markup JSON-LD Key Moments agar muncul di Google Video Tab.</p>
+          <div class="flex gap-2">
+            <input id="gscEmbedUrl" type="text" placeholder="https://domain-anda.com/artikel-video" class="flex-1 bg-[#0e1117] border border-slate-700 rounded-lg px-3 py-2 text-xs text-white">
+            <button onclick="showGscGuide()" class="bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold px-4 py-2 rounded-lg">🔍 Cek Panduan</button>
+          </div>
+          <div id="gscGuideOutput" class="hidden p-3 rounded-lg bg-sky-950/40 border border-sky-800 text-xs text-sky-200"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= TAB 4: YOUTUBE TRENDING FEED ================= -->
+    <section id="tab_trending" class="tab-panel hidden space-y-6">
+      <div>
+        <h2 class="text-lg font-bold text-white">🔥 YouTube Trending Feed Explorer</h2>
+        <p class="text-xs text-slate-400">Pantau langsung video yang sedang trending di YouTube berdasarkan perangkat, negara, bahasa, dan kategori.</p>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 bg-[#161b26] p-4 rounded-xl border border-slate-800 items-end">
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">💻 Perangkat:</label>
+          <select id="trendDevice" class="w-full bg-[#0e1117] border border-slate-700 rounded-lg px-3 py-2 text-xs text-white">
+            <option value="desktop">Desktop (16:9 Web)</option>
+            <option value="mobile">Mobile (m.youtube.com)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">📍 Lokasi Negara:</label>
+          <select id="trendGl" class="w-full bg-[#0e1117] border border-slate-700 rounded-lg px-3 py-2 text-xs text-white">
+            <option value="ID">🇮🇩 Indonesia (ID)</option>
+            <option value="US">🇺🇸 Amerika Serikat (US)</option>
+            <option value="GB">🇬🇧 Inggris (GB)</option>
+            <option value="JP">🇯🇵 Jepang (JP)</option>
+            <option value="MY">🇲🇾 Malaysia (MY)</option>
+            <option value="SG">🇸🇬 Singapura (SG)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">🌐 Bahasa:</label>
+          <select id="trendHl" class="w-full bg-[#0e1117] border border-slate-700 rounded-lg px-3 py-2 text-xs text-white">
+            <option value="id">Bahasa Indonesia (id)</option>
+            <option value="en">English (en)</option>
+            <option value="ja">日本語 (ja)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">🎯 Kategori:</label>
+          <select id="trendCat" class="w-full bg-[#0e1117] border border-slate-700 rounded-lg px-3 py-2 text-xs text-white">
+            <option value="now">🔥 Trending Sekarang (Now)</option>
+            <option value="music">🎵 Musik (Music)</option>
+            <option value="gaming">🎮 Video Game (Gaming)</option>
+            <option value="movies">🎬 Film & Trailer (Movies)</option>
+            <option value="shorts">📱 Shorts Trending</option>
+          </select>
+        </div>
+        <button onclick="loadTrendingFeed()" id="btnLoadTrending" class="bg-red-600 hover:bg-red-500 text-white font-semibold px-4 py-2 rounded-lg text-xs">🔄 Muat Trending</button>
+      </div>
+
+      <div id="trendingStatsRow" class="grid grid-cols-1 sm:grid-cols-4 gap-4"></div>
+
+      <div class="overflow-x-auto bg-[#161b26] border border-slate-800 rounded-xl">
+        <table class="w-full text-left text-xs">
+          <thead class="bg-slate-900/90 text-slate-400 border-b border-slate-800">
+            <tr>
+              <th class="p-3">Rank</th>
+              <th class="p-3">Judul Video</th>
+              <th class="p-3">Channel</th>
+              <th class="p-3">Views</th>
+              <th class="p-3">Durasi</th>
+              <th class="p-3">Format</th>
+              <th class="p-3">Tipe Kreator</th>
+              <th class="p-3">Status Outlier</th>
+            </tr>
+          </thead>
+          <tbody id="trendingTableBody" class="divide-y divide-slate-800/60"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ================= TAB 5: RISET KESENJANGAN KONTEN (CONTENT GAP) ================= -->
+    <section id="tab_research" class="tab-panel hidden space-y-6">
+      <div>
+        <h2 class="text-lg font-bold text-white">🔬 YouTube Studio Research & Content Gap Explorer</h2>
+        <p class="text-xs text-slate-400">Replikasi fitur Riset YouTube Studio: Content Gap, Outlier Multiplier, Faceless Niche Viability, & AI Shorts Clipping.</p>
+      </div>
+
+      <!-- Content Gaps -->
+      <div class="space-y-3">
+        <div id="contentGapSummary" class="p-3.5 rounded-xl bg-emerald-950/30 border border-emerald-800/60 text-xs text-emerald-300 font-semibold"></div>
+        <div class="overflow-x-auto bg-[#161b26] border border-slate-800 rounded-xl">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-900/90 text-slate-400 border-b border-slate-800">
+              <tr>
+                <th class="p-3">Kueri Penelusuran</th>
+                <th class="p-3">Volume</th>
+                <th class="p-3">Status Gap</th>
+                <th class="p-3">Tipe Kesenjangan</th>
+                <th class="p-3">Alasan</th>
+                <th class="p-3">Aksi Rekomendasi</th>
+              </tr>
+            </thead>
+            <tbody id="contentGapTableBody" class="divide-y divide-slate-800/60"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Outlier & Faceless Niche -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div class="bg-[#161b26] border border-slate-800 rounded-xl p-4 space-y-3">
+          <h4 class="text-sm font-bold text-white">💥 Outlier Multiplier & Golden Benchmark</h4>
+          <div id="outlierMetricsBox" class="grid grid-cols-3 gap-2 text-xs"></div>
+          <div id="goldenVideoBox" class="p-3 rounded-lg bg-amber-950/30 border border-amber-800/50 text-xs text-amber-200"></div>
+        </div>
+        <div class="bg-[#161b26] border border-slate-800 rounded-xl p-4 space-y-3">
+          <h4 class="text-sm font-bold text-white">🤖 Faceless Niche Finder (Channel Tanpa Wajah)</h4>
+          <div id="facelessBox" class="space-y-2 text-xs"></div>
+        </div>
+      </div>
+
+      <!-- AI Shorts Clipping -->
+      <div class="space-y-3">
+        <h4 class="text-sm font-bold text-white">✂️ AI Shorts Clipping & Highlights Generator (3 Ide Klip 45 Detik)</h4>
+        <div id="clippingIdeasGrid" class="grid grid-cols-1 md:grid-cols-3 gap-4"></div>
+      </div>
+    </section>
+
+    <!-- ================= TAB 6: STUDIO STORYBOARD VIDEO AI ================= -->
+    <section id="tab_flow" class="tab-panel hidden space-y-6">
+      <div>
+        <h2 class="text-lg font-bold text-white">🎬 Studio Storyboard & Shotlist Video AI</h2>
+        <p class="text-xs text-slate-400">Storyboard scene-by-scene siap ekspor ke generator video AI (Google Flow Veo, Kling AI, Runway, Luma, Sora, CapCut).</p>
+      </div>
+
+      <div class="flex flex-wrap gap-4 items-end bg-[#161b26] p-4 rounded-xl border border-slate-800">
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Pilih Format Target Video AI:</label>
+          <select id="flowFormatSelect" onchange="regenerateShotlist()" class="bg-[#0e1117] border border-slate-700 rounded-lg px-3 py-2 text-xs text-white">
+            <option value="LANDSCAPE">LANDSCAPE (16:9)</option>
+            <option value="SHORTS">SHORTS (9:16)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Jumlah Scene (3 - 6):</label>
+          <select id="flowScenesSelect" onchange="regenerateShotlist()" class="bg-[#0e1117] border border-slate-700 rounded-lg px-3 py-2 text-xs text-white">
+            <option value="3">3 Scenes</option>
+            <option value="4">4 Scenes</option>
+            <option value="5" selected>5 Scenes</option>
+            <option value="6">6 Scenes</option>
+          </select>
+        </div>
+        <button onclick="regenerateShotlist()" class="bg-red-600 hover:bg-red-500 text-white font-semibold px-4 py-2 rounded-lg text-xs">🔄 Buat Ulang Storyboard</button>
+      </div>
+
+      <div id="flowScenesContainer" class="space-y-3"></div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div class="bg-[#161b26] border border-slate-800 rounded-xl p-4 space-y-2">
+          <div class="flex justify-between items-center">
+            <h5 class="text-xs font-bold text-white">1️⃣ Format Batch `prompts.txt` (1 Baris per Scene):</h5>
+            <button onclick="downloadPromptsTxt()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-1 rounded-lg font-semibold">💾 Download prompts.txt</button>
+          </div>
+          <textarea id="flowPromptsTxtBox" rows="6" class="w-full bg-[#0e1117] border border-slate-700 rounded-lg p-3 text-xs text-slate-200 font-mono"></textarea>
+        </div>
+        <div class="bg-[#161b26] border border-slate-800 rounded-xl p-4 space-y-2">
+          <div class="flex justify-between items-center">
+            <h5 class="text-xs font-bold text-white">2️⃣ Manifest JSON (CapCut / Premiere / Remotion):</h5>
+            <button onclick="copyValueById('flowManifestJsonBox')" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-3 py-1 rounded-lg">📋 Salin JSON</button>
+          </div>
+          <textarea id="flowManifestJsonBox" rows="6" class="w-full bg-[#0e1117] border border-slate-700 rounded-lg p-3 text-xs text-amber-300 font-mono"></textarea>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= TAB 7: RENCANA VIDEO LANDSCAPE (16:9) ================= -->
+    <section id="tab_landscape" class="tab-panel hidden space-y-6">
+      <div>
+        <h2 class="text-lg font-bold text-white">📺 Blueprint Video Landscape (16:9 Panjang)</h2>
+        <p id="landscapeIntroText" class="text-xs text-slate-400"></p>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div class="bg-[#161b26] border border-slate-800 rounded-xl p-5 space-y-4">
+          <div>
+            <h5 class="text-xs font-bold text-slate-300 uppercase mb-1.5">📌 Rekomendasi Struktur Judul</h5>
+            <pre id="landscapeTitleCode" class="bg-[#0e1117] border border-slate-700 rounded-lg p-3 text-xs text-emerald-300 whitespace-pre-wrap"></pre>
+          </div>
+          <div>
+            <h5 class="text-xs font-bold text-slate-300 uppercase mb-1.5">⏱️ Kerangka Timestamps / Daftar Isi Otomatis</h5>
+            <ul id="landscapeTimestampsList" class="space-y-1.5 text-xs font-mono text-sky-300"></ul>
+          </div>
+        </div>
+        <div class="bg-[#161b26] border border-slate-800 rounded-xl p-5 space-y-3 text-xs text-slate-300">
+          <h5 class="text-xs font-bold text-white uppercase">💡 Checklist Sukses Video Landscape:</h5>
+          <ul class="space-y-2.5 leading-relaxed">
+            <li>✅ <b>Durasi Ideal:</b> 12 – 22 Menit (memungkinkan iklan mid-roll otomatis).</li>
+            <li>✅ <b>Hook 30 Detik Awal:</b> Jangan buang waktu salam berbelit! Langsung perlihatkan cuplikan utama / poin paling krusial topik.</li>
+            <li>✅ <b>Thumbnail:</b> Maksimal 3–4 kata besar + ekspresi wajah atau grafik kontras.</li>
+            <li>✅ <b>Bab/Chapters:</b> Wajib pasang timestamps di deskripsi untuk SEO Google Search Key Moments.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= TAB 8: RENCANA VIDEO SHORTS (9:16) ================= -->
+    <section id="tab_shorts" class="tab-panel hidden space-y-6">
+      <div>
+        <h2 class="text-lg font-bold text-white">📱 Blueprint Video Shorts (9:16 Vertikal)</h2>
+        <p class="text-xs text-slate-400">Format khusus penonton mobile yang swipe cepat untuk menjaring subscriber baru.</p>
+      </div>
+      <div class="bg-[#161b26] border border-slate-800 rounded-xl p-5 space-y-4">
+        <div>
+          <h5 class="text-xs font-bold text-slate-300 uppercase mb-1">⚡ Formula Judul Shorts (&lt; 40 Karakter):</h5>
+          <pre id="shortsTitleCode" class="bg-[#0e1117] border border-slate-700 rounded-lg p-3 text-xs text-amber-300 whitespace-pre-wrap"></pre>
+        </div>
+        <div class="p-4 rounded-xl bg-amber-950/30 border border-amber-700/60">
+          <span class="text-xs font-bold text-amber-400 block mb-1">🛑 Kalimat Pembuka 3 Detik Pertama (Wajib Diucapkan Tanpa Jeda):</span>
+          <div id="shortsHookText" class="text-sm font-bold text-white">-</div>
+        </div>
+        <div>
+          <h5 class="text-xs font-bold text-slate-300 uppercase mb-2">⏱️ Alur Skrip 45 Detik:</h5>
+          <ul id="shortsScriptList" class="space-y-1.5 text-xs text-slate-200 list-disc pl-5"></ul>
+        </div>
+        <div class="p-3.5 rounded-lg bg-sky-950/30 border border-sky-800/50 text-xs text-sky-200">
+          🔗 <b>Trik Funnel (Pancingan ke Video Panjang):</b> Di YouTube Shorts, sematkan fitur <b>Related Video</b> yang menunjuk ke video utama 16:9 Anda!
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= TAB 9: CROSS-SURFACE KEYWORDS ================= -->
+    <section id="tab_keywords" class="tab-panel hidden space-y-6">
+      <div>
+        <h2 class="text-lg font-bold text-white">🌐 Pemisahan Kata Kunci Berdasarkan Search Behavior</h2>
+        <p class="text-xs text-slate-400">Matriks ekspansi kata kunci lintas Google Search (GKP), YouTube Search, dan AI / AEO Prompts.</p>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="bg-[#161b26] border border-slate-800 rounded-xl p-4 space-y-2">
+          <h5 class="text-xs font-bold text-sky-400">🔵 Google Search (GKP)</h5>
+          <div id="kwGoogleList" class="space-y-1.5 text-xs"></div>
+        </div>
+        <div class="bg-[#161b26] border border-slate-800 rounded-xl p-4 space-y-2">
+          <h5 class="text-xs font-bold text-red-400">🔴 YouTube Search</h5>
+          <div id="kwYoutubeList" class="space-y-1.5 text-xs"></div>
+        </div>
+        <div class="bg-[#161b26] border border-slate-800 rounded-xl p-4 space-y-2">
+          <h5 class="text-xs font-bold text-purple-400">🟣 AI & AEO Queries</h5>
+          <div id="kwAiList" class="space-y-1.5 text-xs"></div>
+        </div>
+      </div>
+      <div class="space-y-2">
+        <h5 class="text-xs font-bold text-slate-300 uppercase">🎯 Matriks Klaster Intent Tersinkronisasi:</h5>
+        <div class="overflow-x-auto bg-[#161b26] border border-slate-800 rounded-xl">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-900/90 text-slate-400 border-b border-slate-800">
+              <tr>
+                <th class="p-3">Klaster</th>
+                <th class="p-3">Tipe Intent</th>
+                <th class="p-3">Istilah Google</th>
+                <th class="p-3">Istilah YouTube</th>
+                <th class="p-3">Pertanyaan AI</th>
+              </tr>
+            </thead>
+            <tbody id="intentClustersTableBody" class="divide-y divide-slate-800/60"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= TAB 10: TREN GOOGLE VS YOUTUBE ================= -->
+    <section id="tab_trends" class="tab-panel hidden space-y-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h2 class="text-lg font-bold text-white">📈 Tren Google Web vs YouTube Search (`gprop=youtube`)</h2>
+          <p class="text-xs text-slate-400">Perbandingan minat penelusuran, distribusi wilayah, Top Queries, Rising Queries, dan Google Daily Trends RSS.</p>
+        </div>
+        <div class="flex gap-2 items-center">
+          <select id="trendsGeoSelect" onchange="loadTrendsComparison()" class="bg-[#161b26] border border-slate-700 rounded-lg px-3 py-2 text-xs text-white">
+            <option value="ID">🇮🇩 Indonesia (geo=ID)</option>
+            <option value="US">🇺🇸 Amerika Serikat (geo=US)</option>
+            <option value="GB">🇬🇧 Inggris (geo=GB)</option>
+            <option value="">🌍 Seluruh Dunia (Worldwide)</option>
+          </select>
+          <button onclick="loadTrendsComparison()" class="bg-red-600 hover:bg-red-500 text-white text-xs font-bold px-3.5 py-2 rounded-lg">🔄 Refresh Tren</button>
+        </div>
+      </div>
+
+      <div id="trendsExternalLink" class="text-xs"></div>
+
+      <!-- Chart Interest Over Time -->
+      <div class="bg-[#161b26] border border-slate-800 rounded-xl p-4 space-y-3">
+        <h4 class="text-sm font-bold text-white">📊 Grafik Minat Penelusuran Sepanjang Waktu (Interest Over Time)</h4>
+        <div id="trendsChartContainer" class="h-64 w-full flex items-center justify-center text-xs text-slate-400">
+          <canvas id="trendsLineChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Top & Rising Queries -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div class="bg-[#161b26] border border-slate-800 rounded-xl p-4 space-y-2">
+          <h5 class="text-xs font-bold text-emerald-400 uppercase">📺 Top & Rising Queries YouTube (`gprop=youtube`)</h5>
+          <div id="ytQueriesBox" class="text-xs space-y-2 max-h-72 overflow-y-auto"></div>
+        </div>
+        <div class="bg-[#161b26] border border-slate-800 rounded-xl p-4 space-y-2">
+          <h5 class="text-xs font-bold text-sky-400 uppercase">🌐 Top & Rising Queries Google Web</h5>
+          <div id="gwQueriesBox" class="text-xs space-y-2 max-h-72 overflow-y-auto"></div>
+        </div>
+      </div>
+
+      <!-- Daily RSS Trends -->
+      <div class="bg-[#161b26] border border-slate-800 rounded-xl p-4 space-y-3">
+        <h4 class="text-sm font-bold text-white">⚡ Topik Populer Harian di Google Trends RSS (Real-Time)</h4>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-900/90 text-slate-400 border-b border-slate-800">
+              <tr>
+                <th class="p-2.5">No</th>
+                <th class="p-2.5">Topik Tren Harian</th>
+                <th class="p-2.5">Estimasi Penelusuran</th>
+                <th class="p-2.5">Aksi Cepat</th>
+              </tr>
+            </thead>
+            <tbody id="dailyRssTableBody" class="divide-y divide-slate-800/60"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Toast Notification -->
+  <div id="toastNotice" class="fixed bottom-5 right-5 hidden bg-emerald-600 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-2xl z-50">
+    ✅ Berhasil disalin ke clipboard!
+  </div>
+
+  <!-- ================= OFFICIAL CHROME WEBMCP BRIDGE + DASHBOARD LOGIC ================= -->
+  <script>
+    // 1. Official WebMCP Bridge for Google Flow & Chrome DevTools AI Agent
+    (function() {
+      const WebMCP = {
+        async listTools() {
+          const res = await fetch('/api/webmcp/tools');
+          const data = await res.json();
+          return data.tools || [];
+        },
+        async callTool(name, args = {}) {
+          const res = await fetch('/api/webmcp/call', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, arguments: args })
+          });
+          return await res.json();
+        }
+      };
+      window.WebMCP = WebMCP;
+      if (typeof navigator !== 'undefined' && !navigator.modelContext) {
+        navigator.modelContext = WebMCP;
+      }
+      console.log('[WebMCP] YouTube Analyzer Agent-Native Bridge Initialized.');
+    })();
+
+    // 2. Dashboard State & Utilities
+    let currentAnalysisData = null;
+    let trendsChartInstance = null;
+
+    function showToast(msg) {
+      const t = document.getElementById('toastNotice');
+      t.textContent = msg || '✅ Berhasil disalin!';
+      t.classList.remove('hidden');
+      setTimeout(() => t.classList.add('hidden'), 2200);
+    }
+
+    function copyTextById(id) {
+      const txt = document.getElementById(id)?.innerText || '';
+      navigator.clipboard.writeText(txt);
+      showToast('📋 Disalin ke clipboard!');
+    }
+
+    function copyValueById(id) {
+      const txt = document.getElementById(id)?.value || '';
+      navigator.clipboard.writeText(txt);
+      showToast('📋 Disalin ke clipboard!');
+    }
+
+    function toggleSidebarAI() {
+      const p = document.getElementById('aiConfigPanel');
+      p.classList.toggle('hidden');
+    }
+
+    function onProviderChange() {
+      const p = document.getElementById('aiProvider').value;
+      const defaults = {
+        gemini: 'gemini-flash-lite-latest',
+        groq: 'llama-3.3-70b-versatile',
+        openai: 'gpt-4o-mini',
+        openrouter: 'google/gemini-2.0-flash-001',
+        custom: ''
+      };
+      document.getElementById('aiModelName').value = defaults[p] || '';
+      document.getElementById('customUrlWrapper').classList.toggle('hidden', p !== 'custom');
+      updateAiBadge();
+    }
+
+    function updateAiBadge() {
+      const key = document.getElementById('aiApiKey').value.trim();
+      const prov = document.getElementById('aiProvider').value.toUpperCase();
+      const box = document.getElementById('aiModeStatus');
+      if (key) {
+        box.className = 'p-2.5 rounded-lg bg-emerald-950/40 border border-emerald-800/50 text-[11px] text-emerald-300';
+        box.innerHTML = `🟢 <b>Mode: AI Enhanced (${prov})</b><br><span class="text-slate-400">Judul diracik langsung oleh AI membaca 5 video kompetitor.</span>`;
+      } else {
+        box.className = 'p-2.5 rounded-lg bg-sky-950/40 border border-sky-800/50 text-[11px] text-sky-300';
+        box.innerHTML = `🧠 <b>Mode: Smart Competitor Heuristic</b><br><span class="text-slate-400">Tanpa API Key, sistem mengekstrak entitas penting dari video riil kompetitor.</span>`;
+      }
+    }
+
+    function getAiConfig() {
+      const key = document.getElementById('aiApiKey').value.trim();
+      if (!key) return null;
+      return {
+        provider: document.getElementById('aiProvider').value,
+        api_key: key,
+        model_name: document.getElementById('aiModelName').value.trim() || null,
+        custom_base_url: document.getElementById('aiCustomUrl').value.trim() || null
+      };
+    }
+
+    // History Management
+    function loadHistory() {
+      try {
+        const list = JSON.parse(localStorage.getItem('yt_search_history') || '[]');
+        const sel = document.getElementById('historySelector');
+        sel.innerHTML = '<option value="">-- Masukkan Topik Baru --</option>';
+        list.forEach(kw => {
+          const opt = document.createElement('option');
+          opt.value = kw;
+          opt.textContent = kw;
+          sel.appendChild(opt);
+        });
+      } catch (e) {}
+    }
+
+    function saveToHistory(kw) {
+      try {
+        let list = JSON.parse(localStorage.getItem('yt_search_history') || '[]');
+        list = [kw, ...list.filter(item => item.toLowerCase() !== kw.toLowerCase())].slice(0, 15);
+        localStorage.setItem('yt_search_history', JSON.stringify(list));
+        loadHistory();
+      } catch (e) {}
+    }
+
+    function clearHistory() {
+      localStorage.removeItem('yt_search_history');
+      loadHistory();
+      showToast('🗑️ Riwayat dibersihkan');
+    }
+
+    function onSelectHistory(val) {
+      if (val) {
+        document.getElementById('seedKeywordInput').value = val;
+        runFullAnalysis();
+      }
+    }
+
+    function switchTab(tabId, btnEl) {
+      document.querySelectorAll('.tab-panel').forEach(el => el.classList.add('hidden'));
+      document.getElementById(tabId)?.classList.remove('hidden');
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      if (btnEl) btnEl.classList.add('active');
+
+      if (tabId === 'tab_trending' && !document.getElementById('trendingTableBody').children.length) {
+        loadTrendingFeed();
+      }
+      if (tabId === 'tab_trends' && !document.getElementById('dailyRssTableBody').children.length) {
+        loadTrendsComparison();
+      }
+    }
+
+    function switchAuditMode(mode) {
+      const m1 = document.getElementById('auditMode1Panel');
+      const m2 = document.getElementById('auditMode2Panel');
+      const b1 = document.getElementById('btnAuditMode1');
+      const b2 = document.getElementById('btnAuditMode2');
+      if (mode === 'mode1') {
+        m1.classList.remove('hidden');
+        m2.classList.add('hidden');
+        b1.className = 'px-4 py-2 rounded-lg text-xs font-bold bg-red-600 text-white';
+        b2.className = 'px-4 py-2 rounded-lg text-xs font-bold bg-[#161b26] text-slate-300 border border-slate-700';
+      } else {
+        m1.classList.add('hidden');
+        m2.classList.remove('hidden');
+        b2.className = 'px-4 py-2 rounded-lg text-xs font-bold bg-red-600 text-white';
+        b1.className = 'px-4 py-2 rounded-lg text-xs font-bold bg-[#161b26] text-slate-300 border border-slate-700';
+      }
+    }
+
+    function escapeHtml(str) {
+      return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    // 3. Main Analysis Call
+    async function runFullAnalysis() {
+      const kw = document.getElementById('seedKeywordInput').value.trim();
+      if (!kw) return;
+      saveToHistory(kw);
+      document.getElementById('preTopicInput').value = kw;
+
+      const banner = document.getElementById('loadingBanner');
+      const btn = document.getElementById('btnAnalyze');
+      banner.classList.remove('hidden');
+      btn.disabled = true;
+
+      try {
+        const res = await fetch('/api/dashboard/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            keyword: kw,
+            ai_config: getAiConfig()
+          })
+        });
+        const data = await res.json();
+        currentAnalysisData = data;
+        renderDashboard(data);
+      } catch (err) {
+        console.error('Analysis error:', err);
+      } finally {
+        banner.classList.add('hidden');
+        btn.disabled = false;
+      }
+    }
+
+    function renderDashboard(d) {
+      if (!d) return;
+      const kw = d.keyword || '';
+      const km = d.kw_metrics || {};
+      const rpm = d.rpm_data || {};
+      const ai = d.ai_presence || {};
+      const plan = d.outranking_plan || {};
+      const comps = d.competitors || [];
+      const topComp = comps[0] || null;
+
+      // Verdict Card
+      const vBanner = document.getElementById('verdictBanner');
+      const vTitle = document.getElementById('verdictTitle');
+      const vBody = document.getElementById('verdictBody');
+      const score = km.opportunity_score || 0;
+      const compFormat = topComp ? (topComp.format || 'LANDSCAPE') : 'LANDSCAPE';
+
+      if (!comps.length || km.rating === 'INSUFFICIENT_DATA') {
+        vBanner.className = 'p-5 rounded-xl border bg-amber-950/30 border-amber-700/60 space-y-1.5';
+        vTitle.className = 'text-base md:text-lg font-bold text-amber-300';
+        vTitle.textContent = `⚠️ DATA KOMPETITOR LIVE TIDAK DITEMUKAN UNTUK "${kw}"`;
+        vBody.innerHTML = `Sistem hanya menampilkan data riil. Gunakan kata kunci yang lebih umum atau periksa koneksi.`;
+      } else if (score >= 65) {
+        vBanner.className = 'p-5 rounded-xl border bg-emerald-950/30 border-emerald-700/60 space-y-1.5';
+        vTitle.className = 'text-base md:text-lg font-bold text-emerald-300';
+        vTitle.textContent = `🟢 KEPUTUSAN STRATEGIS: SANGAT LAYAK DIBUAT (Skor Peluang: ${score}/100)`;
+        vBody.innerHTML = `<b>Format Direkomendasikan:</b> 🎬 ${compFormat} &nbsp;|&nbsp; <b>Volume Pencarian:</b> ~${(km.search_volume||0).toLocaleString()}/bulan &nbsp;|&nbsp; <b>Persaingan:</b> ${km.competition_score}/100<br><b>Analisis Niche (${(rpm.detected_niche||'general').toUpperCase()}):</b> Estimasi monetisasi <b>${rpm.rpm_range_usd || '$2-$5'} per 1.000 views</b> (Potensi ${rpm.potential_earnings_per_100k_views || '-'} per 100k views).`;
+      } else if (score >= 45) {
+        vBanner.className = 'p-5 rounded-xl border bg-amber-950/30 border-amber-700/60 space-y-1.5';
+        vTitle.className = 'text-base md:text-lg font-bold text-amber-300';
+        vTitle.textContent = `🟡 KEPUTUSAN STRATEGIS: POTENSIAL DENGAN DIFERENSIASI (Skor Peluang: ${score}/100)`;
+        vBody.innerHTML = `<b>Format Direkomendasikan:</b> 🎬 ${compFormat} &nbsp;|&nbsp; <b>Volume Pencarian:</b> ~${(km.search_volume||0).toLocaleString()}/bulan &nbsp;|&nbsp; <b>Persaingan:</b> ${km.competition_score}/100<br>Persaingan cukup ketat di niche <b>${(rpm.detected_niche||'general').toUpperCase()}</b>. Wajib gunakan hook judul NLP di bawah.`;
+      } else {
+        vBanner.className = 'p-5 rounded-xl border bg-red-950/30 border-red-700/60 space-y-1.5';
+        vTitle.className = 'text-base md:text-lg font-bold text-red-300';
+        vTitle.textContent = `🔴 KEPUTUSAN STRATEGIS: PERSAINGAN TINGGI / VOLUME RENDAH (Skor Peluang: ${score}/100)`;
+        vBody.innerHTML = `Disarankan membidik keyword turunan (long-tail) di Tab Riset Content Gap.`;
+      }
+
+      // 4 Metric Cards
+      document.getElementById('metricScore').textContent = `${score} / 100`;
+      document.getElementById('metricScoreSub').textContent = `Peringkat: ${km.rating || '-'}`;
+      document.getElementById('metricAiCount').textContent = `${ai.ai_count || 0} / ${ai.total_competitors || comps.length} Video`;
+      document.getElementById('metricAiSub').textContent = (ai.ai_count > 0) ? `${ai.ai_percentage}% AI Ratio` : '100% Kreator Manusia';
+      document.getElementById('metricVolume').textContent = `~${(km.search_volume || 0).toLocaleString()} /bln`;
+      document.getElementById('metricCompSub').textContent = `Tingkat Persaingan: ${km.competition_score || 0}/100`;
+      document.getElementById('metricRpmTitle').textContent = `Estimasi RPM (${(rpm.detected_niche || 'GENERAL').toUpperCase()})`;
+      document.getElementById('metricRpmVal').textContent = `$${Number(rpm.avg_rpm_usd || 0).toFixed(2)}`;
+      document.getElementById('metricRpmSub').textContent = `Range: ${rpm.rpm_range_usd || '-'}`;
+
+      // Tab 1: Top Competitor & Outranking
+      if (topComp) {
+        document.getElementById('topCompHeader').textContent = `🏆 Benchmark Video Ranking #1 (${topComp.format || 'LANDSCAPE'})`;
+        document.getElementById('topCompTitle').textContent = topComp.title || '-';
+        document.getElementById('topCompChannel').textContent = topComp.channel || '-';
+        document.getElementById('topCompViews').textContent = `🔥 ${topComp.views || '0'} (${topComp.upload_age || ''})`;
+        document.getElementById('topCompBadge').textContent = topComp.ai_badge || '👤 Human Creator';
+      }
+      document.getElementById('aiPresenceBox').innerHTML = `🤖 <b>Status Persaingan Konten AI:</b> ${escapeHtml(ai.verdict || '-')}<br>💡 <b>Analisis Kelayakan:</b> ${escapeHtml(ai.ranking_feasibility || '-')}`;
+
+      const compAna = plan.competitor_analysis || {};
+      document.getElementById('compWeakness').textContent = compAna.weakness || 'Judul kompetitor masih bersifat deskriptif standar.';
+      document.getElementById('compCounter').textContent = compAna.counter_strategy || 'Gunakan angka spesifik, kontras tajam, dan jaminan hasil.';
+
+      document.getElementById('outrankingTitleText').textContent = plan.outranking_title || '-';
+      document.getElementById('outrankingFormulaText').textContent = `📐 ${plan.title_formula || ''}`;
+      document.getElementById('genModeBadge').textContent = plan.generation_mode === 'ai_enhanced'
+        ? `⚡ AI Enhanced (${(plan.ai_provider || 'AI').toUpperCase()})`
+        : '🧠 Smart Competitor SERP Analysis';
+
+      // Psychological Angles
+      const pGrid = document.getElementById('psychAnglesGrid');
+      pGrid.innerHTML = '';
+      const angles = plan.psychological_angles || {};
+      Object.keys(angles).forEach(k => {
+        const item = angles[k];
+        const card = document.createElement('div');
+        card.className = 'bg-[#161b26] border border-slate-800 rounded-xl p-3.5 space-y-1.5';
+        card.innerHTML = `
+          <div class="text-xs font-bold text-amber-400">${escapeHtml(item.label || k)}</div>
+          <pre class="bg-[#0e1117] border border-slate-800 rounded-lg p-2.5 text-xs text-white whitespace-pre-wrap">${escapeHtml(item.title || '')}</pre>
+          <p class="text-[11px] text-slate-400">${escapeHtml(item.rationale || '')}</p>
+        `;
+        pGrid.appendChild(card);
+      });
+
+      document.getElementById('seoDescTextarea').value = plan.seo_description || '';
+      document.getElementById('videoTagsCode').textContent = plan.video_tags || '';
+
+      // Spy Tags
+      const spyContainer = document.getElementById('spyTagsContainer');
+      const spyTags = (d.comp_spy && d.comp_spy.top_tags_by_frequency) || [];
+      if (spyTags.length) {
+        spyContainer.innerHTML = spyTags.slice(0, 15).map(t =>
+          `<span class="inline-block bg-slate-800 border border-slate-700 rounded px-2 py-0.5 mr-1.5 mb-1.5 text-[11px] text-slate-200">${escapeHtml(t.tag || t.Tag || '')} <b class="text-emerald-400">(${t.count || t.Frekuensi || 1}x)</b></span>`
+        ).join('');
+      } else {
+        spyContainer.innerHTML = '<span class="text-slate-500">Tags kompetitor diekstrak otomatis ke kolom Video Tags di atas.</span>';
+      }
+
+      // Competitors Table
+      const cBody = document.getElementById('competitorsTableBody');
+      cBody.innerHTML = comps.map(c => `
+        <tr class="hover:bg-slate-800/40">
+          <td class="p-3 font-bold text-amber-400">#${c.rank || '-'}</td>
+          <td class="p-3 font-medium text-white"><a href="${escapeHtml(c.url || '#')}" target="_blank" class="hover:text-red-400 underline">${escapeHtml(c.title)}</a></td>
+          <td class="p-3 text-slate-300">${escapeHtml(c.channel)}</td>
+          <td class="p-3 text-emerald-400 font-semibold">${escapeHtml(c.views)}</td>
+          <td class="p-3 text-slate-400 font-mono">${escapeHtml(c.duration)}</td>
+          <td class="p-3"><span class="px-2 py-0.5 rounded bg-slate-800 text-[11px]">${escapeHtml(c.format)}</span></td>
+          <td class="p-3 text-[11px]">${escapeHtml(c.ai_badge || '👤 Human')}</td>
+          <td class="p-3 text-[11px] text-amber-300">${escapeHtml(c.outlier_status || '')}</td>
+        </tr>
+      `).join('');
+
+      // Tab 5: Content Gaps, Outlier & Faceless, Clipping
+      const gaps = d.content_gaps || [];
+      const gapsFound = gaps.filter(g => g.is_content_gap).length;
+      document.getElementById('contentGapSummary').textContent = `🎯 Ditemukan ${gapsFound} Kesenjangan Konten (Content Gaps) dari ${gaps.length} kueri penelusuran!`;
+      document.getElementById('contentGapTableBody').innerHTML = gaps.map(g => `
+        <tr class="hover:bg-slate-800/40">
+          <td class="p-3 font-semibold text-white">${escapeHtml(g.query)}</td>
+          <td class="p-3 text-slate-300">${escapeHtml(g.search_volume_tier)}</td>
+          <td class="p-3"><span class="px-2 py-0.5 rounded bg-slate-800 text-amber-300 text-[11px]">${escapeHtml(g.gap_badge)}</span></td>
+          <td class="p-3 text-slate-300">${escapeHtml(g.gap_type)}</td>
+          <td class="p-3 text-slate-400">${escapeHtml(g.gap_reason)}</td>
+          <td class="p-3 text-emerald-400">${escapeHtml(g.recommended_action)}</td>
+        </tr>
+      `).join('');
+
+      const out = d.outlier_analysis || {};
+      document.getElementById('outlierMetricsBox').innerHTML = `
+        <div class="p-2.5 rounded-lg bg-[#0e1117] border border-slate-800"><span class="text-slate-400 block">Median Views</span><b class="text-white text-sm">${(out.median_views || 0).toLocaleString()}</b></div>
+        <div class="p-2.5 rounded-lg bg-[#0e1117] border border-slate-800"><span class="text-slate-400 block">Max Multiplier</span><b class="text-emerald-400 text-sm">${out.highest_multiplier || 1}x</b></div>
+        <div class="p-2.5 rounded-lg bg-[#0e1117] border border-slate-800"><span class="text-slate-400 block">Outlier Videos</span><b class="text-amber-400 text-sm">${out.outliers_found || 0} Video</b></div>
+      `;
+      const gv = out.golden_video;
+      document.getElementById('goldenVideoBox').innerHTML = gv
+        ? `👑 <b>Golden Benchmark:</b> ${escapeHtml(gv.title)} (${escapeHtml(gv.channel)} - 🔥 ${escapeHtml(gv.views)})`
+        : `ℹ️ Belum ada outlier ekstrem di SERP ini.`;
+
+      const fl = d.faceless_info || {};
+      document.getElementById('facelessBox').innerHTML = `
+        <div class="flex items-center justify-between p-2.5 rounded-lg bg-[#0e1117] border border-slate-800">
+          <span>Skor Kelayakan Faceless AI:</span>
+          <b class="text-emerald-400 text-sm">${fl.faceless_score || 80} / 100 (${escapeHtml(fl.tier || 'Very High')})</b>
+        </div>
+        <p class="text-slate-300">${escapeHtml(fl.verdict || '')}</p>
+        <ul class="list-disc pl-5 text-slate-400 space-y-1">${(fl.recommended_pipeline || []).map(s => `<li>${escapeHtml(s)}</li>`).join('')}</ul>
+      `;
+
+      const clips = d.clipping_ideas || [];
+      document.getElementById('clippingIdeasGrid').innerHTML = clips.map(c => `
+        <div class="bg-[#161b26] border border-slate-800 rounded-xl p-4 space-y-2 text-xs">
+          <div class="font-bold text-amber-400">🎬 Klip #${c.clip_id}: ${escapeHtml(c.clip_title)}</div>
+          <div class="text-[11px] text-slate-400">⏱️ Timestamp: <code>${escapeHtml(c.timestamp_window)}</code> | Virality: ${escapeHtml(c.projected_virality)}</div>
+          <div class="p-2.5 rounded bg-amber-950/30 border border-amber-800/50 text-amber-200">🗣️ <b>Hook 3s:</b> "${escapeHtml(c.hook_line)}"</div>
+          <p class="text-slate-300">${escapeHtml(c.core_insight)}</p>
+          <div class="text-sky-400 font-mono text-[11px]">🎯 CTA: ${escapeHtml(c.call_to_action)}</div>
+        </div>
+      `).join('');
+
+      // Tab 6: Flow Storyboard
+      renderFlowShotlist(d.flow_shotlist);
+
+      // Tab 7: Landscape Blueprint
+      document.getElementById('landscapeIntroText').textContent = `Potensi AdSense RPM ${rpm.rpm_range_usd || '$2-$5'} (${(rpm.detected_niche || 'general').toUpperCase()}).`;
+      document.getElementById('landscapeTitleCode').textContent = plan.outranking_title || '';
+      document.getElementById('landscapeTimestampsList').innerHTML = (plan.timestamps || []).map(ts => `<li>• ${escapeHtml(ts)}</li>`).join('');
+
+      // Tab 8: Shorts Blueprint
+      const sp = plan.shorts_package || {};
+      document.getElementById('shortsTitleCode').textContent = sp.title || '';
+      document.getElementById('shortsHookText').textContent = `"${sp.three_second_hook || ''}"`;
+      document.getElementById('shortsScriptList').innerHTML = (sp.script_structure || []).map(s => `<li>${escapeHtml(s)}</li>`).join('');
+
+      // Tab 9: Cross-Surface Keywords
+      const sf = d.surfaces || {};
+      document.getElementById('kwGoogleList').innerHTML = (sf.google || []).map(x => `<div class="p-2 rounded bg-[#0e1117] border border-slate-800 flex justify-between"><span>${escapeHtml(x.term)}</span><span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-sky-300">${escapeHtml(x.intent)}</span></div>`).join('');
+      document.getElementById('kwYoutubeList').innerHTML = (sf.youtube || []).map(x => `<div class="p-2 rounded bg-[#0e1117] border border-slate-800 flex justify-between"><span>${escapeHtml(x.term)}</span><span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-red-300">${escapeHtml(x.intent)}</span></div>`).join('');
+      document.getElementById('kwAiList').innerHTML = (sf.ai || []).map(x => `<div class="p-2 rounded bg-[#0e1117] border border-slate-800 flex justify-between"><span>${escapeHtml(x.term)}</span><span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-purple-300">${escapeHtml(x.intent)}</span></div>`).join('');
+
+      document.getElementById('intentClustersTableBody').innerHTML = (d.clusters || []).map(c => `
+        <tr>
+          <td class="p-3 font-semibold text-white">${escapeHtml(c.cluster_name)}</td>
+          <td class="p-3 text-amber-400 font-mono">${escapeHtml(c.intent_type)}</td>
+          <td class="p-3 text-slate-300">${escapeHtml(c.google_term_sample || '-')}</td>
+          <td class="p-3 text-slate-300">${escapeHtml(c.youtube_term_sample || '-')}</td>
+          <td class="p-3 text-slate-300">${escapeHtml(c.aeo_query_sample || '-')}</td>
+        </tr>
+      `).join('');
+    }
+
+    function renderFlowShotlist(shotlist) {
+      if (!shotlist) return;
+      const container = document.getElementById('flowScenesContainer');
+      const scenes = shotlist.scenes || [];
+      container.innerHTML = scenes.map(sc => `
+        <div class="bg-[#161b26] border border-slate-800 rounded-xl p-4 space-y-2">
+          <div class="flex justify-between items-center text-xs font-bold text-amber-400">
+            <span>🎞️ ${escapeHtml(sc.scene_id)} - ${escapeHtml(sc.timing)} (${sc.duration_seconds}s)</span>
+            <span class="px-2 py-0.5 rounded bg-slate-800 text-slate-300">Rasio ${escapeHtml(sc.aspect_ratio || shotlist.aspect_ratio || '9:16')}</span>
+          </div>
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-3 text-xs">
+            <div class="lg:col-span-2 space-y-1">
+              <span class="text-slate-400 block">Prompt Visual AI Video:</span>
+              <pre class="bg-[#0e1117] border border-slate-800 rounded-lg p-2.5 text-slate-200 whitespace-pre-wrap">${escapeHtml(sc.flow_prompt || sc.visual_action || '')}</pre>
+              <span class="text-[11px] text-sky-400 block">🎥 Kamera: ${escapeHtml(sc.camera_motion || '')}</span>
+            </div>
+            <div class="space-y-1">
+              <span class="text-slate-400 block">🎙️ Naskah Narasi / Dialog:</span>
+              <div class="p-3 rounded-lg bg-sky-950/30 border border-sky-800/50 text-sky-200 italic">"${escapeHtml(sc.audio_script || sc.dialogue || '')}"</div>
+            </div>
+          </div>
+        </div>
+      `).join('');
+
+      document.getElementById('flowPromptsTxtBox').value = shotlist.flow_batch_prompts_txt || scenes.map(s => s.flow_prompt || s.visual_action).join('\n');
+      document.getElementById('flowManifestJsonBox').value = JSON.stringify(shotlist.autoflowcut_manifest || shotlist, null, 2);
+    }
+
+    async function regenerateShotlist() {
+      const kw = document.getElementById('seedKeywordInput').value.trim() || 'Google Ads UMKM';
+      const fmt = document.getElementById('flowFormatSelect').value;
+      const num = parseInt(document.getElementById('flowScenesSelect').value, 10) || 5;
+      try {
+        const res = await fetch('/api/webmcp/call', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: 'generate_flow_shotlist',
+            arguments: { seed_keyword: kw, format_type: fmt, num_scenes: num }
+          })
+        });
+        const data = await res.json();
+        renderFlowShotlist(data);
+        showToast('🎬 Storyboard diperbarui!');
+      } catch (e) {}
+    }
+
+    function downloadPromptsTxt() {
+      const txt = document.getElementById('flowPromptsTxtBox').value;
+      const kw = (document.getElementById('seedKeywordInput').value || 'video').replace(/\s+/g, '_').toLowerCase();
+      const blob = new Blob([txt], { type: 'text/plain;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `prompts_${kw}.txt`;
+      a.click();
+    }
+
+    // 4. Tab 2: Video Audit & Pre-Upload
+    async function runVideoAudit() {
+      const url = document.getElementById('auditVideoUrl').value.trim();
+      if (!url) return;
+      const btn = document.getElementById('btnRunAudit');
+      btn.textContent = '⏳ Mengaudit...';
+      btn.disabled = true;
+      try {
+        const res = await fetch('/api/dashboard/audit-video', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ video_url: url, ai_config: getAiConfig() })
+        });
+        const d = await res.json();
+        const box = document.getElementById('auditResultContainer');
+        box.classList.remove('hidden');
+        if (!res.ok || d.error) {
+          box.innerHTML = `<div class="p-4 rounded-xl bg-red-950/40 border border-red-800 text-xs text-red-300">❌ ${escapeHtml(d.error || d.detail || 'Gagal mengambil video')}</div>`;
+          return;
+        }
+        const v = d.video_details || {};
+        const ar = d.audit_result || {};
+        const sc = ar.audit || {};
+        box.innerHTML = `
+          <div class="bg-[#161b26] border border-slate-800 rounded-xl p-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+            <div>
+              <img src="${escapeHtml(v.thumbnail_url || '')}" class="rounded-lg w-full mb-2">
+              <div class="text-slate-400">⏱️ Durasi: ${escapeHtml(v.duration)} | 👁️ Views: ${escapeHtml(v.views_display)}</div>
+            </div>
+            <div class="md:col-span-2 space-y-2">
+              <div class="text-sm font-bold text-white">${escapeHtml(v.title)}</div>
+              <div class="grid grid-cols-3 gap-2 pt-2">
+                <div class="p-2.5 rounded bg-[#0e1117] border border-slate-800"><span class="text-slate-400 block">Skor Judul</span><b class="text-base text-amber-400">${sc.title_score || 5}/10</b><p class="text-[11px] text-slate-400 mt-1">${escapeHtml(sc.title_flaws || '')}</p></div>
+                <div class="p-2.5 rounded bg-[#0e1117] border border-slate-800"><span class="text-slate-400 block">Skor Deskripsi</span><b class="text-base text-amber-400">${sc.description_score || 5}/10</b><p class="text-[11px] text-slate-400 mt-1">${escapeHtml(sc.description_flaws || '')}</p></div>
+                <div class="p-2.5 rounded bg-[#0e1117] border border-slate-800"><span class="text-slate-400 block">Skor Tags</span><b class="text-base text-amber-400">${sc.tags_score || 5}/10</b><p class="text-[11px] text-slate-400 mt-1">${escapeHtml(sc.tags_flaws || '')}</p></div>
+              </div>
+              <div class="p-3 rounded-lg bg-emerald-950/30 border border-emerald-700/60 mt-2">
+                <span class="text-emerald-400 font-bold block">👑 Rekomendasi Judul Baru (Outranking):</span>
+                <div class="text-sm font-bold text-white mt-0.5">${escapeHtml(ar.outranking_title || '')}</div>
+              </div>
+              <div>
+                <span class="text-slate-400 block mb-1">📝 Deskripsi Revamp Siap Salin:</span>
+                <textarea rows="6" class="w-full bg-[#0e1117] border border-slate-700 rounded-lg p-2.5 text-xs text-slate-200 font-mono">${escapeHtml(ar.full_description || '')}</textarea>
+              </div>
+              <div>
+                <span class="text-slate-400 block mb-1">🏷️ Video Tags Baru:</span>
+                <pre class="bg-[#0e1117] border border-slate-700 rounded-lg p-2.5 text-xs text-amber-300 whitespace-pre-wrap">${escapeHtml(ar.video_tags || '')}</pre>
+              </div>
+            </div>
+          </div>
+        `;
+      } catch (e) {
+      } finally {
+        btn.textContent = '🔍 Audit & Revamp';
+        btn.disabled = false;
+      }
+    }
+
+    async function runPreUploadPlan() {
+      const topic = document.getElementById('preTopicInput').value.trim();
+      const notes = document.getElementById('preNotesTextarea').value.trim();
+      const fmt = document.getElementById('preFormatSelect').value;
+      const dur = document.getElementById('preDurationInput').value.trim();
+      if (!topic || !notes) {
+        showToast('⚠️ Isi Topik & Poin Bahasan dulu!');
+        return;
+      }
+      const btn = document.getElementById('btnRunPreUpload');
+      btn.textContent = '⏳ Meracik...';
+      btn.disabled = true;
+      try {
+        const res = await fetch('/api/dashboard/pre-upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            topic, content_notes: notes, target_format: fmt, duration: dur, ai_config: getAiConfig()
+          })
+        });
+        const d = await res.json();
+        const box = document.getElementById('preUploadResultContainer');
+        box.classList.remove('hidden');
+        box.innerHTML = `
+          <div class="bg-[#161b26] border border-slate-800 rounded-xl p-4 space-y-3 text-xs">
+            <div class="p-3 rounded-lg bg-emerald-950/30 border border-emerald-700/60">
+              <span class="text-emerald-400 font-bold block">👑 Rekomendasi Judul Peluncuran:</span>
+              <div class="text-sm font-bold text-white mt-1">${escapeHtml(d.outranking_title || '')}</div>
+            </div>
+            <div>
+              <span class="text-slate-400 block mb-1">📝 Deskripsi Lengkap & Chapters:</span>
+              <textarea rows="6" class="w-full bg-[#0e1117] border border-slate-700 rounded-lg p-2.5 text-xs text-slate-200 font-mono">${escapeHtml(d.full_description || '')}</textarea>
+            </div>
+            <div>
+              <span class="text-slate-400 block mb-1">🏷️ Video Tags Siap Pakai:</span>
+              <pre class="bg-[#0e1117] border border-slate-700 rounded-lg p-2.5 text-xs text-amber-300 whitespace-pre-wrap">${escapeHtml(d.video_tags || '')}</pre>
+            </div>
+          </div>
+        `;
+      } catch (e) {
+      } finally {
+        btn.textContent = '🚀 Racik Paket Peluncuran SEO';
+        btn.disabled = false;
+      }
+    }
+
+    function quickAuditFromChannelTab() {
+      const u = document.getElementById('quickChannelVideoUrl').value.trim();
+      if (!u) return;
+      document.getElementById('auditVideoUrl').value = u;
+      const auditBtn = document.querySelectorAll('.tab-btn')[1];
+      switchTab('tab_audit', auditBtn);
+      runVideoAudit();
+    }
+
+    function showGscGuide() {
+      const u = document.getElementById('gscEmbedUrl').value.trim();
+      const box = document.getElementById('gscGuideOutput');
+      box.classList.remove('hidden');
+      box.innerHTML = `📋 <b>Target Halaman:</b> <code>${escapeHtml(u || 'https://domain-anda.com')}</code><br>1. Salin kode JSON-LD VideoObject dari hasil Audit Video.<br>2. Tempel di blok HTML artikel Anda.<br>3. Submit URL di Google Search Console agar Key Moments terindeks.`;
+    }
+
+    // 5. Tab 4: Trending Feed
+    async function loadTrendingFeed() {
+      const gl = document.getElementById('trendGl').value;
+      const hl = document.getElementById('trendHl').value;
+      const category = document.getElementById('trendCat').value;
+      const device = document.getElementById('trendDevice').value;
+      const btn = document.getElementById('btnLoadTrending');
+      btn.textContent = '⏳ Memuat...';
+      btn.disabled = true;
+      try {
+        const res = await fetch(`/api/dashboard/trending?gl=${gl}&hl=${hl}&category=${category}&device=${device}`);
+        const d = await res.json();
+        const feed = d.trending || [];
+        const shortsCount = feed.filter(v => v.format === 'SHORTS').length;
+        const aiCount = feed.filter(v => v.is_ai_generated).length;
+
+        document.getElementById('trendingStatsRow').innerHTML = `
+          <div class="bg-[#161b26] border border-slate-800 rounded-xl p-3.5"><span class="text-xs text-slate-400">Total Video Trending</span><div class="text-lg font-bold text-white">${feed.length} Video</div><span class="text-[11px] text-emerald-400">${shortsCount} Shorts / ${feed.length - shortsCount} Landscape</span></div>
+          <div class="bg-[#161b26] border border-slate-800 rounded-xl p-3.5"><span class="text-xs text-slate-400">Rasio Konten AI</span><div class="text-lg font-bold text-white">${aiCount} / ${feed.length}</div><span class="text-[11px] text-sky-400">Deteksi Otomatis</span></div>
+          <div class="bg-[#161b26] border border-slate-800 rounded-xl p-3.5"><span class="text-xs text-slate-400">Format Perangkat</span><div class="text-lg font-bold text-white">${device.toUpperCase()}</div><span class="text-[11px] text-slate-400">Negara: ${gl} | Bahasa: ${hl}</span></div>
+          <div class="bg-[#161b26] border border-slate-800 rounded-xl p-3.5"><span class="text-xs text-slate-400">Sumber Data</span><div class="text-lg font-bold text-emerald-400">🟢 LIVE SERP</div><span class="text-[11px] text-slate-400">Real-Time Crawl</span></div>
+        `;
+
+        document.getElementById('trendingTableBody').innerHTML = feed.map(v => `
+          <tr class="hover:bg-slate-800/40">
+            <td class="p-3 font-bold text-amber-400">#${v.rank}</td>
+            <td class="p-3 font-medium text-white"><a href="${escapeHtml(v.url || '#')}" target="_blank" class="hover:text-red-400 underline">${escapeHtml(v.title)}</a></td>
+            <td class="p-3 text-slate-300">${escapeHtml(v.channel)}</td>
+            <td class="p-3 text-emerald-400 font-semibold">${escapeHtml(v.views)}</td>
+            <td class="p-3 text-slate-400 font-mono">${escapeHtml(v.duration)}</td>
+            <td class="p-3"><span class="px-2 py-0.5 rounded bg-slate-800 text-[11px]">${v.format === 'SHORTS' ? '📱 SHORTS' : '📺 LANDSCAPE'}</span></td>
+            <td class="p-3 text-[11px]">${escapeHtml(v.ai_badge || '👤 Human Creator')}</td>
+            <td class="p-3 text-[11px] text-amber-300">${escapeHtml(v.outlier_status || 'Trending')}</td>
+          </tr>
+        `).join('');
+      } catch (e) {
+      } finally {
+        btn.textContent = '🔄 Muat Trending';
+        btn.disabled = false;
+      }
+    }
+
+    // 6. Tab 10: Google vs YouTube Trends
+    async function loadTrendsComparison() {
+      const kw = document.getElementById('seedKeywordInput').value.trim() || 'Google Ads untuk UMKM';
+      const geo = document.getElementById('trendsGeoSelect').value;
+      const enc = encodeURIComponent(kw);
+      const gUrl = geo
+        ? `https://trends.google.co.id/explore?geo=${geo}&gprop=youtube&q=${enc}`
+        : `https://trends.google.co.id/explore?gprop=youtube&q=${enc}`;
+      document.getElementById('trendsExternalLink').innerHTML = `🌐 <b>Buka Langsung di Google Trends YouTube:</b> <a href="${gUrl}" target="_blank" class="text-red-400 underline">🔗 Klik untuk buka "${escapeHtml(kw)}" di Google Trends (${geo || 'Worldwide'})</a>`;
+
+      try {
+        const res = await fetch(`/api/dashboard/trends?keyword=${enc}&geo=${geo || 'ID'}`);
+        const d = await res.json();
+
+        // Render Daily RSS
+        const rss = d.daily_rss || [];
+        document.getElementById('dailyRssTableBody').innerHTML = rss.length
+          ? rss.map((it, i) => `
+              <tr class="hover:bg-slate-800/40">
+                <td class="p-2.5 text-slate-400">${i + 1}</td>
+                <td class="p-2.5 font-bold text-white">${escapeHtml(it['Topik Tren'])}</td>
+                <td class="p-2.5 text-emerald-400 font-mono">${escapeHtml(it['Estimasi Penelusuran'])}</td>
+                <td class="p-2.5"><button onclick="document.getElementById('seedKeywordInput').value='${escapeHtml(it['Topik Tren'])}'; runFullAnalysis();" class="text-[11px] bg-slate-800 hover:bg-red-600 px-2.5 py-1 rounded text-white">🔍 Riset Topik Ini</button></td>
+              </tr>
+            `).join('')
+          : `<tr><td colspan="4" class="p-3 text-slate-400">Data RSS tren harian belum tersedia.</td></tr>`;
+
+        // Render Queries
+        const ytTop = d.youtube_top_queries || [];
+        const ytRis = d.youtube_rising_queries || [];
+        document.getElementById('ytQueriesBox').innerHTML = (ytTop.length || ytRis.length)
+          ? [...ytRis.slice(0, 10), ...ytTop.slice(0, 10)].map(q => `<div class="p-2 rounded bg-[#0e1117] border border-slate-800 flex justify-between"><span>${escapeHtml(q.Query || q.query)}</span><b class="text-amber-400">${escapeHtml(q['Lonjakan Minat'] || q['Popularitas (0-100)'] || q.value || '')}</b></div>`).join('')
+          : `<div class="text-slate-400">Menampilkan ekspansi kata kunci YouTube dari mesin intelejensi SERP.</div>`;
+
+        const gwTop = d.google_top_queries || [];
+        const gwRis = d.google_rising_queries || [];
+        document.getElementById('gwQueriesBox').innerHTML = (gwTop.length || gwRis.length)
+          ? [...gwRis.slice(0, 10), ...gwTop.slice(0, 10)].map(q => `<div class="p-2 rounded bg-[#0e1117] border border-slate-800 flex justify-between"><span>${escapeHtml(q.Query || q.query)}</span><b class="text-sky-400">${escapeHtml(q['Lonjakan Minat'] || q['Popularitas (0-100)'] || q.value || '')}</b></div>`).join('')
+          : `<div class="text-slate-400">Gunakan tautan Google Trends di atas untuk melihat grafik real-time interaktif.</div>`;
+
+        // Render Line Chart if historical data exists
+        const ytOt = d.youtube_interest_over_time || [];
+        const gwOt = d.google_interest_over_time || [];
+        const canvas = document.getElementById('trendsLineChart');
+        if (trendsChartInstance) trendsChartInstance.destroy();
+        if (ytOt.length && canvas) {
+          const labels = ytOt.map(x => x.Tanggal);
+          const ytVals = ytOt.map(x => x['Minat Penelusuran']);
+          const gwVals = gwOt.map(x => x['Minat Penelusuran']);
+          trendsChartInstance = new Chart(canvas, {
+            type: 'line',
+            data: {
+              labels,
+              datasets: [
+                { label: 'YouTube Search (gprop=youtube)', data: ytVals, borderColor: '#ef4444', tension: 0.3 },
+                { label: 'Google Web Search', data: gwVals, borderColor: '#38bdf8', tension: 0.3 }
+              ]
+            },
+            options: { responsive: true, maintainAspectRatio: false }
+          });
+        }
+      } catch (e) {}
+    }
+
+    // Initialize on load
+    window.addEventListener('DOMContentLoaded', () => {
+      loadHistory();
+      runFullAnalysis();
+    });
+  </script>
+</body>
+</html>

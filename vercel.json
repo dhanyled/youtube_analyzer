@@ -2,7 +2,7 @@
   "version": 2,
   "functions": {
     "api/index.py": {
-      "includeFiles": "src/**"
+      "includeFiles": "{src/**,api/*.html}"
     }
   },
   "rewrites": [

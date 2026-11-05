@@ -164,44 +164,49 @@ async def health_check():
 @app.get("/api/debug/innertube/{video_id}")
 async def debug_innertube(video_id: str):
     yt = YouTubeConnector()
-    client_configs = [
-        ("WEB_EMBEDDED_PLAYER", "1.20240726.00.00", "https://www.youtube.com/embed/" + video_id),
-        ("TVHTML5_SIMPLY_EMBEDDED_PLAYER", "2.0", None),
-        ("ANDROID", "19.29.37", None),
-        ("IOS", "19.29.1", None),
-        ("MWEB", "2.20240726.00.00", None),
-    ]
+    headers = yt._get_natural_headers(hl="id", gl="ID", device="desktop")
     results = {}
-    async with httpx.AsyncClient(timeout=8.0) as client:
-        for cname, cver, ref in client_configs:
-            payload: dict[str, Any] = {
-                "context": {
-                    "client": {
-                        "clientName": cname,
-                        "clientVersion": cver,
-                        "hl": "id",
-                        "gl": "ID",
-                    }
-                },
-                "videoId": video_id,
-            }
-            if ref:
-                payload["context"]["thirdParty"] = {"embedUrl": ref}
-            headers = yt._get_natural_headers(hl="id", gl="ID", device="desktop")
+    async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+        # 1. Watch page HTML
+        resp = await client.get(f"https://www.youtube.com/watch?v={video_id}", headers=headers)
+        html = resp.text
+        m_player = re.search(r"ytInitialPlayerResponse\s*=\s*({.+?});", html)
+        has_player = bool(m_player)
+        player_status = None
+        player_kw = []
+        if m_player:
             try:
-                resp = await client.post(yt.INNERTUBE_PLAYER_URL, json=payload, headers=headers)
-                d = resp.json() if resp.status_code == 200 else {}
-                status = d.get("playabilityStatus", {}).get("status")
-                kw = d.get("videoDetails", {}).get("keywords", [])
-                results[cname] = {
-                    "code": resp.status_code,
-                    "playability": status,
-                    "kw_count": len(kw),
-                    "kw_sample": kw[:4] if kw else [],
-                }
+                pd = json.loads(m_player.group(1))
+                player_status = pd.get("playabilityStatus", {}).get("status")
+                player_kw = pd.get("videoDetails", {}).get("keywords", [])
             except Exception as e:
-                results[cname] = {"error": str(e)}
-    return results
+                player_status = f"json_err: {e}"
+
+        og_tags = re.findall(r'<meta property="og:video:tag" content="(.*?)">', html)
+        meta_kw = re.search(r'<meta name="keywords" content="(.*?)">', html)
+        m_title = re.search(r"<title>(.*?)</title>", html)
+
+        # 2. oEmbed endpoint
+        oembed_resp = await client.get(
+            f"https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v={video_id}&format=json"
+        )
+
+        return {
+            "html_status": resp.status_code,
+            "title": m_title.group(1) if m_title else None,
+            "has_ytInitialPlayerResponse": has_player,
+            "player_status": player_status,
+            "player_keywords_count": len(player_kw),
+            "player_keywords_sample": player_kw[:5],
+            "og_video_tags": og_tags,
+            "meta_keywords": meta_kw.group(1) if meta_kw else None,
+            "oembed_title": oembed_resp.json().get("title")
+            if oembed_resp.status_code == 200
+            else None,
+            "oembed_author": oembed_resp.json().get("author_name")
+            if oembed_resp.status_code == 200
+            else None,
+        }
 
 
 # ==============================================================================

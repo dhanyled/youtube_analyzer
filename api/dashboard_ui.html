@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://ssl.gstatic.com/trends_nrtr/3349_RC01/embed_loader.js"></script>
   <style>
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: #0f172a; }
@@ -776,9 +777,33 @@ https://www.youtube.com/@ppm_consulting</textarea>
 
       <!-- Chart Interest Over Time -->
       <div class="bg-[#161b26] border border-slate-800 rounded-xl p-4 space-y-3">
-        <h4 class="text-sm font-bold text-white">📊 Grafik Minat Penelusuran Sepanjang Waktu (Interest Over Time)</h4>
-        <div id="trendsChartContainer" class="h-64 w-full flex items-center justify-center text-xs text-slate-400">
-          <canvas id="trendsLineChart"></canvas>
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div class="space-y-0.5">
+            <h4 class="text-sm font-bold text-white flex items-center gap-2">
+              <span>📊 Grafik Minat Penelusuran Sepanjang Waktu (Interest Over Time)</span>
+              <span class="text-[10px] bg-red-950/80 text-red-400 border border-red-800/60 px-2 py-0.5 rounded font-mono">100% Interaktif Google Trends</span>
+            </h4>
+            <p class="text-[11px] text-slate-400">Grafik time-series interaktif resmi dari Google Trends (hover tanggal & pergerakan tren 12 bulan).</p>
+          </div>
+          <div class="flex items-center gap-1.5 bg-[#0e1117] p-1 rounded-lg border border-slate-800">
+            <span class="text-[11px] text-slate-400 px-2 font-medium">Properti:</span>
+            <button id="btnTrendPropYt" onclick="switchTrendsProperty('youtube')" class="text-xs px-3 py-1.5 rounded-md bg-red-600 text-white font-bold transition flex items-center gap-1">
+              <span>📺 YouTube Search</span>
+            </button>
+            <button id="btnTrendPropWeb" onclick="switchTrendsProperty('web')" class="text-xs px-3 py-1.5 rounded-md bg-slate-800 text-slate-300 font-bold hover:bg-slate-700 transition flex items-center gap-1">
+              <span>🌐 Google Web</span>
+            </button>
+          </div>
+        </div>
+
+        <div id="trendsChartContainer" class="w-full min-h-[380px] flex items-center justify-center text-xs text-slate-400 rounded-lg bg-[#0e1117] border border-slate-800/80 p-2 overflow-hidden">
+          <canvas id="trendsLineChart" style="display:none;"></canvas>
+          <div id="trendsEmbedWidget" class="w-full min-h-[360px]"></div>
+        </div>
+
+        <div id="trendsKeywordSuggestions" class="hidden text-xs text-slate-400 flex flex-wrap items-center gap-2 pt-2 border-t border-slate-800/80">
+          <span class="text-amber-400 font-medium">💡 Coba kata kunci lebih umum untuk volume data lebih tinggi:</span>
+          <div id="trendsSuggestChips" class="flex flex-wrap gap-1.5"></div>
         </div>
       </div>
 
@@ -1613,47 +1638,139 @@ https://www.youtube.com/@ppm_consulting</textarea>
           ? gwQueries.slice(0, 15).map(q => `<div class="p-2 rounded bg-[#0e1117] border border-slate-800 flex justify-between items-center"><span class="font-medium text-slate-200">${escapeHtml(q.Query || q.query || '')}</span><b class="text-sky-400 text-[11px] px-2 py-0.5 rounded bg-slate-900 border border-slate-800">${escapeHtml(q['Lonjakan Minat'] || (q['Popularitas (0-100)'] !== undefined ? q['Popularitas (0-100)'] + '/100' : q.value || ''))}</b></div>`).join('')
           : `<div class="text-slate-400">Gunakan tautan Google Trends di atas untuk melihat grafik real-time interaktif.</div>`;
 
-        // Render Line Chart if historical data exists
-        const ytOt = d.youtube_interest_over_time || [];
-        const gwOt = d.google_interest_over_time || [];
-        const canvas = document.getElementById('trendsLineChart');
-        if (trendsChartInstance) trendsChartInstance.destroy();
-        if ((ytOt.length || gwOt.length) && canvas) {
-          canvas.style.display = 'block';
-          const noDataMsg = document.getElementById('trendsNoChartMsg');
-          if (noDataMsg) noDataMsg.remove();
-          const labels = (ytOt.length ? ytOt : gwOt).map(x => x.Tanggal);
-          const ytVals = ytOt.map(x => x['Minat Penelusuran']);
-          const gwVals = gwOt.map(x => x['Minat Penelusuran']);
-          const datasets = [];
-          if (ytVals.length) {
-            datasets.push({ label: 'YouTube Search (gprop=youtube)', data: ytVals, borderColor: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.1)', tension: 0.3, fill: true });
-          }
-          if (gwVals.length) {
-            datasets.push({ label: 'Google Web Search', data: gwVals, borderColor: '#38bdf8', backgroundColor: 'rgba(56, 189, 248, 0.05)', tension: 0.3, fill: true });
-          }
-          trendsChartInstance = new Chart(canvas, {
-            type: 'line',
-            data: { labels, datasets },
-            options: { responsive: true, maintainAspectRatio: false }
-          });
-        } else if (canvas) {
-          canvas.style.display = 'none';
-          const container = document.getElementById('trendsChartContainer');
-          let msg = document.getElementById('trendsNoChartMsg');
-          if (!msg) {
-            msg = document.createElement('div');
-            msg.id = 'trendsNoChartMsg';
-            msg.className = 'p-5 text-center space-y-2';
-            container.appendChild(msg);
-          }
-          msg.innerHTML = `
-            <div class="text-amber-400 font-bold text-xs">🌐 Grafik Interaktif Google Trends Tersedia</div>
-            <p class="text-[11px] text-slate-400 max-w-md mx-auto">Google Trends membatasi grafik time-series mentah dari server cloud/hosting. Gunakan tombol di bawah untuk melihat grafik tren interaktif 12 bulan resmi langsung dari Google.</p>
-            <a href="${gUrl}" target="_blank" class="inline-block mt-2 bg-red-600 hover:bg-red-500 text-white font-bold text-xs px-4 py-2 rounded-lg transition">📈 Buka Grafik "${escapeHtml(kw)}" di Google Trends</a>
-          `;
+        // Render Interactive Google Trends Widget directly in Dashboard
+        renderGoogleTrendsEmbedWidget(kw, geo, currentTrendProperty);
+      } catch (e) {
+        console.error('loadTrendsComparison error:', e);
+      }
+    }
+
+    let currentTrendProperty = 'youtube';
+
+    function switchTrendsProperty(prop) {
+      currentTrendProperty = prop;
+      const btnYt = document.getElementById('btnTrendPropYt');
+      const btnWeb = document.getElementById('btnTrendPropWeb');
+      if (btnYt && btnWeb) {
+        if (prop === 'youtube') {
+          btnYt.className = 'text-xs px-3 py-1.5 rounded-md bg-red-600 text-white font-bold transition flex items-center gap-1';
+          btnWeb.className = 'text-xs px-3 py-1.5 rounded-md bg-slate-800 text-slate-300 font-bold hover:bg-slate-700 transition flex items-center gap-1';
+        } else {
+          btnYt.className = 'text-xs px-3 py-1.5 rounded-md bg-slate-800 text-slate-300 font-bold hover:bg-slate-700 transition flex items-center gap-1';
+          btnWeb.className = 'text-xs px-3 py-1.5 rounded-md bg-sky-600 text-white font-bold transition flex items-center gap-1';
         }
-      } catch (e) {}
+      }
+      const kw = document.getElementById('seedKeywordInput')?.value.trim() || 'Google Ads';
+      const geo = document.getElementById('trendsGeoSelect')?.value || 'ID';
+      renderGoogleTrendsEmbedWidget(kw, geo, currentTrendProperty);
+    }
+
+    function renderGoogleTrendsEmbedWidget(kw, geo, prop) {
+      const container = document.getElementById('trendsChartContainer');
+      const canvas = document.getElementById('trendsLineChart');
+      if (canvas) canvas.style.display = 'none';
+
+      let widgetBox = document.getElementById('trendsEmbedWidget');
+      if (!widgetBox) {
+        widgetBox = document.createElement('div');
+        widgetBox.id = 'trendsEmbedWidget';
+        widgetBox.className = 'w-full min-h-[360px]';
+        container.appendChild(widgetBox);
+      }
+      widgetBox.innerHTML = '<div class="flex items-center justify-center p-8 text-slate-400 text-xs">⏳ Memuat widget resmi Google Trends...</div>';
+
+      const propertyVal = (prop === 'youtube') ? 'youtube' : '';
+      const exploreQuery = `geo=${encodeURIComponent(geo || 'ID')}&gprop=${encodeURIComponent(propertyVal)}&q=${encodeURIComponent(kw)}`;
+
+      if (window.trends && window.trends.embed && typeof window.trends.embed.renderExploreWidgetTo === 'function') {
+        try {
+          widgetBox.innerHTML = '';
+          window.trends.embed.renderExploreWidgetTo(
+            widgetBox,
+            'TIMESERIES',
+            {
+              comparisonItem: [{ keyword: kw, geo: geo || 'ID', time: 'today 12-m' }],
+              category: 0,
+              property: propertyVal
+            },
+            {
+              exploreQuery: exploreQuery,
+              guestPath: 'https://trends.google.com:443/trends/embed/'
+            }
+          );
+        } catch (err) {
+          console.warn('Google Trends embed render error:', err);
+          renderEmbedFallback(widgetBox, kw, geo, exploreQuery);
+        }
+      } else {
+        const existingScript = document.getElementById('gtEmbedScript');
+        if (!existingScript) {
+          const script = document.createElement('script');
+          script.id = 'gtEmbedScript';
+          script.src = 'https://ssl.gstatic.com/trends_nrtr/3349_RC01/embed_loader.js';
+          script.onload = () => {
+            setTimeout(() => renderGoogleTrendsEmbedWidget(kw, geo, prop), 100);
+          };
+          script.onerror = () => renderEmbedFallback(widgetBox, kw, geo, exploreQuery);
+          document.head.appendChild(script);
+        } else {
+          setTimeout(() => renderGoogleTrendsEmbedWidget(kw, geo, prop), 600);
+        }
+      }
+
+      updateKeywordSuggestions(kw);
+    }
+
+    function renderEmbedFallback(box, kw, geo, eq) {
+      const gUrl = `https://trends.google.com/trends/explore?${eq}`;
+      box.innerHTML = `
+        <div class="p-6 text-center space-y-2">
+          <div class="text-amber-400 font-bold text-xs">🌐 Grafik Interaktif Google Trends</div>
+          <p class="text-[11px] text-slate-400">Grafik interaktif dapat dibuka langsung di Google Trends:</p>
+          <a href="${gUrl}" target="_blank" class="inline-block mt-2 bg-red-600 hover:bg-red-500 text-white font-bold text-xs px-4 py-2 rounded-lg transition">📈 Buka Grafik "${escapeHtml(kw)}" di Google Trends (${geo || 'Worldwide'})</a>
+        </div>
+      `;
+    }
+
+    function updateKeywordSuggestions(kw) {
+      const suggestContainer = document.getElementById('trendsKeywordSuggestions');
+      const chipsBox = document.getElementById('trendsSuggestChips');
+      if (!suggestContainer || !chipsBox) return;
+
+      const words = kw.trim().split(/\s+/).filter(w => w.length > 1);
+      const stopWords = ['untuk', 'bagi', 'cara', 'yang', 'dan', 'di', 'ke', 'dari', 'pada', 'buat', 'bisa', 'apa', 'ini', 'itu', 'atau', 'dengan', 'tentang', 'oleh'];
+      const filteredWords = words.filter(w => !stopWords.includes(w.toLowerCase()));
+
+      const suggestions = [];
+      if (words.length > 2) {
+        suggestions.push(words.slice(0, 2).join(' '));
+        suggestions.push(words.slice(-2).join(' '));
+      }
+      filteredWords.forEach(w => {
+        if (!suggestions.includes(w) && w.toLowerCase() !== kw.toLowerCase()) {
+          suggestions.push(w);
+        }
+      });
+
+      const uniqueSuggestions = [...new Set(suggestions)].filter(s => s.toLowerCase() !== kw.toLowerCase());
+      if (uniqueSuggestions.length > 0 && words.length > 1) {
+        chipsBox.innerHTML = uniqueSuggestions.slice(0, 4).map(s => `
+          <button onclick="setTrendsKeyword('${escapeHtml(s)}')" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-red-950/60 border border-slate-700 hover:border-red-500 text-slate-200 hover:text-white text-[11px] font-medium transition flex items-center gap-1">
+            <span>🔍 ${escapeHtml(s)}</span>
+          </button>
+        `).join('');
+        suggestContainer.classList.remove('hidden');
+      } else {
+        suggestContainer.classList.add('hidden');
+      }
+    }
+
+    function setTrendsKeyword(newKw) {
+      const seedInput = document.getElementById('seedKeywordInput');
+      if (seedInput) {
+        seedInput.value = newKw;
+      }
+      loadTrendsComparison();
     }
 
     // Initialize on load

@@ -164,46 +164,44 @@ async def health_check():
 @app.get("/api/debug/innertube/{video_id}")
 async def debug_innertube(video_id: str):
     yt = YouTubeConnector()
-    payload = {
-        "context": {
-            "client": {
-                "clientName": "WEB",
-                "clientVersion": yt.INNERTUBE_WEB_CLIENT_VERSION,
-                "hl": "id",
-                "gl": "ID",
+    client_configs = [
+        ("WEB_EMBEDDED_PLAYER", "1.20240726.00.00", "https://www.youtube.com/embed/" + video_id),
+        ("TVHTML5_SIMPLY_EMBEDDED_PLAYER", "2.0", None),
+        ("ANDROID", "19.29.37", None),
+        ("IOS", "19.29.1", None),
+        ("MWEB", "2.20240726.00.00", None),
+    ]
+    results = {}
+    async with httpx.AsyncClient(timeout=8.0) as client:
+        for cname, cver, ref in client_configs:
+            payload: dict[str, Any] = {
+                "context": {
+                    "client": {
+                        "clientName": cname,
+                        "clientVersion": cver,
+                        "hl": "id",
+                        "gl": "ID",
+                    }
+                },
+                "videoId": video_id,
             }
-        },
-        "videoId": video_id,
-    }
-    headers = yt._get_natural_headers(hl="id", gl="ID", device="desktop")
-    headers["Origin"] = "https://www.youtube.com"
-    headers["Referer"] = f"https://www.youtube.com/watch?v={video_id}"
-    headers["X-YouTube-Client-Name"] = "1"
-    headers["X-YouTube-Client-Version"] = yt.INNERTUBE_WEB_CLIENT_VERSION
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp_raw = await client.post(yt.INNERTUBE_PLAYER_URL, json=payload)
-            resp_hdr = await client.post(yt.INNERTUBE_PLAYER_URL, json=payload, headers=headers)
-        return {
-            "raw_status": resp_raw.status_code,
-            "raw_keys": list(resp_raw.json().keys()) if resp_raw.status_code == 200 else [],
-            "raw_playability": resp_raw.json().get("playabilityStatus", {}).get("status")
-            if resp_raw.status_code == 200
-            else None,
-            "raw_keywords": resp_raw.json().get("videoDetails", {}).get("keywords", [])
-            if resp_raw.status_code == 200
-            else [],
-            "hdr_status": resp_hdr.status_code,
-            "hdr_keys": list(resp_hdr.json().keys()) if resp_hdr.status_code == 200 else [],
-            "hdr_playability": resp_hdr.json().get("playabilityStatus", {}).get("status")
-            if resp_hdr.status_code == 200
-            else None,
-            "hdr_keywords": resp_hdr.json().get("videoDetails", {}).get("keywords", [])
-            if resp_hdr.status_code == 200
-            else [],
-        }
-    except Exception as e:
-        return {"error": str(e)}
+            if ref:
+                payload["context"]["thirdParty"] = {"embedUrl": ref}
+            headers = yt._get_natural_headers(hl="id", gl="ID", device="desktop")
+            try:
+                resp = await client.post(yt.INNERTUBE_PLAYER_URL, json=payload, headers=headers)
+                d = resp.json() if resp.status_code == 200 else {}
+                status = d.get("playabilityStatus", {}).get("status")
+                kw = d.get("videoDetails", {}).get("keywords", [])
+                results[cname] = {
+                    "code": resp.status_code,
+                    "playability": status,
+                    "kw_count": len(kw),
+                    "kw_sample": kw[:4] if kw else [],
+                }
+            except Exception as e:
+                results[cname] = {"error": str(e)}
+    return results
 
 
 # ==============================================================================

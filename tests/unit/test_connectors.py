@@ -1,124 +1,123 @@
-"""Unit tests for search connectors (HasData & YouTube)."""
+"""Unit tests for search connectors (HasData & YouTube) ensuring 100% real data integrity."""
+
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from youtube_analyzer.connectors.hasdata_trends import HasDataTrendsConnector
 from youtube_analyzer.connectors.youtube import YouTubeConnector
-from youtube_analyzer.core.models import PlatformEnum
+
+
+def test_hasdata_empty_when_unavailable():
+    """Verify that when Google Trends data is unavailable, no synthetic or fake data is generated."""
+    connector = HasDataTrendsConnector(api_key=None)
+    with patch.object(connector, "_fetch_pytrends_interest_over_time", return_value=None):
+        ot = connector.get_interest_over_time("NonExistentTermXYZ", geo="ID")
+        assert ot == []
+
+    with patch.object(connector, "_fetch_pytrends_interest_by_region", return_value=None):
+        reg = connector.get_interest_by_region("NonExistentTermXYZ", geo="ID")
+        assert reg == []
+
+    with patch.object(connector, "_fetch_pytrends_top_and_rising", return_value=None):
+        queries = connector.get_top_and_rising_queries("NonExistentTermXYZ", geo="ID")
+        assert queries == {"top": [], "rising": []}
+
+
+def test_hasdata_returns_real_data_when_present():
+    """Verify that real Google Trends data is preserved and returned accurately."""
+    connector = HasDataTrendsConnector(api_key=None)
+    mock_ot = [{"Tanggal": "2026-01-01", "Minat Penelusuran": 75, "Properti": "YouTube Search"}]
+    mock_reg = [{"Wilayah": "Bali", "Kode": "ID-BA", "Indeks Minat": 100, "Tingkat Minat": "🔥 Sangat Tinggi"}]
+    mock_q = {
+        "top": [
+            {
+                "Rank": 1,
+                "Query": "google ads",
+                "query": "google ads",
+                "Popularitas (0-100)": 100,
+                "value": 100,
+                "type": "top",
+                "property": "youtube",
+            }
+        ],
+        "rising": [
+            {
+                "Rank": 1,
+                "Query": "meta ads",
+                "query": "meta ads",
+                "Lonjakan Minat": "+120%",
+                "value": "+120%",
+                "numeric_growth": 120,
+                "type": "rising",
+                "property": "youtube",
+            }
+        ],
+    }
+
+    with patch.object(connector, "_fetch_pytrends_interest_over_time", return_value=mock_ot):
+        assert connector.get_interest_over_time("google ads") == mock_ot
+
+    with patch.object(connector, "_fetch_pytrends_interest_by_region", return_value=mock_reg):
+        assert connector.get_interest_by_region("google ads") == mock_reg
+
+    with patch.object(connector, "_fetch_pytrends_top_and_rising", return_value=mock_q):
+        assert connector.get_top_and_rising_queries("google ads") == mock_q
 
 
 @pytest.mark.asyncio
-async def test_hasdata_trends_offline_mock():
-    connector = HasDataTrendsConnector(api_key=None)
-    web_results = await connector.search(query="Google Ads UMKM", property_type="web")
-    assert len(web_results) > 0
-    assert any("jasa" in r["query"] or "biaya" in r["query"] for r in web_results)
-
-    yt_results = await connector.get_youtube_trends(query="Google Ads UMKM")
-    assert len(yt_results) > 0
-    assert any("cara" in r["query"] or "tutorial" in r["query"] for r in yt_results)
-
-
-@pytest.mark.asyncio
-async def test_compare_google_vs_youtube():
-    connector = HasDataTrendsConnector(api_key=None)
-    comparison = await connector.compare_google_vs_youtube(query="Google Ads UMKM")
-    assert "google_web_trends" in comparison
-    assert "youtube_trends" in comparison
-    assert len(comparison["youtube_trends"]) > 0
-    assert "youtube_interest_over_time" in comparison
-    assert len(comparison["youtube_interest_over_time"]) == 52
-    assert "google_interest_over_time" in comparison
-    assert len(comparison["google_interest_over_time"]) == 52
-    assert "interest_by_region" in comparison
-    assert len(comparison["interest_by_region"]) > 0
-    assert "youtube_top_queries" in comparison
-    assert len(comparison["youtube_top_queries"]) == 50
-    assert "youtube_rising_queries" in comparison
-    assert len(comparison["youtube_rising_queries"]) == 50
-    assert "google_top_queries" in comparison
-    assert len(comparison["google_top_queries"]) == 50
-    assert "google_rising_queries" in comparison
-    assert len(comparison["google_rising_queries"]) == 50
-
-
-def test_hasdata_interest_over_time():
-    connector = HasDataTrendsConnector(api_key=None)
-    ot = connector.get_interest_over_time("Google Ads UMKM", geo="ID", property_type="youtube")
-    assert len(ot) == 52
-    assert all("Tanggal" in item and "Minat Penelusuran" in item for item in ot)
-    assert all(0 <= item["Minat Penelusuran"] <= 100 for item in ot)
-
-
-def test_hasdata_interest_by_region():
-    connector = HasDataTrendsConnector(api_key=None)
-    reg_id = connector.get_interest_by_region("Google Ads UMKM", geo="ID")
-    assert len(reg_id) > 0
-    assert reg_id[0]["Wilayah"] == "DKI Jakarta"
-    assert all("Indeks Minat" in item for item in reg_id)
-
-    reg_ww = connector.get_interest_by_region("Google Ads UMKM", geo="")
-    assert len(reg_ww) > 0
-    assert any(item["Wilayah"] == "Indonesia" for item in reg_ww)
-
-
-def test_hasdata_top_and_rising_queries_50():
-    connector = HasDataTrendsConnector(api_key=None)
-    queries = connector.get_top_and_rising_queries(
-        "Google Ads UMKM", geo="ID", property_type="youtube"
-    )
-    assert len(queries["top"]) == 50
-    assert len(queries["rising"]) == 50
-    assert queries["top"][0]["Rank"] == 1
-    assert queries["top"][49]["Rank"] == 50
-    assert "Breakout" in queries["rising"][0]["Lonjakan Minat"]
-
-
-@pytest.mark.asyncio
-async def test_youtube_connector_search():
+async def test_youtube_connector_empty_when_blocked():
+    """Verify that when scraping fails or is blocked, no fake or synthetic videos are ever injected."""
     connector = YouTubeConnector(api_key=None)
-    results = await connector.search(query="Google Ads UMKM")
-    assert len(results) > 0
-    assert results[0]["platform"] == PlatformEnum.YOUTUBE_SEARCH
+    with patch("httpx.AsyncClient.get", side_effect=Exception("Blocked")):
+        competitors = await connector.get_top_competitors("Some Query", limit=10)
+        assert competitors == []
+
+        trending = await connector.get_trending_feed(limit=10)
+        assert trending == []
+
+        autocomplete = await connector.get_autocomplete("Some Query")
+        assert autocomplete == []
 
 
 @pytest.mark.asyncio
-async def test_youtube_trending_feed():
+async def test_youtube_connector_parses_real_items():
+    """Verify that scraped live competitor videos are parsed correctly without dummy additions."""
     connector = YouTubeConnector(api_key=None)
-    # Test desktop trending
-    desktop_trending = await connector.get_trending_feed(
-        gl="ID", hl="id", category="now", device="desktop", limit=5
-    )
-    assert len(desktop_trending) > 0
-    assert "title" in desktop_trending[0]
-    assert "views" in desktop_trending[0]
-    assert "format" in desktop_trending[0]
-    assert desktop_trending[0]["device"] == "DESKTOP"
-
-    # Test mobile trending
-    mobile_trending = await connector.get_trending_feed(
-        gl="US", hl="en", category="gaming", device="mobile", limit=5
-    )
-    assert len(mobile_trending) > 0
-    assert mobile_trending[0]["device"] == "MOBILE"
-    assert mobile_trending[0]["location"] == "US"
+    mock_video = {
+        "rank": 1,
+        "title": "Tutorial Google Ads 2026 Lengkap",
+        "channel": "Pakar Digital",
+        "views": "150K views",
+        "views_count": 150000,
+        "upload_age": "2026-01-10",
+        "duration": "14:20",
+        "format": "LANDSCAPE",
+        "url": "https://www.youtube.com/watch?v=123",
+        "outlier_status": "Top #1",
+        "is_ai_generated": False,
+        "ai_badge": "👤 Human Creator",
+        "ai_label_reason": "Human narrator",
+    }
+    with patch.object(connector, "_parse_youtube_search_html", return_value=[mock_video]):
+        mock_resp = MagicMock(status_code=200, text="<html>...</html>")
+        with patch("httpx.AsyncClient.get", return_value=mock_resp):
+            res = await connector.get_top_competitors("Google Ads", limit=5)
+            assert len(res) == 1
+            assert res[0]["title"] == "Tutorial Google Ads 2026 Lengkap"
+            assert res[0]["channel"] == "Pakar Digital"
+            assert res[0]["views_count"] == 150000
 
 
 @pytest.mark.asyncio
-async def test_youtube_top_competitors_10():
-    connector = YouTubeConnector(api_key=None)
-    competitors = await connector.get_top_competitors("Google Ads UMKM", limit=10)
-    assert len(competitors) == 10
-    assert competitors[0]["rank"] == 1
-    assert competitors[9]["rank"] == 10
-    assert all(c["format"] in ["LANDSCAPE", "SHORTS"] for c in competitors)
-    assert all("title" in c and "views" in c for c in competitors)
+async def test_youtube_connector_natural_headers():
+    """Verify that YouTubeConnector generates realistic modern browser fingerprint headers."""
+    desktop_headers = YouTubeConnector._get_natural_headers(hl="id", gl="ID", device="desktop")
+    assert "User-Agent" in desktop_headers
+    assert "Sec-Ch-Ua" in desktop_headers
+    assert desktop_headers["Sec-Ch-Ua-Mobile"] == "?0"
+    assert desktop_headers["Sec-Ch-Ua-Platform"] in ['"Windows"', '"macOS"']
 
-
-@pytest.mark.asyncio
-async def test_youtube_trending_feed_10():
-    connector = YouTubeConnector(api_key=None)
-    trending = await connector.get_trending_feed(limit=10)
-    assert len(trending) == 10
-    assert trending[0]["rank"] == 1
-    assert trending[9]["rank"] == 10
+    mobile_headers = YouTubeConnector._get_natural_headers(hl="id", gl="ID", device="mobile")
+    assert mobile_headers["Sec-Ch-Ua-Mobile"] == "?1"
+    assert mobile_headers["Sec-Ch-Ua-Platform"] == '"Android"'

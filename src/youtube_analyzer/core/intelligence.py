@@ -7,6 +7,7 @@ Incorporates proven algorithms for:
 """
 
 import math
+import re
 from datetime import UTC, datetime
 from typing import Any
 
@@ -157,8 +158,14 @@ class SearchIntelligence:
             avg_comp_views = sum(views_list) / len(views_list)
             max_comp_views = max(views_list)
         else:
-            avg_comp_views = 25000
-            max_comp_views = 50000
+            return {
+                "search_volume": 0,
+                "competition_score": 0.0,
+                "opportunity_score": 0.0,
+                "rating": "INSUFFICIENT_DATA",
+                "avg_competitor_views": 0,
+                "max_competitor_views": 0,
+            }
 
         # Correlate search volume with competitor view velocity
         if avg_comp_views >= 500000:
@@ -997,8 +1004,8 @@ class SearchIntelligence:
             ]
         )
 
-        # Check if title has year
-        has_year = any(y in lowered for y in ["2020", "2021", "2022", "2023", "2024", "2025"])
+        # Check if title has year (dynamic 4-digit year detection)
+        has_year = bool(re.search(r"\b(19\d\d|20\d\d)\b", lowered))
 
         if is_shouting or has_clickbait:
             weakness = (
@@ -1103,28 +1110,57 @@ class SearchIntelligence:
                     "two_line_hook",
                     f"Penasaran tentang {clean}? Simak bedah lengkapnya di video ini!",
                 )
-                timestamps = ai_res.get(
-                    "timestamps",
-                    [
-                        "00:00 - Pembuka & Sorotan Utama",
-                        f"02:00 - Latar Belakang & Pengenalan {clean}",
-                        "06:30 - Kronologi Kunci & Penjelasan Mendalam",
-                        "11:00 - Evaluasi & Solusi Nyata",
-                        "15:00 - Kesimpulan Akhir",
-                    ],
-                )
+                from youtube_analyzer.connectors.youtube import parse_duration_to_seconds
+
+                comp_dur = competitor.get("duration", "10:00") if competitor else "10:00"
+                if comp_format == "SHORTS" or "short" in str(comp_format).lower():
+                    timestamps = []
+                else:
+                    raw_ts = ai_res.get("timestamps")
+                    if raw_ts:
+                        max_sec = parse_duration_to_seconds(comp_dur)
+                        valid_ts = []
+                        for ts in raw_ts:
+                            parts = ts.split("-")[0].strip().split(":")
+                            if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
+                                sec = int(parts[0]) * 60 + int(parts[1])
+                                if sec <= max_sec:
+                                    valid_ts.append(ts)
+                            else:
+                                valid_ts.append(ts)
+                        timestamps = valid_ts if len(valid_ts) >= 3 else AITitleGenerator.generate_synchronized_timestamps(clean, comp_dur)
+                    else:
+                        timestamps = AITitleGenerator.generate_synchronized_timestamps(clean, comp_dur)
+
+                clean_tag = "".join(w.capitalize() for w in clean.split() if w.isalnum())
                 hashtags = ai_res.get(
                     "hashtags",
-                    [f"#{clean_tag}", f"#{clean_tag}Indonesia", "#VideoPopuler", "#YouTubeSEO"],
+                    [f"#{clean_tag}", f"#{clean_tag}Indonesia", f"#Tips{clean_tag}", f"#Tutorial{clean_tag}"],
                 )
 
+                # Collect competitor tags
+                comp_tags = []
+                for c in (all_comps or []):
+                    if c.get("tags"):
+                        comp_tags.extend(c.get("tags", []))
+                comp_tags = list(dict.fromkeys(t.strip() for t in comp_tags if t and t.strip()))
+
+                if comp_tags:
+                    merged_tags = comp_tags[:12]
+                    focus_tags = [seed.lower(), clean.lower(), f"cara {seed.lower()}", f"tips {seed.lower()}"]
+                    for ft in focus_tags:
+                        if ft not in [t.lower() for t in merged_tags]:
+                            merged_tags.append(ft)
+                    ai_video_tags = ", ".join(merged_tags[:18])
+                else:
+                    ai_video_tags = ai_res.get("video_tags") or f"{seed}, {clean.lower()}, {niche}, cara {seed}, tips {seed}"
+
+                ts_section = "⏱️ TIMESTAMPS / DAFTAR ISI:\n" + "\n".join(timestamps) + "\n\n" if timestamps else ""
                 desc_text = (
                     f"{two_line_hook}\n\n"
                     f"📌 Video ini mengupas tuntas fakta, analisis, dan wawasan penting seputar {clean}.\n\n"
-                    f"⏱️ TIMESTAMPS / DAFTAR ISI:\n"
-                    + "\n".join(timestamps)
-                    + f"\n\n🔗 LINK & INFORMASI:\n"
-                    f"- Sumber Informasi & Diskusi: https://example.com\n\n"
+                    f"{ts_section}💬 Tulis pertanyaan atau pengalaman Anda di kolom komentar di bawah!\n"
+                    f"🔔 Subscribe & nyalakan lonceng agar tidak ketinggalan video terbaru.\n\n"
                     f"{' '.join(hashtags)}"
                 )
 
@@ -1165,6 +1201,7 @@ class SearchIntelligence:
                     "two_line_hook": two_line_hook,
                     "timestamps": timestamps,
                     "hashtags": hashtags,
+                    "video_tags": ai_video_tags,
                     "shorts_package": shorts_pkg,
                     "generation_mode": "ai_enhanced",
                     "ai_provider": ai_config.get("provider", "gemini"),
@@ -1179,6 +1216,10 @@ class SearchIntelligence:
         # ------------------------------------------------------------------
         # OPSI 2: SMART COMPETITOR HEURISTIC (EKSTRAKSI SEMANTIK SERP NYATA)
         # ------------------------------------------------------------------
+        from youtube_analyzer.connectors.youtube import parse_duration_to_seconds
+        from youtube_analyzer.core.ai_generator import AITitleGenerator
+
+        comp_dur = competitor.get("duration", "10:00") if competitor else "10:00"
         comp_analysis = cls.analyze_competitor_packaging(comp_title, seed, niche)
 
         # Kumpulkan teks semua judul kompetitor teratas untuk ekstraksi entitas
@@ -1263,13 +1304,25 @@ class SearchIntelligence:
                     f"Sedang mencari referensi seputar {clean}? Di video ini kita bedah tuntas "
                     f"panduan cek izin resmi Kemenag, rincian biaya transparan, dan tips memilih biro layanan yang amanah!"
                 )
-                timestamps = [
-                    "00:00 - Urgensi Memilih Layanan yang Amanah",
-                    "02:30 - Cara Cek Izin Resmi Kemenag (PPIU/PIHK)",
-                    "06:15 - Transparansi Rincian Biaya, Tiket & Jarak Hotel",
-                    "11:00 - Alur Pendampingan Ibadah & Manasik",
-                    "15:30 - Checklist Wajib Sebelum Membayar DP",
+                chapter_labels = [
+
+                    "Urgensi Memilih Layanan yang Amanah",
+
+                    "Cara Cek Izin Resmi Kemenag (PPIU/PIHK)",
+
+                    "Transparansi Rincian Biaya, Tiket & Jarak Hotel",
+
+                    "Alur Pendampingan Ibadah & Manasik",
+
+                    "Checklist Wajib Sebelum Membayar DP",
+
                 ]
+
+                timestamps = AITitleGenerator.generate_synchronized_timestamps(
+
+                    clean, comp_dur, chapter_labels=chapter_labels
+
+                )
                 hashtags = [
                     f"#{clean_tag}",
                     "#HajiUmroh",
@@ -1315,13 +1368,25 @@ class SearchIntelligence:
                     f"Mau berangkat {clean}? Tonton panduan lengkap persiapan ibadah, "
                     f"tips stamina, dan alur perjalanan agar ibadahmu di Tanah Suci mabrur dan khusyuk!"
                 )
-                timestamps = [
-                    "00:00 - Niat & Fondasi Ibadah",
-                    f"02:15 - Perlengkapan Wajib & Dokumen Penting {clean}",
-                    "06:45 - Rangkaian Ibadah Sesuai Sunnah & Kondisi Fisik",
-                    "12:20 - Tips Beribadah Nyaman di Masjidil Haram & Nabawi",
-                    "17:00 - Evaluasi & Doa Mustajab",
+                chapter_labels = [
+
+                    "Niat & Fondasi Ibadah",
+
+                    f"Perlengkapan Wajib & Dokumen Penting {clean}",
+
+                    "Rangkaian Ibadah Sesuai Sunnah & Kondisi Fisik",
+
+                    "Tips Beribadah Nyaman di Masjidil Haram & Nabawi",
+
+                    "Evaluasi & Doa Mustajab",
+
                 ]
+
+                timestamps = AITitleGenerator.generate_synchronized_timestamps(
+
+                    clean, comp_dur, chapter_labels=chapter_labels
+
+                )
                 hashtags = [
                     f"#{clean_tag}",
                     "#PanduanUmroh",
@@ -1444,13 +1509,25 @@ class SearchIntelligence:
                     f"Bagaimana detik-detik peristiwa erupsi {clean} terjadi? "
                     f"Di video ini kita rekonstruksi arsip sejarah, kesaksian saksi, dan dampak dahsyatnya bagi bumi!"
                 )
-                timestamps = [
-                    "00:00 - Tanda Awal & Gempa Vulkanik",
-                    f"02:30 - Detik-Detik Puncak Erupsi {clean}",
-                    "07:15 - Sebaran Awan Panas & Dampak Sekitar",
-                    "11:45 - Evaluasi Dampak Lingkungan & Geologi",
-                    "15:20 - Kondisi Terkini & Pelajaran Mitigasi",
+                chapter_labels = [
+
+                    "Tanda Awal & Gempa Vulkanik",
+
+                    f"Detik-Detik Puncak Erupsi {clean}",
+
+                    "Sebaran Awan Panas & Dampak Sekitar",
+
+                    "Evaluasi Dampak Lingkungan & Geologi",
+
+                    "Kondisi Terkini & Pelajaran Mitigasi",
+
                 ]
+
+                timestamps = AITitleGenerator.generate_synchronized_timestamps(
+
+                    clean, comp_dur, chapter_labels=chapter_labels
+
+                )
                 hashtags = [
                     f"#{clean_tag}",
                     f"#{clean_tag}Erupsi",
@@ -1496,13 +1573,25 @@ class SearchIntelligence:
                     f"Apa yang sebenarnya dialami para pendaki di {clean}? "
                     f"Di video ini kita bedah kronologi penyelamatan, analisa medan ekstrem, dan evaluasi penting bagi para petualang!"
                 )
-                timestamps = [
-                    "00:00 - Awal Pendakian & Rencana Perjalanan",
-                    f"02:15 - Titik Kritis Jalur Pendakian {clean}",
-                    "06:40 - Detik-Detik Terjebak & Upaya Bertahan Hidup",
-                    "11:10 - Operasi SAR & Kronologi Evakuasi",
-                    "15:00 - Evaluasi Jalur & Panduan Keselamatan",
+                chapter_labels = [
+
+                    "Awal Pendakian & Rencana Perjalanan",
+
+                    f"Titik Kritis Jalur Pendakian {clean}",
+
+                    "Detik-Detik Terjebak & Upaya Bertahan Hidup",
+
+                    "Operasi SAR & Kronologi Evakuasi",
+
+                    "Evaluasi Jalur & Panduan Keselamatan",
+
                 ]
+
+                timestamps = AITitleGenerator.generate_synchronized_timestamps(
+
+                    clean, comp_dur, chapter_labels=chapter_labels
+
+                )
                 hashtags = [
                     f"#{clean_tag}",
                     f"#{clean_tag}Pendakian",
@@ -1548,13 +1637,25 @@ class SearchIntelligence:
                     f"Penasaran dengan cerita misteri yang beredar di {clean}? "
                     f"Di video ini kita telusuri fakta sejarah, pengakuan warga lokal, dan penjelasan logisnya!"
                 )
-                timestamps = [
-                    "00:00 - Pengantar Mitos yang Viral",
-                    f"02:00 - Asal Usul Cerita Rakyat Seputar {clean}",
-                    "06:15 - Kesaksian Saksi Mata & Warga Lokal",
-                    "10:30 - Penjelasan Rasional & Fakta Sejarah",
-                    "14:00 - Kesimpulan & Pelajaran Berharga",
+                chapter_labels = [
+
+                    "Pengantar Mitos yang Viral",
+
+                    f"Asal Usul Cerita Rakyat Seputar {clean}",
+
+                    "Kesaksian Saksi Mata & Warga Lokal",
+
+                    "Penjelasan Rasional & Fakta Sejarah",
+
+                    "Kesimpulan & Pelajaran Berharga",
+
                 ]
+
+                timestamps = AITitleGenerator.generate_synchronized_timestamps(
+
+                    clean, comp_dur, chapter_labels=chapter_labels
+
+                )
                 hashtags = [f"#{clean_tag}", f"#{clean_tag}Misteri", "#FaktaMitos", "#CeritaRakyat"]
                 shorts_package = {
                     "title": f"Misteri Nyata Seputar {clean} yang Bikin Penasaran! #shorts",
@@ -1604,13 +1705,25 @@ class SearchIntelligence:
                     f"Seberapa banyak yang kamu tahu tentang {clean}? "
                     f"Di video ini kita bedah fakta ilmiah terkini, misteri yang belum terpecahkan, dan temuan yang bikin tercengang!"
                 )
-                timestamps = [
-                    "00:00 - Pengantar: Mengapa Ini Penting?",
-                    f"02:00 - Fakta Dasar tentang {clean}",
-                    "05:30 - Penemuan Ilmiah Paling Mengejutkan",
-                    "10:15 - Misteri yang Masih Belum Terjawab",
-                    "14:30 - Kesimpulan & Prediksi Masa Depan",
+                chapter_labels = [
+
+                    "Pengantar: Mengapa Ini Penting?",
+
+                    f"Fakta Dasar tentang {clean}",
+
+                    "Penemuan Ilmiah Paling Mengejutkan",
+
+                    "Misteri yang Masih Belum Terjawab",
+
+                    "Kesimpulan & Prediksi Masa Depan",
+
                 ]
+
+                timestamps = AITitleGenerator.generate_synchronized_timestamps(
+
+                    clean, comp_dur, chapter_labels=chapter_labels
+
+                )
                 hashtags = [
                     f"#{clean_tag}",
                     f"#{clean_tag}Sains",
@@ -1654,13 +1767,25 @@ class SearchIntelligence:
                     f"Pernahkah kamu membayangkan betapa dahsyatnya peristiwa {clean}? "
                     f"Di video ini kita bedah kronologi lengkap, arsip sejarah autentik, dan fakta mengejutkan yang jarang dibahas!"
                 )
-                timestamps = [
-                    "00:00 - Kilas Balik Awal Peristiwa",
-                    f"02:30 - Latar Belakang & Tanda Awal {clean}",
-                    "06:45 - Kronologi Puncak Kejadian",
-                    "11:20 - Dampak & Akibat bagi Dunia",
-                    "15:50 - Pelajaran Sejarah & Kondisi Terkini",
+                chapter_labels = [
+
+                    "Kilas Balik Awal Peristiwa",
+
+                    f"Latar Belakang & Tanda Awal {clean}",
+
+                    "Kronologi Puncak Kejadian",
+
+                    "Dampak & Akibat bagi Dunia",
+
+                    "Pelajaran Sejarah & Kondisi Terkini",
+
                 ]
+
+                timestamps = AITitleGenerator.generate_synchronized_timestamps(
+
+                    clean, comp_dur, chapter_labels=chapter_labels
+
+                )
                 hashtags = [
                     f"#{clean_tag}",
                     f"#{clean_tag}Sejarah",
@@ -1712,13 +1837,25 @@ class SearchIntelligence:
                 f"Mau bikin {clean} yang lezat, bumbunya meresap sempurna, dan anti gagal? "
                 f"Simak panduan takaran dan rahasia bumbunya di video ini!"
             )
-            timestamps = [
-                "00:00 - Tampilan & Rahasia Kelezatan",
-                "01:15 - Bahan-Bahan & Takaran Pas",
-                f"04:30 - Cara Mengolah & Meracik {clean}",
-                "08:15 - Tips Memasak dengan Api Sempurna",
-                "11:40 - Hasil Akhir & Uji Rasa",
+            chapter_labels = [
+
+                "Tampilan & Rahasia Kelezatan",
+
+                "Bahan-Bahan & Takaran Pas",
+
+                f"Cara Mengolah & Meracik {clean}",
+
+                "Tips Memasak dengan Api Sempurna",
+
+                "Hasil Akhir & Uji Rasa",
+
             ]
+
+            timestamps = AITitleGenerator.generate_synchronized_timestamps(
+
+                clean, comp_dur, chapter_labels=chapter_labels
+
+            )
             hashtags = [f"#{clean_tag}", f"#Resep{clean_tag}", "#KulinerViral", "#MasakPraktis"]
             shorts_package = {
                 "title": f"Trik Rahasia Bikin {clean} Jadi Super Enak! #shorts",
@@ -1779,13 +1916,25 @@ class SearchIntelligence:
                     f"Tertarik menginap di {clean}? Di video ini kita review tuntas suasana kamar, "
                     f"fasilitas asli di lapangan, dan apakah sepadan dengan biaya menginapnya!"
                 )
-                timestamps = [
-                    "00:00 - First Impression & Lokasi",
-                    f"01:45 - Room Tour & Fasilitas Kamar {clean}",
-                    "05:30 - Area Publik, Kolam & Fasilitas Unggulan",
-                    "08:45 - Review Menu Sarapan & Cita Rasa",
-                    "11:30 - Kesimpulan & Rekomendasi Booking",
+                chapter_labels = [
+
+                    "First Impression & Lokasi",
+
+                    f"Room Tour & Fasilitas Kamar {clean}",
+
+                    "Area Publik, Kolam & Fasilitas Unggulan",
+
+                    "Review Menu Sarapan & Cita Rasa",
+
+                    "Kesimpulan & Rekomendasi Booking",
+
                 ]
+
+                timestamps = AITitleGenerator.generate_synchronized_timestamps(
+
+                    clean, comp_dur, chapter_labels=chapter_labels
+
+                )
                 hashtags = [
                     f"#{clean_tag}",
                     "#HotelReview",
@@ -1830,13 +1979,25 @@ class SearchIntelligence:
                     f"Mau pesan {clean} dengan harga paling hemat? "
                     f"Di video ini kita bongkar trik berburu tarif termurah dan tips menghindari biaya tersembunyi!"
                 )
-                timestamps = [
-                    "00:00 - Pengantar & Masalah Lonjakan Harga",
-                    f"01:30 - Waktu Terbaik Berburu {clean}",
-                    "05:00 - Perbandingan Platform & Maskapai",
-                    "08:30 - Tips Hindari Biaya Tambahan & Aturan Bagasi",
-                    "11:15 - Kesimpulan & Rekomendasi Pemesanan",
+                chapter_labels = [
+
+                    "Pengantar & Masalah Lonjakan Harga",
+
+                    f"Waktu Terbaik Berburu {clean}",
+
+                    "Perbandingan Platform & Maskapai",
+
+                    "Tips Hindari Biaya Tambahan & Aturan Bagasi",
+
+                    "Kesimpulan & Rekomendasi Pemesanan",
+
                 ]
+
+                timestamps = AITitleGenerator.generate_synchronized_timestamps(
+
+                    clean, comp_dur, chapter_labels=chapter_labels
+
+                )
                 hashtags = [
                     f"#{clean_tag}",
                     "#TiketMurah",
@@ -1881,13 +2042,25 @@ class SearchIntelligence:
                     f"Sedang butuh {clean} untuk perjalananmu? "
                     f"Di video ini kita kupas panduan sewa aman, syarat lepas kunci, dan tips cek unit agar tidak rugi!"
                 )
-                timestamps = [
-                    "00:00 - Pengantar & Hal Penting Sebelum Sewa",
-                    f"01:45 - Kisaran Tarif Wajar {clean}",
-                    "04:30 - Cek Fisik & Kelengkapan Surat Unit",
-                    "08:00 - Aturan Deposit, Bensin & Kebijakan Denda",
-                    "10:45 - Kesimpulan & Checklist Serah Terima",
+                chapter_labels = [
+
+                    "Pengantar & Hal Penting Sebelum Sewa",
+
+                    f"Kisaran Tarif Wajar {clean}",
+
+                    "Cek Fisik & Kelengkapan Surat Unit",
+
+                    "Aturan Deposit, Bensin & Kebijakan Denda",
+
+                    "Kesimpulan & Checklist Serah Terima",
+
                 ]
+
+                timestamps = AITitleGenerator.generate_synchronized_timestamps(
+
+                    clean, comp_dur, chapter_labels=chapter_labels
+
+                )
                 hashtags = [
                     f"#{clean_tag}",
                     "#RentalMobil",
@@ -1949,13 +2122,25 @@ class SearchIntelligence:
                     f"Rencana liburan ke {clean}? Tonton panduan lengkap rute terbaik, "
                     f"estimasi budget, dan rekomendasi spot terbaik yang wajib kamu kunjungi!"
                 )
-                timestamps = [
-                    "00:00 - Pesona Keindahan Lokasi",
-                    f"01:45 - Rute & Transportasi Menuju {clean}",
-                    "05:20 - Rekomendasi Spot Terbaik & Daya Tarik",
-                    "09:10 - Estimasi Biaya & Kuliner Khas",
-                    "12:30 - Tips Penting Sebelum Berangkat",
+                chapter_labels = [
+
+                    "Pesona Keindahan Lokasi",
+
+                    f"Rute & Transportasi Menuju {clean}",
+
+                    "Rekomendasi Spot Terbaik & Daya Tarik",
+
+                    "Estimasi Biaya & Kuliner Khas",
+
+                    "Tips Penting Sebelum Berangkat",
+
                 ]
+
+                timestamps = AITitleGenerator.generate_synchronized_timestamps(
+
+                    clean, comp_dur, chapter_labels=chapter_labels
+
+                )
                 hashtags = [f"#{clean_tag}", f"#Wisata{clean_tag}", "#TravelVlog", "#LiburanHemat"]
                 shorts_package = {
                     "title": f"Spot Menarik di {clean} yang Wajib Kamu Kunjungi! #shorts",
@@ -2001,13 +2186,25 @@ class SearchIntelligence:
                 f"Mau belajar {clean} dengan alur yang jelas tanpa buang-buang budget? "
                 f"Di video ini kita kupas strategi terbukti dari nol sampai menghasilkan!"
             )
-            timestamps = [
-                "00:00 - Kenapa Harus Mulai Sekarang?",
-                f"02:15 - Riset & Fondasi Dasar {clean}",
-                "06:30 - Langkah Eksekusi Step-by-Step",
-                "12:45 - Optimasi & Cara Skalasi Hasil",
-                "17:20 - Evaluasi & Checklist Sukses",
+            chapter_labels = [
+
+                "Kenapa Harus Mulai Sekarang?",
+
+                f"Riset & Fondasi Dasar {clean}",
+
+                "Langkah Eksekusi Step-by-Step",
+
+                "Optimasi & Cara Skalasi Hasil",
+
+                "Evaluasi & Checklist Sukses",
+
             ]
+
+            timestamps = AITitleGenerator.generate_synchronized_timestamps(
+
+                clean, comp_dur, chapter_labels=chapter_labels
+
+            )
             hashtags = [f"#{clean_tag}", f"#{clean_tag}Pemula", "#BisnisDigital", "#StrategiBisnis"]
             shorts_package = {
                 "title": f"1 Hal yang Wajib Kamu Tahu Sebelum Mulai {clean}! #shorts",
@@ -2053,13 +2250,25 @@ class SearchIntelligence:
                 f"Baru mau belajar {clean_tech}? Jangan bingung, video ini merangkum "
                 f"tutorial langkah demi langkah dari dasar sampai kamu mahir!"
             )
-            timestamps = [
-                "00:00 - Pengantar & Konsep Dasar",
-                f"02:00 - Persiapan & Interface {clean}",
-                "05:30 - Langkah demi Langkah Praktik Langsung",
-                "10:15 - Trik Rahasia & Shortcut Berguna",
-                "14:00 - Kesimpulan & Langkah Lanjutan",
+            chapter_labels = [
+
+                "Pengantar & Konsep Dasar",
+
+                f"Persiapan & Interface {clean}",
+
+                "Langkah demi Langkah Praktik Langsung",
+
+                "Trik Rahasia & Shortcut Berguna",
+
+                "Kesimpulan & Langkah Lanjutan",
+
             ]
+
+            timestamps = AITitleGenerator.generate_synchronized_timestamps(
+
+                clean, comp_dur, chapter_labels=chapter_labels
+
+            )
             hashtags = [
                 f"#{clean_tag}",
                 f"#Tutorial{clean_tag}",
@@ -2104,13 +2313,25 @@ class SearchIntelligence:
                 f"Khawatir soal {clean}? Simak penjelasan medis, cara pencegahan alami, "
                 f"dan tips menjaga tubuh tetap prima tanpa resiko!"
             )
-            timestamps = [
-                "00:00 - Pemahaman Dasar Masalah",
-                f"02:15 - Penyebab Utama Terjadinya {clean}",
-                "06:00 - Cara Mengatasi & Pola Sehat",
-                "10:30 - Mitos vs Fakta Menurut Ahli",
-                "13:45 - Rangkuman Langkah Tindakan",
+            chapter_labels = [
+
+                "Pemahaman Dasar Masalah",
+
+                f"Penyebab Utama Terjadinya {clean}",
+
+                "Cara Mengatasi & Pola Sehat",
+
+                "Mitos vs Fakta Menurut Ahli",
+
+                "Rangkuman Langkah Tindakan",
+
             ]
+
+            timestamps = AITitleGenerator.generate_synchronized_timestamps(
+
+                clean, comp_dur, chapter_labels=chapter_labels
+
+            )
             hashtags = [f"#{clean_tag}", f"#Kesehatan{clean_tag}", "#HidupSehat", "#TipsMedis"]
             shorts_package = {
                 "title": f"Stop Lakukan Ini Kalau Gak Mau Kena {clean}! #shorts",
@@ -2150,13 +2371,25 @@ class SearchIntelligence:
                 f"Ada banyak kejanggalan dan teori mengejutkan di balik {clean}. "
                 f"Di video ini kita kupas tuntas seluruh rahasia dan fakta tersembunyinya!"
             )
-            timestamps = [
-                "00:00 - Pembuka & Sorotan Menarik",
-                f"02:00 - Latar Belakang & Pengenalan {clean}",
-                "06:30 - Momen Paling Krusial & Plot Twist",
-                "10:45 - Bedah Teori & Makna Tersembunyi",
-                "14:15 - Kesimpulan & Penjelasan Akhir",
+            chapter_labels = [
+
+                "Pembuka & Sorotan Menarik",
+
+                f"Latar Belakang & Pengenalan {clean}",
+
+                "Momen Paling Krusial & Plot Twist",
+
+                "Bedah Teori & Makna Tersembunyi",
+
+                "Kesimpulan & Penjelasan Akhir",
+
             ]
+
+            timestamps = AITitleGenerator.generate_synchronized_timestamps(
+
+                clean, comp_dur, chapter_labels=chapter_labels
+
+            )
             hashtags = [f"#{clean_tag}", f"#AlurCerita{clean_tag}", "#BedahFilm", "#PopCulture"]
             shorts_package = {
                 "title": f"Fakta Gila Seputar {clean} yang Pasti Belum Kamu Tahu! #shorts",
@@ -2196,13 +2429,25 @@ class SearchIntelligence:
                 f"Penasaran tentang {clean}? Di video ini kita bahas tuntas sejarah, "
                 f"fakta penting, dan segala hal menarik seputar topik ini!"
             )
-            timestamps = [
-                "00:00 - Pengantar Topik Menarik",
-                f"02:15 - Fakta Penting Seputar {clean}",
-                "06:00 - Penjelasan Mendalam & Contoh Nyata",
-                "10:30 - Mitos yang Sering Salah Dipahami",
-                "13:50 - Rangkuman & Pandangan Masa Depan",
+            chapter_labels = [
+
+                "Pengantar Topik Menarik",
+
+                f"Fakta Penting Seputar {clean}",
+
+                "Penjelasan Mendalam & Contoh Nyata",
+
+                "Mitos yang Sering Salah Dipahami",
+
+                "Rangkuman & Pandangan Masa Depan",
+
             ]
+
+            timestamps = AITitleGenerator.generate_synchronized_timestamps(
+
+                clean, comp_dur, chapter_labels=chapter_labels
+
+            )
             hashtags = [f"#{clean_tag}", f"#{clean_tag}Indonesia", "#EdukasiPopuler", "#FaktaUnik"]
             shorts_package = {
                 "title": f"Fakta Unik {clean} yang Bikin Kaget! #shorts",
@@ -2263,13 +2508,52 @@ class SearchIntelligence:
                 f"📌 Rangkuman lengkap dan mendalam seputar {clean}. Tonton video ini dari awal sampai akhir agar tidak ada detail penting yang terlewat!",
             )
 
+        from youtube_analyzer.connectors.youtube import parse_duration_to_seconds
+        from youtube_analyzer.core.ai_generator import AITitleGenerator
+
+        comp_dur = competitor.get("duration", "10:00") if competitor else "10:00"
+        max_sec = parse_duration_to_seconds(comp_dur)
+
+        if comp_format == "SHORTS" or "short" in str(comp_format).lower() or max_sec <= 60:
+            timestamps = []
+        else:
+            has_overflow = False
+            for ts in timestamps:
+                parts = ts.split("-")[0].strip().split(":")
+                if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
+                    sec = int(parts[0]) * 60 + int(parts[1])
+                    if sec > max_sec:
+                        has_overflow = True
+                        break
+            if has_overflow or len(timestamps) < 3:
+                timestamps = AITitleGenerator.generate_synchronized_timestamps(clean, comp_dur)
+
+        ts_section = "⏱️ TIMESTAMPS / DAFTAR ISI:\n" + "\n".join(timestamps) + "\n\n" if timestamps else ""
+
         full_description = (
             f"{two_line_hook}\n\n"
             f"{desc_intro}\n\n"
-            f"⏱️ TIMESTAMPS / DAFTAR ISI:\n" + "\n".join(timestamps) + f"\n\n🔗 LINK & INFORMASI:\n"
-            f"- Sumber Informasi & Diskusi: https://example.com\n\n"
+            f"{ts_section}💬 Tulis pertanyaan atau pengalaman Anda di kolom komentar di bawah!\n"
+            f"🔔 Subscribe & nyalakan lonceng agar tidak ketinggalan video terbaru.\n\n"
             f"{' '.join(hashtags)}"
         )
+
+        # Collect real competitor tags
+        comp_tags = []
+        for c in (all_comps or []):
+            if c.get("tags"):
+                comp_tags.extend(c.get("tags", []))
+        comp_tags = list(dict.fromkeys(t.strip() for t in comp_tags if t and t.strip()))
+
+        if comp_tags:
+            merged_tags = comp_tags[:12]
+            focus_tags = [seed.lower(), clean.lower(), f"cara {seed.lower()}", f"tips {seed.lower()}"]
+            for ft in focus_tags:
+                if ft not in [t.lower() for t in merged_tags]:
+                    merged_tags.append(ft)
+            video_tags_str = ", ".join(merged_tags[:18])
+        else:
+            video_tags_str = f"{seed}, {clean.lower()}, {niche}, cara {seed}, tips {seed}, panduan {seed}, tutorial {seed}"
 
         return {
             "seed_keyword": seed,
@@ -2292,6 +2576,7 @@ class SearchIntelligence:
             "two_line_hook": two_line_hook,
             "timestamps": timestamps,
             "hashtags": hashtags,
+            "video_tags": video_tags_str,
             "shorts_package": shorts_package,
             "generation_mode": "smart_heuristic",
             "ai_provider": None,
@@ -3047,16 +3332,39 @@ class SearchIntelligence:
         """
         AI Shorts Clipping & Viral Highlights Generator.
         Deconstructs a long-form video topic into 3-4 viral Short clips with hooks and timestamps.
+        Strictly scales timestamps within actual video duration.
         """
+        from youtube_analyzer.connectors.youtube import parse_duration_to_seconds
+
         clean = topic.strip().title()
         niche = cls.detect_content_niche(topic)
+        current_year = datetime.now(UTC).year
+
+        total_sec = parse_duration_to_seconds(duration)
+        if total_sec <= 0:
+            total_sec = 600
+
+        def _fmt(s: int) -> str:
+            m = s // 60
+            sec = s % 60
+            return f"{m:02d}:{sec:02d}"
+
+        def _make_window(start_pct: float, dur_sec: int = 45) -> str:
+            start_s = int(total_sec * start_pct)
+            end_s = min(start_s + dur_sec, total_sec)
+            actual_dur = max(5, end_s - start_s)
+            return f"{_fmt(start_s)} - {_fmt(end_s)} ({actual_dur} Detik)"
+
+        win1 = _make_window(0.12, 45)
+        win2 = _make_window(0.45, 45)
+        win3 = _make_window(0.75, 45)
 
         if niche == "documentary":
             return [
                 {
                     "clip_id": 1,
                     "clip_title": f"Detik-Detik Mencekam {clean} #shorts",
-                    "timestamp_window": "01:15 - 02:00 (45 Detik)",
+                    "timestamp_window": win1,
                     "hook_line": f"Ini detik-detik paling mengerikan saat peristiwa {clean} mengguncang dunia...",
                     "core_insight": "Visualisasi dramatis dan catatan saksi mata saat puncak letusan/bencana terjadi.",
                     "call_to_action": "Tonton dokumenter sejarah lengkapnya di video utama!",
@@ -3065,7 +3373,7 @@ class SearchIntelligence:
                 {
                     "clip_id": 2,
                     "clip_title": f"Fakta Mengerikan {clean} yang Jarang Diungkap #shorts",
-                    "timestamp_window": "05:30 - 06:15 (45 Detik)",
+                    "timestamp_window": win2,
                     "hook_line": f"Tahukah kamu kalau dampak dahsyat {clean} sempat mengubah iklim seluruh bumi?",
                     "core_insight": "Pengungkapan bukti arsip sejarah dan sains yang mencengangkan.",
                     "call_to_action": "Simpan video ini dan bagikan fakta ini ke temanmu!",
@@ -3074,7 +3382,7 @@ class SearchIntelligence:
                 {
                     "clip_id": 3,
                     "clip_title": f"Misteri Tersembunyi di Balik {clean} #shorts",
-                    "timestamp_window": "10:45 - 11:30 (45 Detik)",
+                    "timestamp_window": win3,
                     "hook_line": f"Ada satu kejanggalan besar dalam catatan peristiwa {clean} yang masih misterius...",
                     "core_insight": "Teori ilmiah dan temuan baru yang memicu rasa ingin tahu tinggi.",
                     "call_to_action": "Bagaimana menurutmu? Tulis pendapatmu di kolom komentar!",
@@ -3086,7 +3394,7 @@ class SearchIntelligence:
                 {
                     "clip_id": 1,
                     "clip_title": f"Rahasia Bumbu {clean} Seenak Restoran #shorts",
-                    "timestamp_window": "01:15 - 02:00 (45 Detik)",
+                    "timestamp_window": win1,
                     "hook_line": f"Ternyata cuma butuh 1 bumbu rahasia ini biar {clean} buatanmu 10x lebih lezat!",
                     "core_insight": "Trik marinasi dan takaran bumbu kunci yang jarang dibocorkan restoran.",
                     "call_to_action": "Tonton takaran gram lengkapnya di video utama!",
@@ -3095,7 +3403,7 @@ class SearchIntelligence:
                 {
                     "clip_id": 2,
                     "clip_title": f"Jangan Lakukan Ini Saat Masak {clean}! #shorts",
-                    "timestamp_window": "05:30 - 06:15 (45 Detik)",
+                    "timestamp_window": win2,
                     "hook_line": f"Stop lakukan kesalahan sepele ini kalau gak mau {clean} buatanmu gagal total!",
                     "core_insight": "Teknik pengaturan api dan waktu agar tekstur matang sempurna.",
                     "call_to_action": "Simpan resep ini buat menu masak berikutnya!",
@@ -3104,7 +3412,7 @@ class SearchIntelligence:
                 {
                     "clip_id": 3,
                     "clip_title": f"Trik Cepat Bikin {clean} Cuma 5 Menit #shorts",
-                    "timestamp_window": "10:45 - 11:30 (45 Detik)",
+                    "timestamp_window": win3,
                     "hook_line": f"Pengen makan {clean} tapi gak mau repot? Cobain metode kilat anti gagal ini!",
                     "core_insight": "Langkah ringkas praktis yang bisa langsung dipraktikkan siapa saja.",
                     "call_to_action": "Tulis di komentar, mau resep apa lagi selanjutnya?",
@@ -3116,7 +3424,7 @@ class SearchIntelligence:
                 {
                     "clip_id": 1,
                     "clip_title": f"Spot Tersembunyi di {clean} yang Wajib Tahu #shorts",
-                    "timestamp_window": "01:15 - 02:00 (45 Detik)",
+                    "timestamp_window": win1,
                     "hook_line": f"Kalau kamu ke {clean}, jangan cuma ke tempat biasa, spot rahasia ini jauh lebih indah!",
                     "core_insight": "Sudut panorama tersembunyi yang belum ramai turis.",
                     "call_to_action": "Tonton panduan rute dan rincian biaya di video lengkap!",
@@ -3125,7 +3433,7 @@ class SearchIntelligence:
                 {
                     "clip_id": 2,
                     "clip_title": f"Tips Hemat Liburan ke {clean} #shorts",
-                    "timestamp_window": "05:30 - 06:15 (45 Detik)",
+                    "timestamp_window": win2,
                     "hook_line": f"Liburan ke {clean} gak harus mahal! Terapkan trik hemat ini biar budget aman!",
                     "core_insight": "Rincian pengeluaran realistis dan waktu terbaik berkunjung.",
                     "call_to_action": "Simpan video ini untuk rencana itinerary liburanmu!",
@@ -3134,7 +3442,7 @@ class SearchIntelligence:
                 {
                     "clip_id": 3,
                     "clip_title": f"Aturan Wajib Sebelum Berangkat ke {clean} #shorts",
-                    "timestamp_window": "10:45 - 11:30 (45 Detik)",
+                    "timestamp_window": win3,
                     "hook_line": f"Jangan pernah ke {clean} sebelum kamu tahu peringatan penting ini!",
                     "core_insight": "Informasi cuaca, medan lokasi, dan etika berkunjung yang harus dipatuhi.",
                     "call_to_action": "Pernah ke sini juga? Bagikan pengalamanmu di komentar!",
@@ -3146,7 +3454,7 @@ class SearchIntelligence:
                 {
                     "clip_id": 1,
                     "clip_title": f"Detail Gila di {clean} yang Terlewatkan #shorts",
-                    "timestamp_window": "01:15 - 02:00 (45 Detik)",
+                    "timestamp_window": win1,
                     "hook_line": f"Hampir 99% orang gak sadar kalau ada detail tersembunyi di {clean}!",
                     "core_insight": "Analisis adegan / petunjuk rahasia yang mengubah jalan cerita.",
                     "call_to_action": "Tonton bedah cerita lengkapnya di video utama!",
@@ -3155,7 +3463,7 @@ class SearchIntelligence:
                 {
                     "clip_id": 2,
                     "clip_title": f"Teori Mengejutkan Seputar {clean} #shorts",
-                    "timestamp_window": "05:30 - 06:15 (45 Detik)",
+                    "timestamp_window": win2,
                     "hook_line": f"Gimana kalau fakta sesungguhnya di {clean} sama sekali bukan seperti yang kamu duga?",
                     "core_insight": "Eksplorasi plot twist dan spekulasi cerita yang memukau.",
                     "call_to_action": "Tonton video lengkapnya untuk penjelasan alur selengkapnya!",
@@ -3164,7 +3472,7 @@ class SearchIntelligence:
                 {
                     "clip_id": 3,
                     "clip_title": f"Makna Sebenarnya dari Ending {clean} #shorts",
-                    "timestamp_window": "10:45 - 11:30 (45 Detik)",
+                    "timestamp_window": win3,
                     "hook_line": f"Masih bingung sama adegan akhir {clean}? Ini penjelasan makna sesungguhnya!",
                     "core_insight": "Penjelasan makna filosofis dan pesan tersirat sang kreator.",
                     "call_to_action": "Setuju gak sama teori ini? Tulis pendapatmu di komentar!",
@@ -3176,7 +3484,7 @@ class SearchIntelligence:
                 {
                     "clip_id": 1,
                     "clip_title": f"Tanda Tubuhmu Mengalami {clean} #shorts",
-                    "timestamp_window": "01:15 - 02:00 (45 Detik)",
+                    "timestamp_window": win1,
                     "hook_line": f"Waspada 3 tanda ini di tubuhmu, jangan-jangan kamu sedang mengalami {clean}!",
                     "core_insight": "Edukasi deteksi gejala awal menurut fakta kesehatan.",
                     "call_to_action": "Tonton penjelasan dokter dan solusi alaminya di video lengkap!",
@@ -3185,7 +3493,7 @@ class SearchIntelligence:
                 {
                     "clip_id": 2,
                     "clip_title": f"Hindari 1 Hal Ini Kalau Ada {clean}! #shorts",
-                    "timestamp_window": "05:30 - 06:15 (45 Detik)",
+                    "timestamp_window": win2,
                     "hook_line": f"Banyak orang belum tahu, 1 kebiasaan sepele ini justru bikin {clean} makin parah!",
                     "core_insight": "Pantangan medis penting dan alternatif kebiasaan yang lebih sehat.",
                     "call_to_action": "Simpan video ini dan kirim ke orang tersayang!",
@@ -3194,7 +3502,7 @@ class SearchIntelligence:
                 {
                     "clip_id": 3,
                     "clip_title": f"Cara Alami Atasi {clean} Tanpa Obat Kimia #shorts",
-                    "timestamp_window": "10:45 - 11:30 (45 Detik)",
+                    "timestamp_window": win3,
                     "hook_line": f"Coba lakukan langkah alami ini secara rutin untuk meredakan {clean}!",
                     "core_insight": "Pola hidup sehat dan nutrisi alami yang terbukti menjaga kondisi tubuh.",
                     "call_to_action": "Komen di bawah apa keluhan yang paling sering kamu rasakan!",
@@ -3206,7 +3514,7 @@ class SearchIntelligence:
                 {
                     "clip_id": 1,
                     "clip_title": f"1 Rahasia {clean} yang Mengubah Segalanya #shorts",
-                    "timestamp_window": "01:15 - 02:00 (45 Detik)",
+                    "timestamp_window": win1,
                     "hook_line": f"Banyak yang gagal saat menjalankan {clean} cuma gara-gara 1 kesalahan kecil ini...",
                     "core_insight": "Demonstrasi bagian teknis paling krusial yang langsung mengubah hasil.",
                     "call_to_action": "Tonton tutorial strategi lengkapnya di channel ini!",
@@ -3215,7 +3523,7 @@ class SearchIntelligence:
                 {
                     "clip_id": 2,
                     "clip_title": f"Cukup 30 Detik Paham Cara Kerja {clean} #shorts",
-                    "timestamp_window": "05:30 - 06:15 (45 Detik)",
+                    "timestamp_window": win2,
                     "hook_line": f"Kalau kamu masih bingung cara kerja {clean}, tonton ini sampai habis!",
                     "core_insight": "Alur visual cepat step-by-step tanpa basa-basi.",
                     "call_to_action": "Simpan video ini biar gak lupa!",
@@ -3224,7 +3532,7 @@ class SearchIntelligence:
                 {
                     "clip_id": 3,
                     "clip_title": f"Jangan Pernah Lakukan Ini Saat {clean}! #shorts",
-                    "timestamp_window": "10:45 - 11:30 (45 Detik)",
+                    "timestamp_window": win3,
                     "hook_line": f"Ini kesalahan paling fatal seputar {clean} yang bikin waktu dan energimu terbuang sia-sia!",
                     "core_insight": "Peringatan berbasis studi kasus nyata yang sering diabaikan.",
                     "call_to_action": "Komen pendapatmu di bawah, pernah ngalamin juga?",
@@ -3236,7 +3544,7 @@ class SearchIntelligence:
                 {
                     "clip_id": 1,
                     "clip_title": f"Shortcut Rahasia {clean} yang Wajib Tahu #shorts",
-                    "timestamp_window": "01:15 - 02:00 (45 Detik)",
+                    "timestamp_window": win1,
                     "hook_line": f"Kerja pakai {clean} bakal 10x lebih cepat kalau kamu tahu trik tersembunyi ini!",
                     "core_insight": "Tips efisiensi kerja dan fitur tersembunyi yang menghemat waktu.",
                     "call_to_action": "Tonton tutorial lengkap langkah demi langkah di video utama!",
@@ -3245,7 +3553,7 @@ class SearchIntelligence:
                 {
                     "clip_id": 2,
                     "clip_title": f"Solusi Error pada {clean} dalam 30 Detik #shorts",
-                    "timestamp_window": "05:30 - 06:15 (45 Detik)",
+                    "timestamp_window": win2,
                     "hook_line": f"Pernah ngalamin kendala ini pas pakai {clean}? Jangan panik, ini solusinya!",
                     "core_insight": "Perbaikan langsung untuk kendala teknis yang paling sering muncul.",
                     "call_to_action": "Simpan video ini buat jaga-jaga kalau ketemu error serupa!",
@@ -3253,8 +3561,8 @@ class SearchIntelligence:
                 },
                 {
                     "clip_id": 3,
-                    "clip_title": f"Fitur Baru {clean} Versi 2026 #shorts",
-                    "timestamp_window": "10:45 - 11:30 (45 Detik)",
+                    "clip_title": f"Fitur Baru {clean} Versi {current_year} #shorts",
+                    "timestamp_window": win3,
                     "hook_line": f"Ada update keren di {clean} yang bikin cara kerjamu jauh lebih simpel!",
                     "core_insight": "Review ringkas peningkatan performa dan navigasi baru.",
                     "call_to_action": "Udah coba fitur ini belum? Komen di bawah ya!",
@@ -3266,7 +3574,7 @@ class SearchIntelligence:
                 {
                     "clip_id": 1,
                     "clip_title": f"Fakta Menakjubkan Seputar {clean} #shorts",
-                    "timestamp_window": "01:15 - 02:00 (45 Detik)",
+                    "timestamp_window": win1,
                     "hook_line": f"Tahukah kamu ada fakta mengejutkan seputar {clean} yang jarang diketahui?",
                     "core_insight": "Informasi unik dan berbobot yang memancing rasa penasaran audiens.",
                     "call_to_action": "Tonton penjelasan lengkapnya di video utama!",
@@ -3275,7 +3583,7 @@ class SearchIntelligence:
                 {
                     "clip_id": 2,
                     "clip_title": f"Kenapa {clean} Begitu Menarik? #shorts",
-                    "timestamp_window": "05:30 - 06:15 (45 Detik)",
+                    "timestamp_window": win2,
                     "hook_line": f"Banyak orang belum sadar alasan kenapa {clean} punya pengaruh sebesar ini...",
                     "core_insight": "Sudut pandang segar dan analisis mendalam yang mudah dipahami.",
                     "call_to_action": "Simpan video ini untuk referensi wawasanmu!",
@@ -3284,7 +3592,7 @@ class SearchIntelligence:
                 {
                     "clip_id": 3,
                     "clip_title": f"Mitos vs Fakta Seputar {clean} #shorts",
-                    "timestamp_window": "10:45 - 11:30 (45 Detik)",
+                    "timestamp_window": win3,
                     "hook_line": f"Jangan gampang percaya, mitos tentang {clean} ini ternyata keliru besar!",
                     "core_insight": "Pembongkaran miskonsepsi umum berdasarkan fakta valid.",
                     "call_to_action": "Bagaimana menurutmu? Tulis tanggapanmu di komentar!",

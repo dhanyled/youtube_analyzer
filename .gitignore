@@ -70,3 +70,18 @@ $RECYCLE.BIN/
 *.key
 *.pem
 credentials.json
+
+# Secret files & OAuth Tokens
+client_secret.json
+.youtube_token.json*
+*.bak
+
+# Scratch & Temporary Notes
+agy.txt
+gagal.txt
+notif.txt
+chatgpt.txt
+SEO_COPY_PASTE.txt
+json/
+.agents/
+.claude/

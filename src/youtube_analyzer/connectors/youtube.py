@@ -1,14 +1,27 @@
 """YouTube SERP, Autocomplete & Competitor Ranking Inspector."""
 
+import asyncio
 import json
+import logging
 import os
+import random
 import re
 from typing import Any
 
 import httpx
+from dotenv import load_dotenv
 
 from youtube_analyzer.connectors.base import BaseConnector
 from youtube_analyzer.core.models import PlatformEnum
+
+try:
+    from youtube_transcript_api import YouTubeTranscriptApi
+except ImportError:
+    YouTubeTranscriptApi = None
+
+load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 
 class YouTubeConnector(BaseConnector):
@@ -17,6 +30,51 @@ class YouTubeConnector(BaseConnector):
     SUGGEST_URL = "https://suggestqueries.google.com/complete/search"
     SEARCH_URL = "https://www.youtube.com/results"
 
+    USER_AGENTS_DESKTOP = [
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    ]
+
+    USER_AGENTS_MOBILE = [
+        "Mozilla/5.0 (Linux; Android 14; SM-S928B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.6367.113 Mobile Safari/537.36",
+        "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.6367.82 Mobile Safari/537.36",
+    ]
+
+    @classmethod
+    def _get_natural_headers(
+        cls, hl: str = "id", gl: str = "ID", device: str = "desktop"
+    ) -> dict[str, str]:
+        """Generate human-like modern browser fingerprint headers."""
+        if device.lower() == "mobile":
+            ua = random.choice(cls.USER_AGENTS_MOBILE)
+            platform = '"Android"'
+            mobile = "?1"
+        else:
+            ua = random.choice(cls.USER_AGENTS_DESKTOP)
+            platform = '"Windows"' if "Windows" in ua else '"macOS"'
+            mobile = "?0"
+
+        return {
+            "User-Agent": ua,
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+            "Accept-Language": f"{hl}-{gl},{hl};q=0.9,en-US;q=0.8,en;q=0.7",
+            "Sec-Ch-Ua": '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+            "Sec-Ch-Ua-Mobile": mobile,
+            "Sec-Ch-Ua-Platform": platform,
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "none",
+            "Sec-Fetch-User": "?1",
+            "Upgrade-Insecure-Requests": "1",
+            "Cookie": f"PREF=tz=Asia.Jakarta&hl={hl}&gl={gl};",
+        }
+
+    @staticmethod
+    async def _human_delay(min_sec: float = 0.5, max_sec: float = 1.6) -> None:
+        """Introduce natural, human-like random pause (typing/navigation jitter)."""
+        await asyncio.sleep(random.uniform(min_sec, max_sec))
+
     def __init__(self, api_key: str | None = None):
         key = api_key or os.getenv("YOUTUBE_API_KEY")
         super().__init__(platform=PlatformEnum.YOUTUBE_SEARCH, api_key=key)
@@ -24,16 +82,20 @@ class YouTubeConnector(BaseConnector):
     async def get_autocomplete(
         self, query: str, client_type: str = "youtube", hl: str = "id"
     ) -> list[str]:
-        """Fetch YouTube autocomplete suggestions (public endpoint)."""
+        """Fetch live YouTube autocomplete suggestions (public endpoint) with natural jitter delay."""
+        # Natural human delay before typing/searching
+        await self._human_delay(0.2, 0.5)
+
         params = {
             "client": client_type,
             "ds": "yt",
             "q": query,
             "hl": hl,
         }
+        headers = self._get_natural_headers(hl=hl)
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
-                resp = await client.get(self.SUGGEST_URL, params=params)
+                resp = await client.get(self.SUGGEST_URL, params=params, headers=headers)
                 if resp.status_code == 200:
                     text = resp.text
                     start = text.find("(")
@@ -46,884 +108,637 @@ class YouTubeConnector(BaseConnector):
                             ]
                             if items:
                                 return items
+        except Exception as e:
+            logger.warning(f"Error fetching live autocomplete for '{query}': {e}")
+
+        # Real data only: if no suggestions found from YouTube, return empty list (no fake/dummy suggestions)
+        return []
+
+
+    _shorts_cache: dict[str, bool] = {}
+
+    @classmethod
+    def detect_video_format(
+        cls,
+        video_id: str = "",
+        title: str = "",
+        duration_seconds: int = 0,
+        thumbnail_url: str = "",
+    ) -> tuple[bool, str]:
+        """
+        Accurately detect whether a video is SHORTS (9:16 vertical) or LANDSCAPE (16:9).
+        Never misclassifies horizontal landscape videos as Shorts based solely on duration.
+        Returns: (is_shorts: bool, format_name: "SHORTS" | "LANDSCAPE")
+        """
+        # 1. Videos longer than 3 minutes (180s) can never be YouTube Shorts
+        if duration_seconds > 180:
+            return False, "LANDSCAPE"
+
+        # 2. Check explicit markers in title
+        title_lower = title.lower()
+        if "#shorts" in title_lower or "#short" in title_lower:
+            return True, "SHORTS"
+
+        # 3. Check format cache
+        if video_id and video_id in cls._shorts_cache:
+            is_sh = cls._shorts_cache[video_id]
+            return is_sh, "SHORTS" if is_sh else "LANDSCAPE"
+
+        # 4. For short-duration videos (<= 60s), check YouTube server response
+        # YouTube responds with 303 Redirect to /watch for Landscape videos accessed via /shorts/{video_id}
+        if 0 < duration_seconds <= 60 and video_id:
+            try:
+                headers = {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                }
+                with httpx.Client(follow_redirects=False, timeout=2.5) as client:
+                    resp = client.head(f"https://www.youtube.com/shorts/{video_id}", headers=headers)
+                    if resp.status_code == 303:
+                        cls._shorts_cache[video_id] = False
+                        return False, "LANDSCAPE"
+                    if resp.status_code == 200:
+                        cls._shorts_cache[video_id] = True
+                        return True, "SHORTS"
+            except Exception:
+                pass
+
+            # Fallback: landscape videos generated with high-res standard 16:9 thumbnails
+            if "maxresdefault" in thumbnail_url:
+                cls._shorts_cache[video_id] = False
+                return False, "LANDSCAPE"
+
+        return False, "LANDSCAPE"
+
+    @staticmethod
+    def _parse_iso_duration(dur_str: str) -> tuple[str, bool]:
+        """Convert ISO 8601 duration (e.g. PT1M30S) to readable MM:SS."""
+        if not dur_str:
+            return "10:00", False
+        m = re.match(r"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?", dur_str)
+        if not m:
+            return "10:00", False
+        hours = int(m.group(1) or 0)
+        minutes = int(m.group(2) or 0)
+        seconds = int(m.group(3) or 0)
+        total_seconds = hours * 3600 + minutes * 60 + seconds
+        is_shorts = total_seconds <= 60
+        if hours > 0:
+            formatted = f"{hours}:{minutes:02d}:{seconds:02d}"
+        else:
+            formatted = f"{minutes}:{seconds:02d}"
+        return formatted, is_shorts
+
+    @staticmethod
+    def parse_duration_to_seconds(dur_str: str | int | None) -> int:
+        """Parse duration (string like '08:30', '1:15:20', 'PT8M30S', or int seconds) to total seconds."""
+        if dur_str is None:
+            return 0
+        if isinstance(dur_str, (int, float)):
+            return int(dur_str)
+        clean = str(dur_str).strip()
+        if not clean:
+            return 0
+        if clean.startswith("PT"):
+            m = re.match(r"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?", clean)
+            if m:
+                h = int(m.group(1) or 0)
+                mi = int(m.group(2) or 0)
+                s = int(m.group(3) or 0)
+                return h * 3600 + mi * 60 + s
+        parts = clean.split(":")
+        try:
+            if len(parts) == 3:
+                return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+            elif len(parts) == 2:
+                return int(parts[0]) * 60 + int(parts[1])
+            elif len(parts) == 1:
+                digits = re.findall(r"\d+", parts[0])
+                if digits:
+                    return int(digits[0])
+        except (ValueError, TypeError):
+            pass
+        return 0
+
+    @staticmethod
+    def _format_views_display(views_count: int) -> str:
+        """Format raw integer views into human-readable string (e.g. 1.2M views, 340K views)."""
+        if views_count >= 1_000_000:
+            return f"{views_count / 1_000_000:.1f}M views"
+        elif views_count >= 1_000:
+            return f"{views_count / 1_000:.1f}K views"
+        return f"{views_count} views"
+
+    @staticmethod
+    def extract_video_id(url_or_id: str) -> str | None:
+        """Extract 11-char YouTube video ID from various URL formats or raw ID."""
+        if not url_or_id:
+            return None
+        clean = url_or_id.strip()
+        if len(clean) == 11 and re.match(r"^[a-zA-Z0-9_-]{11}$", clean):
+            return clean
+        patterns = [
+            r"(?:v=|\/v\/|embed\/|shorts\/|live\/|youtu\.be\/|\/e\/)([a-zA-Z0-9_-]{11})",
+            r"youtube\.com\/watch\?.*v=([a-zA-Z0-9_-]{11})",
+        ]
+        for pattern in patterns:
+            m = re.search(pattern, clean)
+            if m:
+                return m.group(1)
+        return None
+
+    def get_video_transcript(
+        self, video_id: str, languages: list[str] | None = None
+    ) -> dict[str, Any]:
+        """Fetch live transcript (captions/subtitles) using YouTubeTranscriptApi."""
+        if not YouTubeTranscriptApi:
+            return {
+                "available": False,
+                "timestamped_text": "",
+                "full_text": "",
+                "snippet_count": 0,
+                "error": "Library youtube_transcript_api belum terpasang.",
+            }
+
+        langs = languages or ["id", "en"]
+        try:
+            api = YouTubeTranscriptApi()
+            t_list = api.list(video_id)
+            trans = None
+            try:
+                trans = t_list.find_transcript(langs)
+            except Exception:
+                for t in t_list:
+                    trans = t
+                    break
+
+            if trans:
+                snippets = trans.fetch().to_raw_data()
+                lines = []
+                plain_words = []
+                for s in snippets:
+                    st_sec = int(s.get("start", 0))
+                    m, sec = divmod(st_sec, 60)
+                    txt = s.get("text", "").strip()
+                    lines.append(f"[{m:02d}:{sec:02d}] {txt}")
+                    plain_words.append(txt)
+                return {
+                    "available": True,
+                    "language": trans.language,
+                    "language_code": trans.language_code,
+                    "is_generated": trans.is_generated,
+                    "timestamped_text": "\n".join(lines),
+                    "full_text": " ".join(plain_words),
+                    "snippet_count": len(snippets),
+                    "error": None,
+                }
+            return {
+                "available": False,
+                "timestamped_text": "",
+                "full_text": "",
+                "snippet_count": 0,
+                "error": "Transkrip / subtitle tidak tersedia untuk video ini.",
+            }
+        except Exception as e:
+            return {
+                "available": False,
+                "timestamped_text": "",
+                "full_text": "",
+                "snippet_count": 0,
+                "error": f"Tidak dapat mengambil transkrip: {e}",
+            }
+
+    async def get_video_details(self, video_id: str) -> dict[str, Any] | None:
+        """Fetch complete video details (title, description, tags, stats, duration) via YouTube API or scraper."""
+        if self.api_key:
+            try:
+                url = "https://www.googleapis.com/youtube/v3/videos"
+                params = {
+                    "part": "snippet,contentDetails,statistics",
+                    "id": video_id,
+                    "key": self.api_key,
+                }
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    resp = await client.get(url, params=params)
+                    if resp.status_code == 200:
+                        items = resp.json().get("items", [])
+                        if items:
+                            item = items[0]
+                            snippet = item.get("snippet", {})
+                            stats = item.get("statistics", {})
+                            cd = item.get("contentDetails", {})
+                            dur_iso = cd.get("duration", "")
+                            dur_text, _ = self._parse_iso_duration(dur_iso)
+                            raw_views = int(stats.get("viewCount", 0))
+                            likes = int(stats.get("likeCount", 0))
+                            comments = int(stats.get("commentCount", 0))
+                            thumbnails = snippet.get("thumbnails", {})
+                            thumb_url = (
+                                thumbnails.get("maxres", {}).get("url")
+                                or thumbnails.get("standard", {}).get("url")
+                                or thumbnails.get("high", {}).get("url")
+                                or thumbnails.get("medium", {}).get("url")
+                                or thumbnails.get("default", {}).get("url", "")
+                            )
+                            tags = snippet.get("tags", [])
+                            dur_sec = self.parse_duration_to_seconds(dur_text)
+                            is_shorts, format_type = self.detect_video_format(
+                                video_id=video_id,
+                                title=snippet.get("title", ""),
+                                duration_seconds=dur_sec,
+                                thumbnail_url=thumb_url,
+                            )
+                            return {
+                                "video_id": video_id,
+                                "url": f"https://www.youtube.com/watch?v={video_id}",
+                                "title": snippet.get("title", ""),
+                                "description": snippet.get("description", ""),
+                                "tags": tags,
+                                "channel": snippet.get("channelTitle", ""),
+                                "channel_id": snippet.get("channelId", ""),
+                                "published_at": snippet.get("publishedAt", ""),
+                                "views": raw_views,
+                                "views_display": self._format_views_display(raw_views),
+                                "likes": likes,
+                                "comments": comments,
+                                "duration": dur_text,
+                                "duration_seconds": dur_sec,
+                                "is_shorts": is_shorts,
+                                "format": format_type,
+                                "thumbnail_url": thumb_url,
+                                "data_source": "YOUTUBE_API_V3",
+                            }
+            except Exception:
+                pass
+
+        # Robust live scraping from YouTube HTML and ytInitialPlayerResponse
+        try:
+            url = f"https://www.youtube.com/watch?v={video_id}"
+            headers = self._get_natural_headers(hl="id", gl="ID", device="desktop")
+            async with httpx.AsyncClient(timeout=12.0, follow_redirects=True) as client:
+                resp = await client.get(url, headers=headers)
+                if resp.status_code == 200:
+                    html = resp.text
+
+                    # 1. Parse embedded ytInitialPlayerResponse
+                    player_data = {}
+                    m_player = re.search(r"ytInitialPlayerResponse\s*=\s*({.+?});", html)
+                    if m_player:
+                        try:
+                            player_data = json.loads(m_player.group(1))
+                        except Exception:
+                            pass
+
+                    v_det = player_data.get("videoDetails", {})
+
+                    # Title
+                    title = v_det.get("title")
+                    if not title:
+                        title_match = re.search(r"<title>(.*?) - YouTube<\/title>", html)
+                        title = title_match.group(1) if title_match else f"Video {video_id}"
+
+                    # Description
+                    description = v_det.get("shortDescription")
+                    if not description:
+                        m_desc = re.search(r'<meta property="og:description" content="(.*?)">', html)
+                        description = m_desc.group(1) if m_desc else ""
+
+                    # Channel / Author
+                    channel = v_det.get("author")
+                    if not channel:
+                        m_chan = re.search(r'<link itemprop="name" content="(.*?)">', html)
+                        channel = m_chan.group(1) if m_chan else "YouTube Creator"
+                    channel_id = v_det.get("channelId", "")
+
+                    # Views
+                    raw_views = 0
+                    if v_det.get("viewCount"):
+                        try:
+                            raw_views = int(v_det.get("viewCount"))
+                        except (ValueError, TypeError):
+                            pass
+                    if raw_views == 0:
+                        m_views = re.search(r'<meta itemprop="interactionCount" content="(\d+)">', html)
+                        if m_views:
+                            try:
+                                raw_views = int(m_views.group(1))
+                            except (ValueError, TypeError):
+                                pass
+
+                    # Duration & Shorts detection
+                    length_sec = 0
+                    if v_det.get("lengthSeconds"):
+                        try:
+                            length_sec = int(v_det.get("lengthSeconds"))
+                        except (ValueError, TypeError):
+                            pass
+                    if length_sec == 0:
+                        m_dur = re.search(r'<meta itemprop="duration" content="(PT.*?)">', html)
+                        if m_dur:
+                            length_sec = self.parse_duration_to_seconds(m_dur.group(1))
+
+                    if length_sec > 0:
+                        h = length_sec // 3600
+                        m = (length_sec % 3600) // 60
+                        s = length_sec % 60
+                        dur_text = f"{h}:{m:02d}:{s:02d}" if h > 0 else f"{m:02d}:{s:02d}"
+                    else:
+                        dur_text = "N/A"
+
+                    # Tags / Keywords extraction
+                    tags = v_det.get("keywords", [])
+                    if not tags:
+                        og_tags = re.findall(r'<meta property="og:video:tag" content="(.*?)">', html)
+                        if og_tags:
+                            tags = [t.strip() for t in og_tags if t.strip()]
+                    if not tags:
+                        m_meta_kw = re.search(r'<meta name="keywords" content="(.*?)">', html)
+                        if m_meta_kw:
+                            tags = [t.strip() for t in m_meta_kw.group(1).split(",") if t.strip()]
+
+                    # Deduplicate tags while preserving order
+                    tags = list(dict.fromkeys(tags))
+
+                    # Thumbnails
+                    thumb_url = f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg"
+
+                    is_shorts, format_type = self.detect_video_format(
+                        video_id=video_id,
+                        title=title,
+                        duration_seconds=length_sec,
+                        thumbnail_url=thumb_url,
+                    )
+
+                    # Published Date extraction
+                    published_at = ""
+                    m_date = re.search(r'itemprop="datePublished" content="(.*?)"', html)
+                    if m_date:
+                        published_at = m_date.group(1)[:10]
+                    elif v_det.get("publishDate"):
+                        published_at = str(v_det.get("publishDate"))[:10]
+                    elif v_det.get("uploadDate"):
+                        published_at = str(v_det.get("uploadDate"))[:10]
+
+                    # Likes count extraction if available in accessibility data
+                    likes = 0
+                    m_like = re.search(r'like this video along with ([\d,]+) other people', html, re.IGNORECASE)
+                    if not m_like:
+                        m_like = re.search(r'sukai video ini bersama ([\d\.]+) orang lainnya', html, re.IGNORECASE)
+                    if m_like:
+                        try:
+                            likes = int(m_like.group(1).replace(",", "").replace(".", ""))
+                        except Exception:
+                            pass
+
+                    return {
+                        "video_id": video_id,
+                        "url": url,
+                        "title": title,
+                        "description": description,
+                        "tags": tags,
+                        "channel": channel,
+                        "channel_id": channel_id,
+                        "published_at": published_at,
+                        "views": raw_views,
+                        "views_display": self._format_views_display(raw_views) if raw_views else "N/A",
+                        "likes": likes,
+                        "comments": 0,
+                        "duration": dur_text,
+                        "duration_seconds": length_sec,
+                        "is_shorts": is_shorts,
+                        "format": format_type,
+                        "thumbnail_url": thumb_url,
+                        "data_source": "SCRAPED_PLAYER_RESPONSE",
+                    }
         except Exception:
             pass
 
-        # Fallback offline suggestions tailored to content niche
-        from youtube_analyzer.core.intelligence import SearchIntelligence
+        return None
 
-        niche = SearchIntelligence.detect_content_niche(query)
-        if niche == "documentary":
-            return [
-                f"dokumenter {query}",
-                f"sejarah {query}",
-                f"kronologi {query}",
-                f"kisah nyata {query}",
-                f"fakta {query}",
-            ]
-        elif niche == "culinary":
-            return [
-                f"resep {query}",
-                f"cara membuat {query}",
-                f"bumbu {query}",
-                f"cara masak {query}",
-                f"{query} praktis",
-            ]
-        elif niche == "travel":
-            return [
-                f"wisata {query}",
-                f"harga tiket {query}",
-                f"rute ke {query}",
-                f"vlog {query}",
-                f"tips liburan ke {query}",
-            ]
-        elif niche == "entertainment":
-            return [
-                f"alur cerita {query}",
-                f"sinopsis {query}",
-                f"bedah film {query}",
-                f"penjelasan ending {query}",
-                f"review {query}",
-            ]
-        elif niche == "health_fitness":
-            return [
-                f"cara mengatasi {query}",
-                f"gejala {query}",
-                f"penyebab {query}",
-                f"tips hidup sehat {query}",
-                f"obat alami {query}",
-            ]
-        elif niche == "business":
-            return [
-                f"cara {query}",
-                f"tutorial {query}",
-                f"strategi {query}",
-                f"panduan {query}",
-                f"{query} pemula",
-            ]
-        elif niche == "tech_tutorial":
-            return [
-                f"tutorial {query}",
-                f"cara setting {query}",
-                f"panduan {query}",
-                f"tips trik {query}",
-                f"cara menggunakan {query}",
-            ]
-        else:
-            return [
-                f"apa itu {query}",
-                f"fakta unik {query}",
-                f"sejarah {query}",
-                f"penjelasan {query}",
-                f"rangkuman {query}",
-            ]
+    async def _fetch_competitors_via_api(
+        self, query: str, limit: int = 10
+    ) -> list[dict[str, Any]]:
+        """Fetch live, 100% real competitor rankings via YouTube Data API v3."""
+        try:
+            async with httpx.AsyncClient(timeout=12.0) as client:
+                search_url = "https://www.googleapis.com/youtube/v3/search"
+                search_params = {
+                    "part": "snippet",
+                    "q": query,
+                    "type": "video",
+                    "maxResults": min(limit, 25),
+                    "key": self.api_key,
+                }
+                s_resp = await client.get(search_url, params=search_params)
+                if s_resp.status_code != 200:
+                    return []
+                items = s_resp.json().get("items", [])
+                vid_ids = [it["id"]["videoId"] for it in items if "videoId" in it.get("id", {})]
+                if not vid_ids:
+                    return []
 
-    def _get_fallback_competitors(self, query: str) -> list[dict[str, Any]]:
-        """Fallback realistic competitor data (based on actual YouTube SERP benchmarks, up to 10 videos)."""
-        clean = query.strip().title()
-        from youtube_analyzer.core.intelligence import SearchIntelligence
+                v_url = "https://www.googleapis.com/youtube/v3/videos"
+                v_params = {
+                    "part": "snippet,contentDetails,statistics",
+                    "id": ",".join(vid_ids),
+                    "key": self.api_key,
+                }
+                v_resp = await client.get(v_url, params=v_params)
+                if v_resp.status_code != 200:
+                    return []
+                v_items = v_resp.json().get("items", [])
 
-        niche = SearchIntelligence.detect_content_niche(query)
-        base_url = "https://www.youtube.com/results?search_query=" + query.replace(" ", "+")
+                v_map = {v["id"]: v for v in v_items}
+                competitors = []
+                for rank, vid_id in enumerate(vid_ids[:limit], 1):
+                    v_data = v_map.get(vid_id)
+                    if not v_data:
+                        continue
+                    snip = v_data.get("snippet", {})
+                    stats = v_data.get("statistics", {})
+                    content_details = v_data.get("contentDetails", {})
 
-        if niche == "documentary":
-            return [
-                {
-                    "rank": 1,
-                    "title": f"Detik-Detik Mencekam {clean} yang Mengguncang Dunia (Dokumenter Lengkap)",
-                    "channel": "Dokumenter Sejarah Dunia",
-                    "views": "2.4M views",
-                    "views_count": 2400000,
-                    "upload_age": "1 tahun lalu",
-                    "duration": "22:15",
-                    "format": "LANDSCAPE",
-                    "url": base_url,
-                    "outlier_status": "🔥 VIRAL_BREAKOUT (14.2x)",
-                    "is_ai_generated": False,
-                    "ai_badge": "👤 Human Creator",
-                    "ai_label_reason": "Arsip sejarah autentik, narator manusia profesional, wawancara sejarawan.",
-                },
-                {
-                    "rank": 2,
-                    "title": f"Fakta Mengerikan di Balik {clean} yang Jarang Diungkap ke Publik",
-                    "channel": "Arsip Bumi & Nusantara",
-                    "views": "890K views",
-                    "views_count": 890000,
-                    "upload_age": "6 bulan lalu",
-                    "duration": "18:40",
-                    "format": "LANDSCAPE",
-                    "url": base_url,
-                    "outlier_status": "⭐ STRONG_OUTLIER (4.8x)",
-                    "is_ai_generated": False,
-                    "ai_badge": "👤 Human Creator",
-                    "ai_label_reason": "Dokumentasi visual ilmiah dan peta rekonstruksi geologi.",
-                },
-                {
-                    "rank": 3,
-                    "title": f"Kronologi Dahsyatnya {clean} dalam 45 Detik! #shorts",
-                    "channel": "Fakta Sains Kilat",
-                    "views": "520K views",
-                    "views_count": 520000,
-                    "upload_age": "2 bulan lalu",
-                    "duration": "0:45",
-                    "format": "SHORTS",
-                    "url": base_url,
-                    "outlier_status": "🔥 VIRAL_BREAKOUT (8.5x)",
-                    "is_ai_generated": True,
-                    "ai_badge": "🤖 Altered / AI Video",
-                    "ai_label_reason": "Klip visual b-roll AI rekontruksi alam, synthetic TTS voiceover.",
-                },
-                {
-                    "rank": 4,
-                    "title": f"Kisah Nyata Saksi Mata Saat {clean} Mengubah Sejarah",
-                    "channel": "Kisah Nyata ID",
-                    "views": "610K views",
-                    "views_count": 610000,
-                    "upload_age": "8 bulan lalu",
-                    "duration": "15:10",
-                    "format": "LANDSCAPE",
-                    "url": base_url,
-                    "outlier_status": "📈 ABOVE_AVERAGE (2.3x)",
-                    "is_ai_generated": False,
-                    "ai_badge": "👤 Human Creator",
-                    "ai_label_reason": "Pembacaan catatan buku harian dan dokumen arsip kuno.",
-                },
-                {
-                    "rank": 5,
-                    "title": f"Kenapa Letusan {clean} Bisa Mengubah Iklim Seluruh Bumi? #shorts",
-                    "channel": "Eksplorasi Sains Populer",
-                    "views": "340K views",
-                    "views_count": 340000,
-                    "upload_age": "1 bulan lalu",
-                    "duration": "0:30",
-                    "format": "SHORTS",
-                    "url": base_url,
-                    "outlier_status": "🔥 VIRAL_BREAKOUT (6.2x)",
-                    "is_ai_generated": True,
-                    "ai_badge": "🤖 Altered / AI Video",
-                    "ai_label_reason": "Animasi ilustrasi sains AI, penjelasan ringkas grafis 3D.",
-                },
-                {
-                    "rank": 6,
-                    "title": f"Misteri Tersembunyi {clean}: Peta Kuno & Arsip Internasional",
-                    "channel": "Laboratorium Sejarah",
-                    "views": "470K views",
-                    "views_count": 470000,
-                    "upload_age": "4 bulan lalu",
-                    "duration": "19:25",
-                    "format": "LANDSCAPE",
-                    "url": base_url,
-                    "outlier_status": "⭐ STRONG_OUTLIER (3.1x)",
-                    "is_ai_generated": False,
-                    "ai_badge": "👤 Human Creator",
-                    "ai_label_reason": "Analisis naskah arsip luar negeri dan testimoni pakar geologi.",
-                },
-                {
-                    "rank": 7,
-                    "title": f"Simulasi Ilmiah: Skala Ledakan {clean} Setara Puluhan Ribu Bom Atom",
-                    "channel": "Sains & Semesta",
-                    "views": "750K views",
-                    "views_count": 750000,
-                    "upload_age": "3 bulan lalu",
-                    "duration": "14:05",
-                    "format": "LANDSCAPE",
-                    "url": base_url,
-                    "outlier_status": "📈 ABOVE_AVERAGE (2.5x)",
-                    "is_ai_generated": False,
-                    "ai_badge": "👤 Human Creator",
-                    "ai_label_reason": "Simulasi fisika dan visualisasi grafis komputer edukatif.",
-                },
-                {
-                    "rank": 8,
-                    "title": f"Visual CGI Dahsyatnya Peristiwa {clean} #shorts",
-                    "channel": "Animasi Sejarah AI",
-                    "views": "980K views",
-                    "views_count": 980000,
-                    "upload_age": "3 minggu lalu",
-                    "duration": "0:40",
-                    "format": "SHORTS",
-                    "url": base_url,
-                    "outlier_status": "🔥 VIRAL_BREAKOUT (11.4x)",
-                    "is_ai_generated": True,
-                    "ai_badge": "🤖 Altered / AI Video",
-                    "ai_label_reason": "Klip visual generator video AI, efek sinematik CGI.",
-                },
-                {
-                    "rank": 9,
-                    "title": f"5 Fakta Tak Terduga Seputar {clean} yang Bikin Merinding",
-                    "channel": "Khazanah Fakta",
-                    "views": "280K views",
-                    "views_count": 280000,
-                    "upload_age": "5 bulan lalu",
-                    "duration": "11:50",
-                    "format": "LANDSCAPE",
-                    "url": base_url,
-                    "outlier_status": "⚖️ STANDARD (1.2x)",
-                    "is_ai_generated": False,
-                    "ai_badge": "👤 Human Creator",
-                    "ai_label_reason": "Penyajian poin edukatif oleh narator manusia.",
-                },
-                {
-                    "rank": 10,
-                    "title": f"Kondisi Terkini Lokasi {clean} Sekarang #shorts",
-                    "channel": "Jelajah Nusantara",
-                    "views": "410K views",
-                    "views_count": 410000,
-                    "upload_age": "2 minggu lalu",
-                    "duration": "0:35",
-                    "format": "SHORTS",
-                    "url": base_url,
-                    "outlier_status": "⭐ STRONG_OUTLIER (3.7x)",
-                    "is_ai_generated": False,
-                    "ai_badge": "👤 Human Creator",
-                    "ai_label_reason": "Rekaman drone langsung di lokasi saat ini.",
-                },
-            ]
-        elif niche == "culinary":
-            return [
-                {
-                    "rank": 1,
-                    "title": f"Resep {clean} Gurih & Lembut (Rahasia Bumbu Meresap Sempurna)",
-                    "channel": "Dapur Rasa Nusantara",
-                    "views": "1.2M views",
-                    "views_count": 1200000,
-                    "upload_age": "8 bulan lalu",
-                    "duration": "12:30",
-                    "format": "LANDSCAPE",
-                    "url": base_url,
-                    "outlier_status": "🔥 VIRAL_BREAKOUT (8.5x)",
-                    "is_ai_generated": False,
-                    "ai_badge": "👤 Human Creator",
-                    "ai_label_reason": "Proses memasak langsung oleh koki di dapur studio.",
-                },
-                {
-                    "rank": 2,
-                    "title": f"Cara Bikin {clean} Seenak Restoran Bintang 5 dengan Bahan Rumahan",
-                    "channel": "Chef Rumahan Praktis",
-                    "views": "450K views",
-                    "views_count": 450000,
-                    "upload_age": "4 bulan lalu",
-                    "duration": "09:45",
-                    "format": "LANDSCAPE",
-                    "url": base_url,
-                    "outlier_status": "⭐ STRONG_OUTLIER (3.4x)",
-                    "is_ai_generated": False,
-                    "ai_badge": "👤 Human Creator",
-                    "ai_label_reason": "Panduan takaran gram & penjelasan teknik masak langsung.",
-                },
-                {
-                    "rank": 3,
-                    "title": f"Trik Cepat Bikin {clean} Cuma 5 Menit! #shorts",
-                    "channel": "Resep Kilat Enak",
-                    "views": "820K views",
-                    "views_count": 820000,
-                    "upload_age": "1 bulan lalu",
-                    "duration": "0:45",
-                    "format": "SHORTS",
-                    "url": base_url,
-                    "outlier_status": "🔥 VIRAL_BREAKOUT (9.2x)",
-                    "is_ai_generated": False,
-                    "ai_badge": "👤 Human Creator",
-                    "ai_label_reason": "Video pendek resep cepat praktis.",
-                },
-                {
-                    "rank": 4,
-                    "title": f"Eksperimen Resep {clean}: Jangan Lakukan 3 Kesalahan Ini!",
-                    "channel": "Uji Resep Dapur",
-                    "views": "290K views",
-                    "views_count": 290000,
-                    "upload_age": "3 bulan lalu",
-                    "duration": "14:10",
-                    "format": "LANDSCAPE",
-                    "url": base_url,
-                    "outlier_status": "📈 ABOVE_AVERAGE (2.1x)",
-                    "is_ai_generated": False,
-                    "ai_badge": "👤 Human Creator",
-                    "ai_label_reason": "Evaluasi perbandingan bahan dan tekstur masakan.",
-                },
-                {
-                    "rank": 5,
-                    "title": f"Rahasia Tekstur {clean} Super Juicy & Wangi! #shorts",
-                    "channel": "Tips Dapur Viral",
-                    "views": "390K views",
-                    "views_count": 390000,
-                    "upload_age": "2 minggu lalu",
-                    "duration": "0:30",
-                    "format": "SHORTS",
-                    "url": base_url,
-                    "outlier_status": "⭐ STRONG_OUTLIER (4.1x)",
-                    "is_ai_generated": False,
-                    "ai_badge": "👤 Human Creator",
-                    "ai_label_reason": "Trik marinasi dan takaran bumbu rahasia.",
-                },
-                {
-                    "rank": 6,
-                    "title": f"Ide Usaha Kuliner {clean} Modal Terjangkau Laris Manis",
-                    "channel": "Bisnis Kuliner ID",
-                    "views": "180K views",
-                    "views_count": 180000,
-                    "upload_age": "5 bulan lalu",
-                    "duration": "16:20",
-                    "format": "LANDSCAPE",
-                    "url": base_url,
-                    "outlier_status": "📈 ABOVE_AVERAGE (1.8x)",
-                    "is_ai_generated": False,
-                    "ai_badge": "👤 Human Creator",
-                    "ai_label_reason": "Analisis HPP dan resep skala jualan.",
-                },
-                {
-                    "rank": 7,
-                    "title": f"Review {clean} Paling Enak & Viral yang Pernah Ada",
-                    "channel": "Food Hunter Review",
-                    "views": "320K views",
-                    "views_count": 320000,
-                    "upload_age": "2 bulan lalu",
-                    "duration": "11:15",
-                    "format": "LANDSCAPE",
-                    "url": base_url,
-                    "outlier_status": "⚖️ STANDARD (1.4x)",
-                    "is_ai_generated": False,
-                    "ai_badge": "👤 Human Creator",
-                    "ai_label_reason": "Vlog mencicipi makanan di lokasi autentik.",
-                },
-                {
-                    "rank": 8,
-                    "title": f"Cara Bikin Sambal Pasangan {clean} Paling Nampol #shorts",
-                    "channel": "Kreasi Rasa",
-                    "views": "490K views",
-                    "views_count": 490000,
-                    "upload_age": "3 minggu lalu",
-                    "duration": "0:40",
-                    "format": "SHORTS",
-                    "url": base_url,
-                    "outlier_status": "🔥 VIRAL_BREAKOUT (5.6x)",
-                    "is_ai_generated": False,
-                    "ai_badge": "👤 Human Creator",
-                    "ai_label_reason": "Klip langkah meracik sambal pelengkap.",
-                },
-                {
-                    "rank": 9,
-                    "title": f"Panduan Lengkap Memasak {clean} Tradisional Warisan Nenek Moyang",
-                    "channel": "Kuliner Leluhur",
-                    "views": "140K views",
-                    "views_count": 140000,
-                    "upload_age": "7 bulan lalu",
-                    "duration": "18:00",
-                    "format": "LANDSCAPE",
-                    "url": base_url,
-                    "outlier_status": "⚖️ STANDARD (1.1x)",
-                    "is_ai_generated": False,
-                    "ai_badge": "👤 Human Creator",
-                    "ai_label_reason": "Teknik memasak tradisional menggunakan tungku kayu.",
-                },
-                {
-                    "rank": 10,
-                    "title": f"Plating Cantik {clean} Rasa Hotel Bintang 5 #shorts",
-                    "channel": "Estetika Makanan",
-                    "views": "210K views",
-                    "views_count": 210000,
-                    "upload_age": "1 bulan lalu",
-                    "duration": "0:35",
-                    "format": "SHORTS",
-                    "url": base_url,
-                    "outlier_status": "⚖️ STANDARD (1.3x)",
-                    "is_ai_generated": False,
-                    "ai_badge": "👤 Human Creator",
-                    "ai_label_reason": "Garnish dan penataan piring estetik.",
-                },
-            ]
-        elif niche == "travel":
-            return [
-                {
-                    "rank": 1,
-                    "title": f"Panduan Lengkap Wisata {clean} 2026: Rute, Biaya, & Hidden Gems Terindah",
-                    "channel": "Traveler Nusantara",
-                    "views": "1.1M views",
-                    "views_count": 1100000,
-                    "upload_age": "7 bulan lalu",
-                    "duration": "20:45",
-                    "format": "LANDSCAPE",
-                    "url": base_url,
-                    "outlier_status": "🔥 VIRAL_BREAKOUT (9.8x)",
-                    "is_ai_generated": False,
-                    "ai_badge": "👤 Human Creator",
-                    "ai_label_reason": "Vlog perjalanan langsung, review hotel & destinasi alam.",
-                },
-                {
-                    "rank": 2,
-                    "title": f"Eksplorasi {clean} Seharian: Tips Liburan Hemat & Spot Foto Viral",
-                    "channel": "Jelajah Liburan Seru",
-                    "views": "480K views",
-                    "views_count": 480000,
-                    "upload_age": "4 bulan lalu",
-                    "duration": "15:20",
-                    "format": "LANDSCAPE",
-                    "url": base_url,
-                    "outlier_status": "⭐ STRONG_OUTLIER (3.9x)",
-                    "is_ai_generated": False,
-                    "ai_badge": "👤 Human Creator",
-                    "ai_label_reason": "Panduan itinerary lengkap dan rincian pengeluaran.",
-                },
-                {
-                    "rank": 3,
-                    "title": f"Spot Tersembunyi di {clean} yang Bikin Melongo! #shorts",
-                    "channel": "Shorts Wisata Cantik",
-                    "views": "670K views",
-                    "views_count": 670000,
-                    "upload_age": "2 bulan lalu",
-                    "duration": "0:45",
-                    "format": "SHORTS",
-                    "url": base_url,
-                    "outlier_status": "🔥 VIRAL_BREAKOUT (7.5x)",
-                    "is_ai_generated": False,
-                    "ai_badge": "👤 Human Creator",
-                    "ai_label_reason": "Rekaman video pemandangan alam memukau.",
-                },
-                {
-                    "rank": 4,
-                    "title": f"Jangan ke {clean} Sebelum Tahu 5 Hal Penting Ini! (Review Jujur)",
-                    "channel": "Tips Travel Hemat",
-                    "views": "310K views",
-                    "views_count": 310000,
-                    "upload_age": "3 bulan lalu",
-                    "duration": "13:40",
-                    "format": "LANDSCAPE",
-                    "url": base_url,
-                    "outlier_status": "📈 ABOVE_AVERAGE (2.2x)",
-                    "is_ai_generated": False,
-                    "ai_badge": "👤 Human Creator",
-                    "ai_label_reason": "Evaluasi fasilitas, transportasi, dan musim terbaik berkunjung.",
-                },
-                {
-                    "rank": 5,
-                    "title": f"Biaya Liburan ke {clean} 3 Hari 2 Malam Cuma Habis Segini? #shorts",
-                    "channel": "Backpacker ID",
-                    "views": "520K views",
-                    "views_count": 520000,
-                    "upload_age": "1 bulan lalu",
-                    "duration": "0:30",
-                    "format": "SHORTS",
-                    "url": base_url,
-                    "outlier_status": "⭐ STRONG_OUTLIER (4.4x)",
-                    "is_ai_generated": False,
-                    "ai_badge": "👤 Human Creator",
-                    "ai_label_reason": "Rincian budget tiket, penginapan, dan makan.",
-                },
-                {
-                    "rank": 6,
-                    "title": f"Itinerary Liburan ke {clean} Paling Santai & Menyenangkan",
-                    "channel": "Family Trip ID",
-                    "views": "210K views",
-                    "views_count": 210000,
-                    "upload_age": "5 bulan lalu",
-                    "duration": "18:10",
-                    "format": "LANDSCAPE",
-                    "url": base_url,
-                    "outlier_status": "⚖️ STANDARD (1.5x)",
-                    "is_ai_generated": False,
-                    "ai_badge": "👤 Human Creator",
-                    "ai_label_reason": "Rekomendasi liburan ramah keluarga dan anak.",
-                },
-                {
-                    "rank": 7,
-                    "title": f"Hotel & Villa Terbaik di {clean} dengan Pemandangan Spektakuler",
-                    "channel": "Staycation Hunter",
-                    "views": "260K views",
-                    "views_count": 260000,
-                    "upload_age": "2 bulan lalu",
-                    "duration": "12:00",
-                    "format": "LANDSCAPE",
-                    "url": base_url,
-                    "outlier_status": "📈 ABOVE_AVERAGE (1.9x)",
-                    "is_ai_generated": False,
-                    "ai_badge": "👤 Human Creator",
-                    "ai_label_reason": "Tur kamar dan fasilitas resort langsung.",
-                },
-                {
-                    "rank": 8,
-                    "title": f"Sensasi Sunrise Ajaib di {clean} #shorts",
-                    "channel": "Nature Shorts",
-                    "views": "390K views",
-                    "views_count": 390000,
-                    "upload_age": "3 minggu lalu",
-                    "duration": "0:40",
-                    "format": "SHORTS",
-                    "url": base_url,
-                    "outlier_status": "⭐ STRONG_OUTLIER (3.6x)",
-                    "is_ai_generated": False,
-                    "ai_badge": "👤 Human Creator",
-                    "ai_label_reason": "Momen matahari terbit dengan sinematografi drone.",
-                },
-                {
-                    "rank": 9,
-                    "title": f"Kuliner Legendaris di Sekitar {clean} yang Wajib Dicoba",
-                    "channel": "Jajan Wisata",
-                    "views": "170K views",
-                    "views_count": 170000,
-                    "upload_age": "6 bulan lalu",
-                    "duration": "14:35",
-                    "format": "LANDSCAPE",
-                    "url": base_url,
-                    "outlier_status": "⚖️ STANDARD (1.2x)",
-                    "is_ai_generated": False,
-                    "ai_badge": "👤 Human Creator",
-                    "ai_label_reason": "Eksplorasi warung makan lokal otentik.",
-                },
-                {
-                    "rank": 10,
-                    "title": f"Waktu Terbaik Berkunjung ke {clean} Biar Gak Kehujanan #shorts",
-                    "channel": "Tips Cuaca Wisata",
-                    "views": "190K views",
-                    "views_count": 190000,
-                    "upload_age": "2 minggu lalu",
-                    "duration": "0:35",
-                    "format": "SHORTS",
-                    "url": base_url,
-                    "outlier_status": "⚖️ STANDARD (1.1x)",
-                    "is_ai_generated": False,
-                    "ai_badge": "👤 Human Creator",
-                    "ai_label_reason": "Panduan musim dan iklim lokasi wisata.",
-                },
-            ]
-        elif niche in ["tech_tutorial", "business"]:
-            return [
-                {
-                    "rank": 1,
-                    "title": f"Tutorial {clean} Lengkap untuk Pemula 2026 | Step by Step Praktis",
-                    "channel": "Pakar Edukasi Digital",
-                    "views": "79K views",
-                    "views_count": 79000,
-                    "upload_age": "10 bulan lalu",
-                    "duration": "24:15",
-                    "format": "LANDSCAPE",
-                    "url": base_url,
-                    "outlier_status": "🔥 VIRAL_BREAKOUT (9.8x)",
-                    "is_ai_generated": False,
-                    "ai_badge": "👤 Human Creator",
-                    "ai_label_reason": "Real human facecam, live screen recording, natural dynamic speech.",
-                },
-                {
-                    "rank": 2,
-                    "title": f"Cara Praktis {clean} Terbaru 2026 - Alur Kerja Paling Efisien",
-                    "channel": "Solusi Digital Praktis",
-                    "views": "13K views",
-                    "views_count": 13000,
-                    "upload_age": "5 bulan lalu",
-                    "duration": "14:30",
-                    "format": "LANDSCAPE",
-                    "url": base_url,
-                    "outlier_status": "⭐ STRONG_OUTLIER (3.2x)",
-                    "is_ai_generated": False,
-                    "ai_badge": "👤 Human Creator",
-                    "ai_label_reason": "Human narration, demonstrasi langkah demi langkah.",
-                },
-                {
-                    "rank": 3,
-                    "title": f"1 Rumus Rahasia {clean} yang Wajib Kamu Tahu! #shorts #ai",
-                    "channel": "Tips Cepat Mahir",
-                    "views": "150K views",
-                    "views_count": 150000,
-                    "upload_age": "2 bulan lalu",
-                    "duration": "0:45",
-                    "format": "SHORTS",
-                    "url": base_url,
-                    "outlier_status": "🔥 VIRAL_BREAKOUT (12.5x)",
-                    "is_ai_generated": True,
-                    "ai_badge": "🤖 Altered / AI Video",
-                    "ai_label_reason": "Hashtag #ai, AI voiceover (ElevenLabs), klip visual b-roll AI.",
-                },
-                {
-                    "rank": 4,
-                    "title": f"Rahasia {clean} yang Jarang Dibahas Para Profesional",
-                    "channel": "Digital Growth ID",
-                    "views": "42K views",
-                    "views_count": 42000,
-                    "upload_age": "3 bulan lalu",
-                    "duration": "11:20",
-                    "format": "LANDSCAPE",
-                    "url": base_url,
-                    "outlier_status": "📈 ABOVE_AVERAGE (2.1x)",
-                    "is_ai_generated": False,
-                    "ai_badge": "👤 Human Creator",
-                    "ai_label_reason": "Live demonstration & step-by-step tutorial.",
-                },
-                {
-                    "rank": 5,
-                    "title": f"Simulasi Cepat {clean} dalam 30 Detik! #shorts",
-                    "channel": "AI Tools Daily",
-                    "views": "88K views",
-                    "views_count": 88000,
-                    "upload_age": "1 bulan lalu",
-                    "duration": "0:30",
-                    "format": "SHORTS",
-                    "url": base_url,
-                    "outlier_status": "🔥 VIRAL_BREAKOUT (6.4x)",
-                    "is_ai_generated": True,
-                    "ai_badge": "🤖 Altered / AI Video",
-                    "ai_label_reason": "YouTube synthetic content disclosure label, AI avatar/faceless narration.",
-                },
-                {
-                    "rank": 6,
-                    "title": f"Studi Kasus {clean}: Implementasi Sukses dari Nol Sampai Selesai",
-                    "channel": "Akademi Praktisi",
-                    "views": "31K views",
-                    "views_count": 31000,
-                    "upload_age": "4 bulan lalu",
-                    "duration": "18:45",
-                    "format": "LANDSCAPE",
-                    "url": base_url,
-                    "outlier_status": "⭐ STRONG_OUTLIER (2.8x)",
-                    "is_ai_generated": False,
-                    "ai_badge": "👤 Human Creator",
-                    "ai_label_reason": "Wawancara founder asli & live dashboard metric.",
-                },
-                {
-                    "rank": 7,
-                    "title": f"Setting Optimasi {clean} Paling Tepat Sasaran 2026",
-                    "channel": "Media Pintar Digital",
-                    "views": "19K views",
-                    "views_count": 19000,
-                    "upload_age": "2 bulan lalu",
-                    "duration": "16:10",
-                    "format": "LANDSCAPE",
-                    "url": base_url,
-                    "outlier_status": "📈 ABOVE_AVERAGE (1.7x)",
-                    "is_ai_generated": False,
-                    "ai_badge": "👤 Human Creator",
-                    "ai_label_reason": "Presentasi slide & demonstrasi langsung.",
-                },
-                {
-                    "rank": 8,
-                    "title": f"Trik AI Buat B-Roll {clean} Otomatis #shorts",
-                    "channel": "Video AI Lab",
-                    "views": "120K views",
-                    "views_count": 120000,
-                    "upload_age": "3 minggu lalu",
-                    "duration": "0:40",
-                    "format": "SHORTS",
-                    "url": base_url,
-                    "outlier_status": "🔥 VIRAL_BREAKOUT (8.9x)",
-                    "is_ai_generated": True,
-                    "ai_badge": "🤖 Altered / AI Video",
-                    "ai_label_reason": "Klip visual generator video AI, synthetic TTS voiceover.",
-                },
-                {
-                    "rank": 9,
-                    "title": f"5 Kesalahan Fatal Saat Menjalankan {clean}",
-                    "channel": "Belajar Bareng Expert",
-                    "views": "9.5K views",
-                    "views_count": 9500,
-                    "upload_age": "1 bulan lalu",
-                    "duration": "12:55",
-                    "format": "LANDSCAPE",
-                    "url": base_url,
-                    "outlier_status": "⚖️ STANDARD (1.1x)",
-                    "is_ai_generated": False,
-                    "ai_badge": "👤 Human Creator",
-                    "ai_label_reason": "Narasi manual kreator & evaluasi studi kasus.",
-                },
-                {
-                    "rank": 10,
-                    "title": f"Stop Pakai Cara Lama {clean}! Ini Rumus Baru #shorts",
-                    "channel": "Shorts Hacks ID",
-                    "views": "65K views",
-                    "views_count": 65000,
-                    "upload_age": "2 minggu lalu",
-                    "duration": "0:35",
-                    "format": "SHORTS",
-                    "url": base_url,
-                    "outlier_status": "⭐ STRONG_OUTLIER (4.5x)",
-                    "is_ai_generated": True,
-                    "ai_badge": "🤖 Altered / AI Video",
-                    "ai_label_reason": "Fast kinetic typography, auto-generated subtitles, synthetic AI audio.",
-                },
-            ]
-        else:
-            return [
-                {
-                    "rank": 1,
-                    "title": f"Semua Hal yang Wajib Kamu Tahu Tentang {clean} (Penjelasan Lengkap)",
-                    "channel": "Edukasi Populer ID",
-                    "views": "580K views",
-                    "views_count": 580000,
-                    "upload_age": "6 bulan lalu",
-                    "duration": "16:20",
-                    "format": "LANDSCAPE",
-                    "url": base_url,
-                    "outlier_status": "🔥 VIRAL_BREAKOUT (7.8x)",
-                    "is_ai_generated": False,
-                    "ai_badge": "👤 Human Creator",
-                    "ai_label_reason": "Penjelasan interaktif dengan animasi visual edukatif.",
-                },
-                {
-                    "rank": 2,
-                    "title": f"Fakta Menakjubkan Seputar {clean} yang Jarang Dibahas Orang",
-                    "channel": "Khazanah Pengetahuan",
-                    "views": "310K views",
-                    "views_count": 310000,
-                    "upload_age": "4 bulan lalu",
-                    "duration": "12:45",
-                    "format": "LANDSCAPE",
-                    "url": base_url,
-                    "outlier_status": "⭐ STRONG_OUTLIER (3.6x)",
-                    "is_ai_generated": False,
-                    "ai_badge": "👤 Human Creator",
-                    "ai_label_reason": "Riset mendalam dan rangkuman fakta menarik terverifikasi.",
-                },
-                {
-                    "rank": 3,
-                    "title": f"Fakta Unik {clean} yang Bikin Kaget! #shorts",
-                    "channel": "Fakta Kilat",
-                    "views": "490K views",
-                    "views_count": 490000,
-                    "upload_age": "1 bulan lalu",
-                    "duration": "0:45",
-                    "format": "SHORTS",
-                    "url": base_url,
-                    "outlier_status": "🔥 VIRAL_BREAKOUT (8.1x)",
-                    "is_ai_generated": True,
-                    "ai_badge": "🤖 Altered / AI Video",
-                    "ai_label_reason": "Animasi visual AI dan narasi suara sintetis ekspresif.",
-                },
-                {
-                    "rank": 4,
-                    "title": f"Kenapa {clean} Sangat Menarik Perhatian Banyak Orang?",
-                    "channel": "Wawasan Dunia",
-                    "views": "220K views",
-                    "views_count": 220000,
-                    "upload_age": "5 bulan lalu",
-                    "duration": "14:10",
-                    "format": "LANDSCAPE",
-                    "url": base_url,
-                    "outlier_status": "📈 ABOVE_AVERAGE (2.0x)",
-                    "is_ai_generated": False,
-                    "ai_badge": "👤 Human Creator",
-                    "ai_label_reason": "Diskusi mendalam dan analisis sudut pandang beragam.",
-                },
-                {
-                    "rank": 5,
-                    "title": f"Misteri Menarik di Balik {clean} yang Belum Banyak Diketahui #shorts",
-                    "channel": "Shorts Fakta Unik",
-                    "views": "370K views",
-                    "views_count": 370000,
-                    "upload_age": "3 minggu lalu",
-                    "duration": "0:30",
-                    "format": "SHORTS",
-                    "url": base_url,
-                    "outlier_status": "⭐ STRONG_OUTLIER (4.2x)",
-                    "is_ai_generated": True,
-                    "ai_badge": "🤖 Altered / AI Video",
-                    "ai_label_reason": "Klip generative video AI dan musik atmosferik.",
-                },
-                {
-                    "rank": 6,
-                    "title": f"Panduan Lengkap Memahami {clean} dari A Sampai Z",
-                    "channel": "Belajar Bareng Expert",
-                    "views": "190K views",
-                    "views_count": 190000,
-                    "upload_age": "3 bulan lalu",
-                    "duration": "19:00",
-                    "format": "LANDSCAPE",
-                    "url": base_url,
-                    "outlier_status": "⚖️ STANDARD (1.4x)",
-                    "is_ai_generated": False,
-                    "ai_badge": "👤 Human Creator",
-                    "ai_label_reason": "Presentasi terstruktur oleh pembicara ahli.",
-                },
-                {
-                    "rank": 7,
-                    "title": f"Mitos vs Fakta Nyata Tentang {clean} yang Perlu Kamu Pahami",
-                    "channel": "Cek Fakta Media",
-                    "views": "160K views",
-                    "views_count": 160000,
-                    "upload_age": "2 bulan lalu",
-                    "duration": "11:30",
-                    "format": "LANDSCAPE",
-                    "url": base_url,
-                    "outlier_status": "⚖️ STANDARD (1.2x)",
-                    "is_ai_generated": False,
-                    "ai_badge": "👤 Human Creator",
-                    "ai_label_reason": "Verifikasi sumber data dan pembuktian ilmiah.",
-                },
-                {
-                    "rank": 8,
-                    "title": f"Hal Tergila Seputar {clean} yang Bikin Geleng Kepala #shorts",
-                    "channel": "Fakta Gokil",
-                    "views": "580K views",
-                    "views_count": 580000,
-                    "upload_age": "1 bulan lalu",
-                    "duration": "0:40",
-                    "format": "SHORTS",
-                    "url": base_url,
-                    "outlier_status": "🔥 VIRAL_BREAKOUT (6.7x)",
-                    "is_ai_generated": True,
-                    "ai_badge": "🤖 Altered / AI Video",
-                    "ai_label_reason": "Visual AI animation dan teks dinamis berkecepatan tinggi.",
-                },
-                {
-                    "rank": 9,
-                    "title": f"Kilas Balik & Sejarah Terbentuknya {clean}",
-                    "channel": "Kronik Cerita",
-                    "views": "130K views",
-                    "views_count": 130000,
-                    "upload_age": "7 bulan lalu",
-                    "duration": "15:45",
-                    "format": "LANDSCAPE",
-                    "url": base_url,
-                    "outlier_status": "⚖️ STANDARD (1.0x)",
-                    "is_ai_generated": False,
-                    "ai_badge": "👤 Human Creator",
-                    "ai_label_reason": "Narasi dokumenter dan foto arsip asli.",
-                },
-                {
-                    "rank": 10,
-                    "title": f"Rangkuman Cepat Tentang {clean} dalam 1 Menit #shorts",
-                    "channel": "Ringkasan Kilat",
-                    "views": "240K views",
-                    "views_count": 240000,
-                    "upload_age": "2 minggu lalu",
-                    "duration": "0:35",
-                    "format": "SHORTS",
-                    "url": base_url,
-                    "outlier_status": "⚖️ STANDARD (1.3x)",
-                    "is_ai_generated": False,
-                    "ai_badge": "👤 Human Creator",
-                    "ai_label_reason": "Infografis cepat dan narator manusia.",
-                },
-            ]
+                    title = snip.get("title", "")
+                    channel = snip.get("channelTitle", "")
+                    raw_views = int(stats.get("viewCount", 0))
+                    views_text = self._format_views_display(raw_views)
+
+                    dur_iso = content_details.get("duration", "")
+                    duration_text, _ = self._parse_iso_duration(dur_iso)
+                    dur_sec = self.parse_duration_to_seconds(duration_text)
+                    thumb_url = snip.get("thumbnails", {}).get("high", {}).get("url", "")
+                    is_shorts, format_type = self.detect_video_format(
+                        video_id=vid_id,
+                        title=title,
+                        duration_seconds=dur_sec,
+                        thumbnail_url=thumb_url,
+                    )
+
+                    pub_at = snip.get("publishedAt", "")
+                    age_text = pub_at[:10] if pub_at else "Recent"
+
+                    is_ai, ai_badge, ai_reason = self._detect_ai_content(v_data, title, channel)
+
+                    competitors.append(
+                        {
+                            "rank": rank,
+                            "video_id": vid_id,
+                            "title": title,
+                            "channel": channel,
+                            "views": views_text,
+                            "views_count": raw_views,
+                            "upload_age": age_text,
+                            "duration": duration_text,
+                            "duration_seconds": self.parse_duration_to_seconds(duration_text),
+                            "format": format_type,
+                            "url": f"https://www.youtube.com/watch?v={vid_id}",
+                            "tags": snip.get("tags", []),
+                            "outlier_status": (
+                                "👑 RANKING #1" if rank == 1 else f"Top #{rank} Competitor"
+                            ),
+                            "is_ai_generated": is_ai,
+                            "ai_badge": ai_badge,
+                            "ai_label_reason": ai_reason,
+                        }
+                    )
+                return competitors
+        except Exception:
+            return []
 
     async def get_top_competitors(self, query: str, limit: int = 10) -> list[dict[str, Any]]:
         """
         Scrape and inspect live top ranking competitor videos on YouTube.
         Detects video title, channel, views, upload age, duration, and format (Landscape vs Shorts).
+        Prioritizes official YouTube Data API v3 when api_key is available.
+        Uses natural human-like timing and stealth headers to evade bot detection.
+        Never injects synthetic or dummy fallback data.
         """
-        fallback_items = self._get_fallback_competitors(query)
-        headers = {
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/120.0.0.0 Safari/537.36"
-            ),
-            "Accept-Language": "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7",
-        }
+        if self.api_key:
+            api_results = await self._fetch_competitors_via_api(query, limit=limit)
+            if api_results:
+                return api_results
+
+        # Natural human delay (jitter) to avoid bot detection
+        await self._human_delay(0.6, 1.8)
+
+        headers = self._get_natural_headers(hl="id", gl="ID", device="desktop")
         params = {"search_query": query}
 
         try:
-            async with httpx.AsyncClient(timeout=12.0, follow_redirects=True) as client:
+            async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
                 resp = await client.get(self.SEARCH_URL, headers=headers, params=params)
                 if resp.status_code == 200:
                     competitors = self._parse_youtube_search_html(resp.text, limit=limit)
                     if competitors:
-                        if len(competitors) < limit:
-                            for fb in fallback_items[len(competitors) : limit]:
-                                fb_copy = dict(fb)
-                                fb_copy["rank"] = len(competitors) + 1
-                                competitors.append(fb_copy)
                         return competitors[:limit]
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Error scraping live YouTube competitors for '{query}': {e}")
 
-        return fallback_items[:limit]
+        # Real data only: return empty list if no competitors found or blocked
+        return []
+
+    async def spy_competitor_tags(
+        self,
+        competitors_or_query: list[dict[str, Any]] | str,
+        limit_competitors: int = 5,
+    ) -> dict[str, Any]:
+        """
+        Spy and extract hidden tags / keywords from top ranking competitor videos.
+        Aggregates tag frequency across competitors, identifies winning tags,
+        and generates ready-to-use YouTube Studio tags.
+        """
+        if isinstance(competitors_or_query, str):
+            competitors = await self.get_top_competitors(competitors_or_query, limit=limit_competitors)
+        else:
+            competitors = list(competitors_or_query)[:limit_competitors]
+
+        if not competitors:
+            return {
+                "top_overlapping_tags": [],
+                "all_unique_tags": [],
+                "tag_frequencies": {},
+                "competitor_breakdown": [],
+                "recommended_tags_csv": "",
+            }
+
+        competitor_breakdown = []
+        all_tags_with_counts: dict[str, int] = {}
+
+        for comp in competitors[:limit_competitors]:
+            v_id = comp.get("video_id") or self.extract_video_id(comp.get("url", ""))
+            tags = comp.get("tags") or []
+
+            # If tags not already attached, fetch video details directly
+            if not tags and v_id:
+                details = await self.get_video_details(v_id)
+                if details and details.get("tags"):
+                    tags = details.get("tags", [])
+                    comp["tags"] = tags
+
+            clean_tags = [t.strip() for t in tags if t and t.strip()]
+            competitor_breakdown.append({
+                "rank": comp.get("rank", 1),
+                "title": comp.get("title", ""),
+                "channel": comp.get("channel", ""),
+                "views": comp.get("views", ""),
+                "video_id": v_id,
+                "tags_count": len(clean_tags),
+                "tags": clean_tags,
+            })
+
+            for t in clean_tags:
+                t_clean = t.strip()
+                all_tags_with_counts[t_clean] = all_tags_with_counts.get(t_clean, 0) + 1
+
+        # Sort tags by frequency (most used by top competitors first)
+        sorted_by_freq = sorted(
+            all_tags_with_counts.items(), key=lambda x: x[1], reverse=True
+        )
+
+        n_comps = max(len(competitor_breakdown), 1)
+        top_by_freq_list = [
+            {
+                "Tag": t,
+                "Frekuensi": f"{count}/{n_comps} video",
+                "Persentase": f"{int((count / n_comps) * 100)}%",
+                "tag": t,
+                "count": count,
+            }
+            for t, count in sorted_by_freq
+        ]
+
+        top_overlapping = [t for t, count in sorted_by_freq if count >= 2]
+        all_unique = [t for t, _ in sorted_by_freq]
+
+        # Generate clean CSV under 450 characters for YouTube Studio
+        selected_tags = []
+        char_count = 0
+        for t, _ in sorted_by_freq:
+            if char_count + len(t) + 2 > 450:
+                break
+            selected_tags.append(t)
+            char_count += len(t) + 2
+
+        recommended_csv = ", ".join(selected_tags)
+
+        best_practices = [
+            "1. Urutan Prioritas: Letakkan Target Keyword Utama di posisi 1-3 tag teratas karena memiliki bobot indexing algoritma tertinggi.",
+            "2. Pola 3 Lapis: Padukan 1 tag umum kategori, 3-5 tag spesifik isi video, dan 1-2 variasi ejaan/typo yang sering dicari.",
+            "3. Intip Kompetitor: Tiru tag yang terbukti dipakai bersama oleh ranking #1-#3 untuk masuk ke carousel 'Up Next / Suggested Videos'.",
+            "4. Hindari Tag Stuffing: Batasi total panjang tag di bawah 450 karakter dan jangan pernah menaruh daftar tag di kolom deskripsi (melanggar ToS YouTube).",
+        ]
+
+        return {
+            "competitors_analyzed": len(competitor_breakdown),
+            "top_tags_by_frequency": top_by_freq_list,
+            "top_overlapping_tags": top_overlapping,
+            "all_unique_tags": all_unique,
+            "tag_frequencies": all_tags_with_counts,
+            "competitor_breakdown": competitor_breakdown,
+            "recommended_tags_copy": recommended_csv,
+            "recommended_tags_csv": recommended_csv,
+            "best_practices": best_practices,
+        }
+
 
     def _parse_youtube_search_html(self, html: str, limit: int = 10) -> list[dict[str, Any]]:
         """Extract videoRenderers from ytInitialData embedded in YouTube HTML."""
@@ -972,16 +787,20 @@ class YouTubeConnector(BaseConnector):
                     views_text = v.get("viewCountText", {}).get("simpleText") or v.get(
                         "viewCountText", {}
                     ).get("runs", [{}])[0].get("text", "0")
+                    reel_id = v.get("videoId", "")
                     competitors.append(
                         {
                             "rank": rank,
+                            "video_id": reel_id,
                             "title": title,
                             "channel": "YouTube Creator",
                             "views": views_text,
                             "upload_age": "Recent",
                             "duration": "0:50",
+                            "duration_seconds": 50,
                             "format": "SHORTS",
-                            "url": f"https://www.youtube.com/shorts/{v.get('videoId')}",
+                            "url": f"https://www.youtube.com/shorts/{reel_id}",
+                            "tags": [],
                             "outlier_status": "Trending Shorts",
                         }
                     )
@@ -993,11 +812,11 @@ class YouTubeConnector(BaseConnector):
                     duration_text = v.get("lengthText", {}).get("simpleText", "10:00")
                     vid_id = v.get("videoId", "")
 
-                    # Detect format: duration <= 1:00 or shorts URL
+                    # Detect format: explicit #shorts in title or shorts URL
+                    dur_sec = self.parse_duration_to_seconds(duration_text)
                     is_shorts = (
-                        duration_text.startswith("0:")
-                        and len(duration_text) <= 4
-                        and int(duration_text.split(":")[1]) <= 60
+                        (dur_sec <= 60 and ("#shorts" in title.lower() or "#short" in title.lower()))
+                        or "/shorts/" in vid_id
                     )
                     format_type = "SHORTS" if is_shorts else "LANDSCAPE"
 
@@ -1007,13 +826,16 @@ class YouTubeConnector(BaseConnector):
                     competitors.append(
                         {
                             "rank": rank,
+                            "video_id": vid_id,
                             "title": title,
                             "channel": channel,
                             "views": views_text,
                             "upload_age": age_text,
                             "duration": duration_text,
+                            "duration_seconds": self.parse_duration_to_seconds(duration_text),
                             "format": format_type,
                             "url": f"https://www.youtube.com/watch?v={vid_id}",
+                            "tags": [],
                             "outlier_status": (
                                 "👑 RANKING #1" if rank == 1 else f"Top #{rank} Competitor"
                             ),
@@ -1130,27 +952,11 @@ class YouTubeConnector(BaseConnector):
         else:
             search_query = "trending indonesia" if gl == "ID" else "trending"
 
-        fallback_feed = self._get_fallback_trending_feed(
-            gl=gl, hl=hl, category=category, device=device
-        )
+        # Natural human delay (jitter)
+        await self._human_delay(0.6, 1.8)
 
-        # 2. Select User-Agent based on Device
-        if device.lower() == "mobile":
-            ua = (
-                "Mozilla/5.0 (Linux; Android 13; SM-S908B) AppleWebKit/537.36 "
-                "(KHTML, like Gecko) Chrome/120.0.6099.144 Mobile Safari/537.36"
-            )
-        else:
-            ua = (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
-            )
-
-        headers = {
-            "User-Agent": ua,
-            "Accept-Language": f"{hl}-{gl},{hl};q=0.9,en;q=0.8",
-            "Cookie": f"PREF=tz=Asia.Jakarta&hl={hl}&gl={gl}; SOCS=CAESEwgDEgk2OTg1MDYzMjQaAnVzIAEaBgiA_K-0Bg;",
-        }
+        # 2. Select human-like headers based on Device and locale
+        headers = self._get_natural_headers(hl=hl, gl=gl, device=device)
 
         # 3. Optional YouTube Data API v3 integration if API key is set
         if self.api_key:
@@ -1187,8 +993,14 @@ class YouTubeConnector(BaseConnector):
                             v_title = snip.get("title", "")
                             v_channel = snip.get("channelTitle", "")
                             dur = item.get("contentDetails", {}).get("duration", "PT10M")
-                            is_shorts = (
-                                "PT1M" in dur or "PT0M" in dur or "PT30S" in dur or "PT45S" in dur
+                            dur_text, _ = self._parse_iso_duration(dur)
+                            dur_sec = self.parse_duration_to_seconds(dur_text)
+                            thumb_url = snip.get("thumbnails", {}).get("high", {}).get("url", "")
+                            is_shorts, format_type = self.detect_video_format(
+                                video_id=vid_id,
+                                title=v_title,
+                                duration_seconds=dur_sec,
+                                thumbnail_url=thumb_url,
                             )
                             is_ai, ai_badge, ai_reason = self._detect_ai_content(
                                 item, v_title, v_channel
@@ -1201,8 +1013,8 @@ class YouTubeConnector(BaseConnector):
                                     "views": f"{v_views:,} views",
                                     "views_count": v_views,
                                     "upload_age": snip.get("publishedAt", "")[:10],
-                                    "duration": dur.replace("PT", "").lower(),
-                                    "format": "SHORTS" if is_shorts else "LANDSCAPE",
+                                    "duration": dur_text,
+                                    "format": format_type,
                                     "url": f"https://www.youtube.com/watch?v={vid_id}",
                                     "outlier_status": (
                                         "🔥 TRENDING TOP #1" if rank == 1 else f"Top #{rank}"
@@ -1218,17 +1030,17 @@ class YouTubeConnector(BaseConnector):
                             )
                         if results:
                             return results[:limit]
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Error fetching trending feed via API: {e}")
 
-        # 4. Scrape YouTube SERP
+        # 4. Scrape YouTube SERP live
         try:
             params = {
                 "search_query": search_query,
                 "gl": gl if gl != "WW" else "US",
                 "hl": hl,
             }
-            async with httpx.AsyncClient(timeout=12.0, follow_redirects=True) as client:
+            async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
                 resp = await client.get(self.SEARCH_URL, headers=headers, params=params)
                 if resp.status_code == 200:
                     competitors = self._parse_youtube_search_html(resp.text, limit=limit)
@@ -1238,212 +1050,13 @@ class YouTubeConnector(BaseConnector):
                             c["device"] = device.upper()
                             c["location"] = gl
                             c["language"] = hl
-                        if len(competitors) < limit:
-                            for fb in fallback_feed[len(competitors) : limit]:
-                                fb_copy = dict(fb)
-                                fb_copy["rank"] = len(competitors) + 1
-                                competitors.append(fb_copy)
                         return competitors[:limit]
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Error scraping live YouTube trending feed: {e}")
 
-        return fallback_feed[:limit]
+        # Real data only: return empty list if trending feed unavailable
+        return []
 
-    def _get_fallback_trending_feed(
-        self, gl: str, hl: str, category: str, device: str
-    ) -> list[dict[str, Any]]:
-        """Fallback regional benchmark data (10 items max)."""
-        cat_lower = category.lower()
-        prefix = f"[{gl}-{category.upper()}]"
-        return [
-            {
-                "rank": 1,
-                "title": f"{prefix} Viral Trending Topic & Music Showcase 2026",
-                "channel": "Trending Central",
-                "views": "1,450,000 views",
-                "views_count": 1450000,
-                "upload_age": "2 hari lalu",
-                "duration": "0:58" if cat_lower == "shorts" else "18:42",
-                "format": "SHORTS" if cat_lower == "shorts" else "LANDSCAPE",
-                "url": "https://www.youtube.com/feed/trending",
-                "outlier_status": "🔥 TRENDING TOP #1",
-                "is_ai_generated": False,
-                "ai_badge": "👤 Human Creator",
-                "ai_label_reason": "Verified official trending release.",
-                "data_source": "BENCHMARK_FALLBACK",
-                "device": device.upper(),
-                "location": gl,
-                "language": hl,
-            },
-            {
-                "rank": 2,
-                "title": f"{prefix} Top Viral Moments & Highlights Hari Ini",
-                "channel": "Media Update ID",
-                "views": "820,000 views",
-                "views_count": 820000,
-                "upload_age": "1 hari lalu",
-                "duration": "0:45" if cat_lower == "shorts" else "12:15",
-                "format": "SHORTS" if cat_lower == "shorts" else "LANDSCAPE",
-                "url": "https://www.youtube.com/feed/trending",
-                "outlier_status": "⭐ TOP #2 VIRAL",
-                "is_ai_generated": False,
-                "ai_badge": "👤 Human Creator",
-                "ai_label_reason": "Curated news broadcasting.",
-                "data_source": "BENCHMARK_FALLBACK",
-                "device": device.upper(),
-                "location": gl,
-                "language": hl,
-            },
-            {
-                "rank": 3,
-                "title": f"{prefix} AI Tools & Tech Breakthrough Tercepat 2026 #shorts",
-                "channel": "Future Tech AI",
-                "views": "530,000 views",
-                "views_count": 530000,
-                "upload_age": "3 hari lalu",
-                "duration": "0:35",
-                "format": "SHORTS",
-                "url": "https://www.youtube.com/feed/trending",
-                "outlier_status": "🔥 VIRAL_SHORTS",
-                "is_ai_generated": True,
-                "ai_badge": "🤖 Altered / AI Video",
-                "ai_label_reason": "Synthesized AI visuals & text-to-speech voiceover.",
-                "data_source": "BENCHMARK_FALLBACK",
-                "device": device.upper(),
-                "location": gl,
-                "language": hl,
-            },
-            {
-                "rank": 4,
-                "title": f"{prefix} Kisah Inspiratif Pebisnis Muda Raih Milyaran",
-                "channel": "Wirausaha Muda",
-                "views": "410,000 views",
-                "views_count": 410000,
-                "upload_age": "2 hari lalu",
-                "duration": "15:20",
-                "format": "LANDSCAPE",
-                "url": "https://www.youtube.com/feed/trending",
-                "outlier_status": "📈 POPULER #4",
-                "is_ai_generated": False,
-                "ai_badge": "👤 Human Creator",
-                "ai_label_reason": "Wawancara langsung & liputan lapangan.",
-                "data_source": "BENCHMARK_FALLBACK",
-                "device": device.upper(),
-                "location": gl,
-                "language": hl,
-            },
-            {
-                "rank": 5,
-                "title": f"{prefix} Trik Rahasia Editing Video Cinematic 2026",
-                "channel": "Creator Academy",
-                "views": "340,000 views",
-                "views_count": 340000,
-                "upload_age": "4 hari lalu",
-                "duration": "14:10",
-                "format": "LANDSCAPE",
-                "url": "https://www.youtube.com/feed/trending",
-                "outlier_status": "📈 POPULER #5",
-                "is_ai_generated": False,
-                "ai_badge": "👤 Human Creator",
-                "ai_label_reason": "Screen tutorial dengan narasi manusia.",
-                "data_source": "BENCHMARK_FALLBACK",
-                "device": device.upper(),
-                "location": gl,
-                "language": hl,
-            },
-            {
-                "rank": 6,
-                "title": f"{prefix} Jangan Sampai Ketinggalan Trend Ini! #shorts #viral",
-                "channel": "Daily Hacks Asia",
-                "views": "690,000 views",
-                "views_count": 690000,
-                "upload_age": "1 hari lalu",
-                "duration": "0:40",
-                "format": "SHORTS",
-                "url": "https://www.youtube.com/feed/trending",
-                "outlier_status": "🔥 VIRAL_SHORTS",
-                "is_ai_generated": True,
-                "ai_badge": "🤖 Altered / AI Video",
-                "ai_label_reason": "AI video pacing, Google Flow b-roll clips.",
-                "data_source": "BENCHMARK_FALLBACK",
-                "device": device.upper(),
-                "location": gl,
-                "language": hl,
-            },
-            {
-                "rank": 7,
-                "title": f"{prefix} Review Gadget Terbaru Paling Dinanti Tahun Ini",
-                "channel": "Gadget Reviewer ID",
-                "views": "280,000 views",
-                "views_count": 280000,
-                "upload_age": "2 hari lalu",
-                "duration": "11:55",
-                "format": "LANDSCAPE",
-                "url": "https://www.youtube.com/feed/trending",
-                "outlier_status": "⭐ TOP #7",
-                "is_ai_generated": False,
-                "ai_badge": "👤 Human Creator",
-                "ai_label_reason": "Unboxing fisik langsung di studio.",
-                "data_source": "BENCHMARK_FALLBACK",
-                "device": device.upper(),
-                "location": gl,
-                "language": hl,
-            },
-            {
-                "rank": 8,
-                "title": f"{prefix} Animasi Unik Cerita Rakyat Modern #shorts",
-                "channel": "Animasi Nusantara AI",
-                "views": "480,000 views",
-                "views_count": 480000,
-                "upload_age": "3 hari lalu",
-                "duration": "0:48",
-                "format": "SHORTS",
-                "url": "https://www.youtube.com/feed/trending",
-                "outlier_status": "🔥 VIRAL_SHORTS",
-                "is_ai_generated": True,
-                "ai_badge": "🤖 Altered / AI Video",
-                "ai_label_reason": "Generative AI video animation & custom TTS.",
-                "data_source": "BENCHMARK_FALLBACK",
-                "device": device.upper(),
-                "location": gl,
-                "language": hl,
-            },
-            {
-                "rank": 9,
-                "title": f"{prefix} Eksplorasi Kuliner Tersembunyi yang Bikin Ngiler",
-                "channel": "Food Hunter ID",
-                "views": "210,000 views",
-                "views_count": 210000,
-                "upload_age": "3 hari lalu",
-                "duration": "16:40",
-                "format": "LANDSCAPE",
-                "url": "https://www.youtube.com/feed/trending",
-                "outlier_status": "📈 POPULER #9",
-                "is_ai_generated": False,
-                "ai_badge": "👤 Human Creator",
-                "ai_label_reason": "Liputan kuliner jalanan langsung di lokasi.",
-                "data_source": "BENCHMARK_FALLBACK",
-                "device": device.upper(),
-                "location": gl,
-                "language": hl,
-            },
-            {
-                "rank": 10,
-                "title": f"{prefix} Cara Cepat Kuasai Skill Baru Tanpa Pusing #shorts",
-                "channel": "Fast Learn ID",
-                "views": "390,000 views",
-                "views_count": 390000,
-                "upload_age": "1 hari lalu",
-                "duration": "0:32",
-                "format": "SHORTS",
-                "url": "https://www.youtube.com/feed/trending",
-                "outlier_status": "⭐ TOP #10",
-                "is_ai_generated": True,
-                "ai_badge": "🤖 Altered / AI Video",
-                "ai_label_reason": "AI infographic animation & synthetic voiceover.",
-                "data_source": "BENCHMARK_FALLBACK",
-                "device": device.upper(),
-                "location": gl,
-                "language": hl,
-            },
-        ]
+
+# Expose helper function at module level
+parse_duration_to_seconds = YouTubeConnector.parse_duration_to_seconds

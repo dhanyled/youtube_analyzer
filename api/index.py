@@ -438,6 +438,20 @@ async def api_dashboard_trends(keyword: str = "Google Ads UMKM", geo: str = "ID"
     res = await connector.compare_google_vs_youtube(keyword, geo=geo)
     daily_rss = await _fetch_google_trends_rss(geo=geo)
     res["daily_rss"] = daily_rss
+
+    # Map queries for frontend binding
+    yt_trends = res.get("youtube_trends", [])
+    gw_trends = res.get("google_web_trends", [])
+
+    res["youtube_top_queries"] = [q for q in yt_trends if q.get("type") == "top"] or yt_trends[:15]
+    res["youtube_rising_queries"] = [
+        q for q in yt_trends if q.get("type") == "rising"
+    ] or yt_trends[15:]
+    res["google_top_queries"] = [q for q in gw_trends if q.get("type") == "top"] or gw_trends[:15]
+    res["google_rising_queries"] = [q for q in gw_trends if q.get("type") == "rising"] or gw_trends[
+        15:
+    ]
+
     return res
 
 

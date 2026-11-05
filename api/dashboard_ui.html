@@ -1597,16 +1597,20 @@ https://www.youtube.com/@ppm_consulting</textarea>
           : `<tr><td colspan="4" class="p-3 text-slate-400">Data RSS tren harian belum tersedia.</td></tr>`;
 
         // Render Queries
-        const ytTop = d.youtube_top_queries || [];
-        const ytRis = d.youtube_rising_queries || [];
-        document.getElementById('ytQueriesBox').innerHTML = (ytTop.length || ytRis.length)
-          ? [...ytRis.slice(0, 10), ...ytTop.slice(0, 10)].map(q => `<div class="p-2 rounded bg-[#0e1117] border border-slate-800 flex justify-between"><span>${escapeHtml(q.Query || q.query)}</span><b class="text-amber-400">${escapeHtml(q['Lonjakan Minat'] || q['Popularitas (0-100)'] || q.value || '')}</b></div>`).join('')
-          : `<div class="text-slate-400">Menampilkan ekspansi kata kunci YouTube dari mesin intelejensi SERP.</div>`;
+        const ytQueries = (d.youtube_top_queries && d.youtube_top_queries.length) || (d.youtube_rising_queries && d.youtube_rising_queries.length)
+          ? [...(d.youtube_rising_queries || []), ...(d.youtube_top_queries || [])]
+          : (d.youtube_trends || []);
 
-        const gwTop = d.google_top_queries || [];
-        const gwRis = d.google_rising_queries || [];
-        document.getElementById('gwQueriesBox').innerHTML = (gwTop.length || gwRis.length)
-          ? [...gwRis.slice(0, 10), ...gwTop.slice(0, 10)].map(q => `<div class="p-2 rounded bg-[#0e1117] border border-slate-800 flex justify-between"><span>${escapeHtml(q.Query || q.query)}</span><b class="text-sky-400">${escapeHtml(q['Lonjakan Minat'] || q['Popularitas (0-100)'] || q.value || '')}</b></div>`).join('')
+        document.getElementById('ytQueriesBox').innerHTML = ytQueries.length
+          ? ytQueries.slice(0, 15).map(q => `<div class="p-2 rounded bg-[#0e1117] border border-slate-800 flex justify-between items-center"><span class="font-medium text-slate-200">${escapeHtml(q.Query || q.query || '')}</span><b class="text-amber-400 text-[11px] px-2 py-0.5 rounded bg-slate-900 border border-slate-800">${escapeHtml(q['Lonjakan Minat'] || (q['Popularitas (0-100)'] !== undefined ? q['Popularitas (0-100)'] + '/100' : q.value || ''))}</b></div>`).join('')
+          : `<div class="text-slate-400">Tidak ada kueri terkait Google Trends untuk kata kunci ini.</div>`;
+
+        const gwQueries = (d.google_top_queries && d.google_top_queries.length) || (d.google_rising_queries && d.google_rising_queries.length)
+          ? [...(d.google_rising_queries || []), ...(d.google_top_queries || [])]
+          : (d.google_web_trends || []);
+
+        document.getElementById('gwQueriesBox').innerHTML = gwQueries.length
+          ? gwQueries.slice(0, 15).map(q => `<div class="p-2 rounded bg-[#0e1117] border border-slate-800 flex justify-between items-center"><span class="font-medium text-slate-200">${escapeHtml(q.Query || q.query || '')}</span><b class="text-sky-400 text-[11px] px-2 py-0.5 rounded bg-slate-900 border border-slate-800">${escapeHtml(q['Lonjakan Minat'] || (q['Popularitas (0-100)'] !== undefined ? q['Popularitas (0-100)'] + '/100' : q.value || ''))}</b></div>`).join('')
           : `<div class="text-slate-400">Gunakan tautan Google Trends di atas untuk melihat grafik real-time interaktif.</div>`;
 
         // Render Line Chart if historical data exists
@@ -1614,19 +1618,20 @@ https://www.youtube.com/@ppm_consulting</textarea>
         const gwOt = d.google_interest_over_time || [];
         const canvas = document.getElementById('trendsLineChart');
         if (trendsChartInstance) trendsChartInstance.destroy();
-        if (ytOt.length && canvas) {
-          const labels = ytOt.map(x => x.Tanggal);
+        if ((ytOt.length || gwOt.length) && canvas) {
+          const labels = (ytOt.length ? ytOt : gwOt).map(x => x.Tanggal);
           const ytVals = ytOt.map(x => x['Minat Penelusuran']);
           const gwVals = gwOt.map(x => x['Minat Penelusuran']);
+          const datasets = [];
+          if (ytVals.length) {
+            datasets.push({ label: 'YouTube Search (gprop=youtube)', data: ytVals, borderColor: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.1)', tension: 0.3, fill: true });
+          }
+          if (gwVals.length) {
+            datasets.push({ label: 'Google Web Search', data: gwVals, borderColor: '#38bdf8', backgroundColor: 'rgba(56, 189, 248, 0.05)', tension: 0.3, fill: true });
+          }
           trendsChartInstance = new Chart(canvas, {
             type: 'line',
-            data: {
-              labels,
-              datasets: [
-                { label: 'YouTube Search (gprop=youtube)', data: ytVals, borderColor: '#ef4444', tension: 0.3 },
-                { label: 'Google Web Search', data: gwVals, borderColor: '#38bdf8', tension: 0.3 }
-              ]
-            },
+            data: { labels, datasets },
             options: { responsive: true, maintainAspectRatio: false }
           });
         }

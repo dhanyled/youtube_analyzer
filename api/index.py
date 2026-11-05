@@ -239,17 +239,19 @@ async def api_dashboard_analyze(req: AnalyzeRequest):
     rpm_data = SearchIntelligence.estimate_rpm(kw)
     kw_metrics = SearchIntelligence.estimate_keyword_metrics(kw, competitors)
     ai_presence = SearchIntelligence.analyze_ai_competitor_presence(competitors)
+    comp_spy = (
+        await yt_conn.spy_competitor_tags(competitors, limit_competitors=5)
+        if competitors
+        else {}
+    )
     outranking_plan = SearchIntelligence.generate_outranking_plan(
         kw,
         competitor=top_comp,
         competitors=competitors,
         ai_config=req.ai_config,
     )
-    comp_spy = (
-        await yt_conn.spy_competitor_tags(competitors, limit_competitors=5)
-        if competitors
-        else {}
-    )
+    if comp_spy.get("recommended_tags_copy"):
+        outranking_plan["video_tags"] = comp_spy["recommended_tags_copy"]
     content_gaps = SearchIntelligence.detect_content_gaps(kw, competitors, all_queries)
     outlier_analysis = SearchIntelligence.analyze_competitor_outliers(competitors)
     faceless_info = SearchIntelligence.analyze_faceless_viability(kw, rpm_data)

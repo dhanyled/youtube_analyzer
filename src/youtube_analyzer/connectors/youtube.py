@@ -381,7 +381,13 @@ class YouTubeConnector(BaseConnector):
 
                     # 1. Parse embedded ytInitialPlayerResponse
                     player_data = {}
-                    m_player = re.search(r"ytInitialPlayerResponse\s*=\s*({.+?});", html)
+                    m_player = re.search(
+                        r"ytInitialPlayerResponse\s*=\s*({.+?});\s*(?:var\s|</script>)",
+                        html,
+                        re.DOTALL,
+                    )
+                    if not m_player:
+                        m_player = re.search(r"ytInitialPlayerResponse\s*=\s*({.+?});", html)
                     if m_player:
                         try:
                             player_data = json.loads(m_player.group(1))
@@ -389,6 +395,13 @@ class YouTubeConnector(BaseConnector):
                             pass
 
                     v_det = player_data.get("videoDetails", {})
+                    if not v_det.get("keywords"):
+                        m_kw_arr = re.search(r'"keywords"\s*:\s*(\[[^\]]+\])', html)
+                        if m_kw_arr:
+                            try:
+                                v_det["keywords"] = json.loads(m_kw_arr.group(1))
+                            except Exception:
+                                pass
 
                     # Title
                     title = v_det.get("title")
@@ -444,7 +457,19 @@ class YouTubeConnector(BaseConnector):
                     else:
                         dur_text = "N/A"
 
-                    # Tags / Keywords extraction
+                    # Tags / Keywords extraction (Filter out generic YouTube platform boilerplate meta keywords)
+                    YOUTUBE_GENERIC_META_BOILERPLATE = {
+                        "video",
+                        "berbagi",
+                        "ponsel kamera",
+                        "ponsel video",
+                        "gratis",
+                        "upload",
+                        "sharing",
+                        "camera phone",
+                        "video phone",
+                        "free",
+                    }
                     tags = v_det.get("keywords", [])
                     if not tags:
                         og_tags = re.findall(r'<meta property="og:video:tag" content="(.*?)">', html)
@@ -453,7 +478,21 @@ class YouTubeConnector(BaseConnector):
                     if not tags:
                         m_meta_kw = re.search(r'<meta name="keywords" content="(.*?)">', html)
                         if m_meta_kw:
-                            tags = [t.strip() for t in m_meta_kw.group(1).split(",") if t.strip()]
+                            raw_meta_tags = [
+                                t.strip() for t in m_meta_kw.group(1).split(",") if t.strip()
+                            ]
+                            tags = [
+                                t
+                                for t in raw_meta_tags
+                                if t.lower() not in YOUTUBE_GENERIC_META_BOILERPLATE
+                            ]
+
+                    # Also filter any boilerplate tags if they slipped into v_det/og_tags
+                    tags = [
+                        t
+                        for t in tags
+                        if t and t.strip().lower() not in YOUTUBE_GENERIC_META_BOILERPLATE
+                    ]
 
                     # Deduplicate tags while preserving order
                     tags = list(dict.fromkeys(tags))
@@ -662,6 +701,7 @@ class YouTubeConnector(BaseConnector):
 
         competitor_breakdown = []
         all_tags_with_counts: dict[str, int] = {}
+        canonical_display_map: dict[str, str] = {}
 
         for comp in competitors[:limit_competitors]:
             v_id = comp.get("video_id") or self.extract_video_id(comp.get("url", ""))
@@ -674,7 +714,18 @@ class YouTubeConnector(BaseConnector):
                     tags = details.get("tags", [])
                     comp["tags"] = tags
 
-            clean_tags = [t.strip() for t in tags if t and t.strip()]
+            # Deduplicate tags within the same video (case-insensitive)
+            seen_in_vid: set[str] = set()
+            clean_tags: list[str] = []
+            for t in tags:
+                if not t or not t.strip():
+                    continue
+                t_str = t.strip()
+                t_low = t_str.lower()
+                if t_low not in seen_in_vid:
+                    seen_in_vid.add(t_low)
+                    clean_tags.append(t_str)
+
             competitor_breakdown.append({
                 "rank": comp.get("rank", 1),
                 "title": comp.get("title", ""),
@@ -685,14 +736,19 @@ class YouTubeConnector(BaseConnector):
                 "tags": clean_tags,
             })
 
-            for t in clean_tags:
-                t_clean = t.strip()
-                all_tags_with_counts[t_clean] = all_tags_with_counts.get(t_clean, 0) + 1
+            for t_str in clean_tags:
+                t_low = t_str.lower()
+                if t_low not in canonical_display_map:
+                    canonical_display_map[t_low] = t_str
+                all_tags_with_counts[t_low] = all_tags_with_counts.get(t_low, 0) + 1
 
         # Sort tags by frequency (most used by top competitors first)
-        sorted_by_freq = sorted(
-            all_tags_with_counts.items(), key=lambda x: x[1], reverse=True
-        )
+        sorted_by_freq = [
+            (canonical_display_map[t_low], count)
+            for t_low, count in sorted(
+                all_tags_with_counts.items(), key=lambda x: x[1], reverse=True
+            )
+        ]
 
         n_comps = max(len(competitor_breakdown), 1)
         top_by_freq_list = [

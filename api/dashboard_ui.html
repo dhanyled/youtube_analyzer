@@ -1619,6 +1619,9 @@ https://www.youtube.com/@ppm_consulting</textarea>
         const canvas = document.getElementById('trendsLineChart');
         if (trendsChartInstance) trendsChartInstance.destroy();
         if ((ytOt.length || gwOt.length) && canvas) {
+          canvas.style.display = 'block';
+          const noDataMsg = document.getElementById('trendsNoChartMsg');
+          if (noDataMsg) noDataMsg.remove();
           const labels = (ytOt.length ? ytOt : gwOt).map(x => x.Tanggal);
           const ytVals = ytOt.map(x => x['Minat Penelusuran']);
           const gwVals = gwOt.map(x => x['Minat Penelusuran']);
@@ -1634,6 +1637,21 @@ https://www.youtube.com/@ppm_consulting</textarea>
             data: { labels, datasets },
             options: { responsive: true, maintainAspectRatio: false }
           });
+        } else if (canvas) {
+          canvas.style.display = 'none';
+          const container = document.getElementById('trendsChartContainer');
+          let msg = document.getElementById('trendsNoChartMsg');
+          if (!msg) {
+            msg = document.createElement('div');
+            msg.id = 'trendsNoChartMsg';
+            msg.className = 'p-5 text-center space-y-2';
+            container.appendChild(msg);
+          }
+          msg.innerHTML = `
+            <div class="text-amber-400 font-bold text-xs">🌐 Grafik Interaktif Google Trends Tersedia</div>
+            <p class="text-[11px] text-slate-400 max-w-md mx-auto">Google Trends membatasi grafik time-series mentah dari server cloud/hosting. Gunakan tombol di bawah untuk melihat grafik tren interaktif 12 bulan resmi langsung dari Google.</p>
+            <a href="${gUrl}" target="_blank" class="inline-block mt-2 bg-red-600 hover:bg-red-500 text-white font-bold text-xs px-4 py-2 rounded-lg transition">📈 Buka Grafik "${escapeHtml(kw)}" di Google Trends</a>
+          `;
         }
       } catch (e) {}
     }

@@ -1,7 +1,5 @@
 import asyncio
-import json
 import os
-import re
 import sys
 import xml.etree.ElementTree as ET
 from typing import Any
@@ -163,54 +161,6 @@ async def health_check():
     }
 
 
-@app.get("/api/debug/innertube/{video_id}")
-async def debug_innertube(video_id: str):
-    yt = YouTubeConnector()
-    headers = yt._get_natural_headers(hl="id", gl="ID", device="desktop")
-    results = {}
-    async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
-        # 1. Watch page HTML
-        resp = await client.get(f"https://www.youtube.com/watch?v={video_id}", headers=headers)
-        html = resp.text
-        m_player = re.search(r"ytInitialPlayerResponse\s*=\s*({.+?});", html)
-        has_player = bool(m_player)
-        player_status = None
-        player_kw = []
-        if m_player:
-            try:
-                pd = json.loads(m_player.group(1))
-                player_status = pd.get("playabilityStatus", {}).get("status")
-                player_kw = pd.get("videoDetails", {}).get("keywords", [])
-            except Exception as e:
-                player_status = f"json_err: {e}"
-
-        og_tags = re.findall(r'<meta property="og:video:tag" content="(.*?)">', html)
-        meta_kw = re.search(r'<meta name="keywords" content="(.*?)">', html)
-        m_title = re.search(r"<title>(.*?)</title>", html)
-
-        # 2. oEmbed endpoint
-        oembed_resp = await client.get(
-            f"https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v={video_id}&format=json"
-        )
-
-        return {
-            "html_status": resp.status_code,
-            "title": m_title.group(1) if m_title else None,
-            "has_ytInitialPlayerResponse": has_player,
-            "player_status": player_status,
-            "player_keywords_count": len(player_kw),
-            "player_keywords_sample": player_kw[:5],
-            "og_video_tags": og_tags,
-            "meta_keywords": meta_kw.group(1) if meta_kw else None,
-            "oembed_title": oembed_resp.json().get("title")
-            if oembed_resp.status_code == 200
-            else None,
-            "oembed_author": oembed_resp.json().get("author_name")
-            if oembed_resp.status_code == 200
-            else None,
-        }
-
-
 # ==============================================================================
 # Dashboard Backend Endpoints (Powers the 10-Tab Interactive UI)
 # ==============================================================================
@@ -302,7 +252,9 @@ async def api_dashboard_analyze(req: AnalyzeRequest):
     kw_metrics = SearchIntelligence.estimate_keyword_metrics(kw, competitors)
     ai_presence = SearchIntelligence.analyze_ai_competitor_presence(competitors)
     comp_spy = (
-        await yt_conn.spy_competitor_tags(competitors, limit_competitors=5) if competitors else {}
+        await yt_conn.spy_competitor_tags(competitors, limit_competitors=5, seed_topic=kw)
+        if competitors
+        else {}
     )
     outranking_plan = SearchIntelligence.generate_outranking_plan(
         kw,

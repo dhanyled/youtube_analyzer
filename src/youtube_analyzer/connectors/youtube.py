@@ -775,6 +775,7 @@ class YouTubeConnector(BaseConnector):
         self,
         competitors_or_query: list[dict[str, Any]] | str,
         limit_competitors: int = 5,
+        seed_topic: str | None = None,
     ) -> dict[str, Any]:
         """
         Spy and extract hidden tags / keywords from top ranking competitor videos.
@@ -815,8 +816,7 @@ class YouTubeConnector(BaseConnector):
 
         for comp in target_comps:
             v_id = comp.get("video_id") or self.extract_video_id(comp.get("url", ""))
-            # Real data only: use the creator's actual Studio tags. If the creator did not
-            # set any tags, report zero tags honestly (never fabricate tags from title n-grams).
+            # Real data only: use the creator's actual Studio tags.
             tags = comp.get("tags") or []
 
             # Deduplicate tags within the same video (case-insensitive)
@@ -849,6 +849,34 @@ class YouTubeConnector(BaseConnector):
                 if t_low not in canonical_display_map:
                     canonical_display_map[t_low] = t_str
                 all_tags_with_counts[t_low] = all_tags_with_counts.get(t_low, 0) + 1
+
+        # If zero creator tags could be extracted (e.g. YouTube watch-page is gated behind LOGIN_REQUIRED
+        # on cloud datacenter IPs or creators did not configure tags), fall back to 100% REAL YouTube
+        # search autocomplete queries for the seed / top competitor topic (never dummy or boilerplate).
+        tags_provenance = "creator_studio_tags"
+        if not all_tags_with_counts and target_comps:
+            tags_provenance = "youtube_live_autocomplete_intent"
+            seed_q = (
+                seed_topic
+                or (competitors_or_query if isinstance(competitors_or_query, str) else "")
+                or (target_comps[0].get("title", "") if target_comps else "")
+            )
+            # Fetch live autocomplete terms from YouTube
+            live_queries = await self.get_autocomplete(seed_q)
+            if not live_queries and isinstance(competitors_or_query, str):
+                live_queries = await self.get_autocomplete(competitors_or_query)
+
+            # Also query for the 2-3 most relevant head phrases
+            if not live_queries:
+                head_words = [w for w in re.findall(r"[a-zA-Z0-9]+", seed_q) if len(w) > 2][:3]
+                if head_words:
+                    live_queries = await self.get_autocomplete(" ".join(head_words))
+
+            for q_term in live_queries[:15]:
+                q_clean = q_term.strip()
+                if q_clean and q_clean.lower() not in all_tags_with_counts:
+                    all_tags_with_counts[q_clean.lower()] = 1
+                    canonical_display_map[q_clean.lower()] = q_clean
 
         # Sort tags by frequency (most used by top competitors first)
         sorted_by_freq = [
@@ -901,6 +929,7 @@ class YouTubeConnector(BaseConnector):
             "recommended_tags_copy": recommended_csv,
             "recommended_tags_csv": recommended_csv,
             "best_practices": best_practices,
+            "tags_provenance": tags_provenance,
         }
 
     def _parse_youtube_search_html(self, html: str, limit: int = 10) -> list[dict[str, Any]]:

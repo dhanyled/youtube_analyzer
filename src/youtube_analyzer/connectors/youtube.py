@@ -703,16 +703,48 @@ class YouTubeConnector(BaseConnector):
         all_tags_with_counts: dict[str, int] = {}
         canonical_display_map: dict[str, str] = {}
 
-        for comp in competitors[:limit_competitors]:
-            v_id = comp.get("video_id") or self.extract_video_id(comp.get("url", ""))
-            tags = comp.get("tags") or []
-
-            # If tags not already attached, fetch video details directly
+        # Fetch missing video details concurrently to avoid sequential latency and bot throttling
+        async def _ensure_comp_tags(comp_item: dict[str, Any]) -> None:
+            v_id = comp_item.get("video_id") or self.extract_video_id(comp_item.get("url", ""))
+            tags = comp_item.get("tags") or []
             if not tags and v_id:
                 details = await self.get_video_details(v_id)
                 if details and details.get("tags"):
-                    tags = details.get("tags", [])
-                    comp["tags"] = tags
+                    comp_item["tags"] = details.get("tags", [])
+
+        target_comps = competitors[:limit_competitors]
+        await asyncio.gather(*[_ensure_comp_tags(c) for c in target_comps])
+
+        TITLE_STOPWORDS = {
+            "dan", "di", "ke", "dari", "yang", "untuk", "dengan", "pada", "ini", "itu",
+            "atau", "juga", "agar", "biar", "tidak", "gak", "bisa", "cara", "tutorial",
+            "panduan", "lengkap", "terbaru", "pemula", "2024", "2025", "2026", "bagaimana",
+            "apa", "kenapa", "mengapa", "dalam", "saat", "oleh", "sebagai", "adalah",
+            "the", "and", "for", "with", "how", "to", "in", "of", "on", "at", "by", "from",
+        }
+
+        for comp in target_comps:
+            v_id = comp.get("video_id") or self.extract_video_id(comp.get("url", ""))
+            tags = comp.get("tags") or []
+
+            # If YouTube hides watch-page keywords (e.g. datacenter IP / creator left tags empty),
+            # extract high-signal bigrams & keyphrases from the competitor's actual ranking title
+            if not tags:
+                raw_title = comp.get("title", "")
+                words = [
+                    w.lower()
+                    for w in re.findall(r"[a-zA-Z0-9]{3,}", raw_title)
+                    if w.lower() not in TITLE_STOPWORDS and not w.isdigit()
+                ]
+                derived_phrases: list[str] = []
+                # 2-word and 3-word topical phrases from title
+                for i in range(len(words) - 1):
+                    bigram = f"{words[i]} {words[i+1]}"
+                    derived_phrases.append(bigram)
+                    if i + 2 < len(words):
+                        trigram = f"{words[i]} {words[i+1]} {words[i+2]}"
+                        derived_phrases.append(trigram)
+                tags = derived_phrases[:8] if derived_phrases else words[:6]
 
             # Deduplicate tags within the same video (case-insensitive)
             seen_in_vid: set[str] = set()

@@ -1365,7 +1365,11 @@ https://www.youtube.com/@ppm_consulting</textarea>
           <td class="p-3 text-slate-400 font-mono">${escapeHtml(c.duration)}</td>
           <td class="p-3"><span class="px-2 py-0.5 rounded bg-slate-800 text-[11px]">${escapeHtml(c.format)}</span></td>
           <td class="p-3 text-[11px]">${escapeHtml(c.ai_badge || '👤 Human')}</td>
-          <td class="p-3 text-[11px] text-amber-300">${escapeHtml(c.outlier_status || '')}</td>
+          <td class="p-3 text-[11px]">
+            ${c.outlier_status && (c.outlier_status.includes('Breakout') || c.outlier_status.includes('High') || c.outlier_status.includes('Viral') || c.outlier_status.includes('🔥') || c.outlier_status.includes('x'))
+              ? `<span class="px-2 py-0.5 rounded bg-red-950/80 border border-red-700/70 text-red-300 font-bold font-mono">${escapeHtml(c.outlier_status)}</span>`
+              : (c.outlier_status ? `<span class="px-2 py-0.5 rounded bg-amber-950/80 border border-amber-700/70 text-amber-300 font-semibold font-mono">${escapeHtml(c.outlier_status)}</span>` : `<span class="text-slate-500 font-mono text-[10px]">Normative</span>`)}
+          </td>
         </tr>
       `).join('');
 
@@ -1647,6 +1651,24 @@ https://www.youtube.com/@ppm_consulting</textarea>
       alert(`Berhasil menyalin ${paa.length} pertanyaan Google People Also Ask ke clipboard!`);
     }
 
+    function scanOffPlatformMonetization(desc) {
+      if (!desc) return [];
+      const signals = [];
+      const checks = [
+        { name: 'Komunitas / Membership Berbayar', pattern: /(skool\.com|discord\.(gg|com)|patreon\.com|karyakarsa\.com|t\.me\/|telegram\.me)/i, icon: '👥', badge: 'bg-indigo-950/80 text-indigo-300 border-indigo-700/60' },
+        { name: 'Kursus Online / Digital Product', pattern: /(gumroad\.com|teachable\.com|udemy\.com|lynk\.id|mayar\.id|tribelio\.page|subscribestar\.com|hotmart\.com)/i, icon: '🎓', badge: 'bg-emerald-950/80 text-emerald-300 border-emerald-700/60' },
+        { name: 'Afiliasi & Toko E-Commerce', pattern: /(shopee\.(co\.id|com)|tokopedia\.com|amzn\.to|amazon\.com|lazada\.co\.id|tiktok\.com\/@|tokopedia\.link|shp\.ee)/i, icon: '🛒', badge: 'bg-amber-950/80 text-amber-300 border-amber-700/60' },
+        { name: 'Sponsorship / Booking / WhatsApp', pattern: /(calendly\.com|wa\.me|api\.whatsapp\.com|business email|contact:|sponsorship:|endorse:)/i, icon: '💼', badge: 'bg-purple-950/80 text-purple-300 border-purple-700/60' }
+      ];
+      checks.forEach(c => {
+        const match = desc.match(c.pattern);
+        if (match) {
+          signals.push({ name: c.name, matched: match[0], icon: c.icon, badge: c.badge });
+        }
+      });
+      return signals;
+    }
+
     // 4. Tab 2: Video Audit & Pre-Upload
     async function runVideoAudit() {
       const url = document.getElementById('auditVideoUrl').value.trim();
@@ -1676,6 +1698,9 @@ https://www.youtube.com/@ppm_consulting</textarea>
         const viewsText = (v.views_display && v.views_display !== 'N/A')
           ? v.views_display
           : (v.views ? Number(v.views).toLocaleString('id-ID') + ' views' : 'N/A');
+        const descText = v.description || ar.full_description || '';
+        const offPlatform = scanOffPlatformMonetization(descText);
+
         box.innerHTML = `
           <div class="bg-[#161b26] border border-slate-800 rounded-xl p-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
             <div>
@@ -1709,6 +1734,31 @@ https://www.youtube.com/@ppm_consulting</textarea>
                   </div>
                 </div>
               ` : ''}
+
+              <!-- NexLev Off-Platform Earnings Scanner Card -->
+              <div class="p-3 rounded-lg bg-[#0e1117] border border-slate-700/80 space-y-2 mt-2">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-1.5">
+                  <span class="font-bold text-white text-[11px] flex items-center gap-1.5">
+                    <span>💰</span> Deteksi Monetisasi Eksternal (NexLev Off-Platform Earnings):
+                  </span>
+                  <span class="text-[10px] font-bold px-2 py-0.5 rounded ${offPlatform.length > 0 ? 'bg-emerald-950 text-emerald-300 border border-emerald-700' : 'bg-slate-800 text-slate-400'}">
+                    ${offPlatform.length > 0 ? `${offPlatform.length} Jalur Terdeteksi` : 'AdSense Murni'}
+                  </span>
+                </div>
+                ${offPlatform.length > 0 ? `
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-0.5">
+                    ${offPlatform.map(s => `
+                      <div class="p-1.5 rounded border text-[11px] flex items-center justify-between ${s.badge}">
+                        <span class="flex items-center gap-1"><span>${s.icon}</span> <b>${escapeHtml(s.name)}</b></span>
+                        <code class="text-[10px] opacity-80 font-mono">${escapeHtml(s.matched)}</code>
+                      </div>
+                    `).join('')}
+                  </div>
+                  <p class="text-[10px] text-slate-400 mt-1">Kreator ini memiliki jalur funnel di luar YouTube AdSense via platform di atas.</p>
+                ` : `
+                  <p class="text-[11px] text-slate-400">Tidak terdeteksi tautan funnel eksternal di deskripsi. Monetisasi video ini 100% bertumpu pada AdSense.</p>
+                `}
+              </div>
 
               <div>
                 <span class="text-slate-400 block mb-1">📝 Deskripsi Revamp Siap Salin:</span>

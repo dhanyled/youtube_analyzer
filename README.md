@@ -9,10 +9,15 @@ Powered by algorithmic search intelligence formulas:
 
 ---
 
-## 🎯 Core Features (v2.2.0 Dual-Engine Blindspot Edition)
+## 🎯 Core Features (v2.3.0 Algorithmic Outlier & Zero-Blindspot Edition)
 
 | Feature | Engine | Description |
 | :--- | :--- | :--- |
+| **Algorithmic 3-Point Niche Validation Scorecard** | Validation Engine | Evaluates 3 criteria (Cluster 3-5 Channels, Breakout Views Proof, Suggest Search Demand) with VALIDATED vs CAUTION status. |
+| **Outlier Multiplier & Breakout Sorting** | Outlier Engine | Computes exact multiplier ($\text{Views} / \text{Median Views}$), badges (`🔥 VIRAL BREAKOUT`, `⭐ STRONG OUTLIER`), and 1-click highest outlier sorting. |
+| **Studio Thumbnail Lab: AI Prompt Generator** | Reverse-Engineering | Deconstructs #1 ranking outlier thumbnail into Google Flow (Nano Banana Pro) & Midjourney prompts + 3-word punchy overlay. |
+| **Off-Platform Funnel Intelligence** | Funnel Scanner | Detects external monetization paths (courses, Skool/Discord communities, affiliate links, sponsorships) from competitor descriptions. |
+| **Dual-Tier Credential Resolution** | Settings Engine | Auto-detects server `.env` credentials with zero configuration, offering persistent UI modal override via `localStorage`. |
 | **5-Pillar Packaging & SEO Blindspot Audit** | Blindspot Gate | Automated audit for mobile title truncation, Google Key Moments timestamps (00:00 start), tag relevancy, first-fold description hook, and format alignment. |
 | **Tag Relevancy & Anti-Spam Gate** | Normalizer Core | Strict contextual tag filter. Disallows generic spam (`fyp`, `viral`) and verifies conditional clickbait (`gratis`, `download`) against video script/topic. |
 | **Audience Pain Point Comment Mining** | InnerTube + API v3 | Unauthenticated dual-engine scraper that mines competitor comments to discover unanswered viewer questions and content gaps. |

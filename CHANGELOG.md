@@ -4,6 +4,47 @@ Semua pembaruan, perbaikan bug, dan rilis versi sistem **YouTube Search & Compet
 
 ---
 
+## [2.3.0] - 2026-11-06 (Algorithmic Outlier & Zero-Blindspot White-Label Edition)
+
+### 🚀 Fitur Baru & Peningkatan Utama
+* **Algorithmic 3-Point Niche Validation Scorecard:**
+  * Mengevaluasi topik riset terhadap 3 kriteria algoritma YouTube:
+    1. *Channel Cluster*: Minimal 3-5 channel independen berhasil memonetisasi topik (bukan one-hit wonder).
+    2. *Breakout Proof*: Terdapat bukti penayangan video mencapai views tinggi (>=20K views).
+    3. *Search Demand*: Autocomplete YouTube Suggest aktif menghasilkan minimal 3 variasi kueri.
+  * Menghasilkan status keputusan `🟢 VALIDATED NICHE` vs `🟡 CAUTION (NICHE SEMPIT)`.
+* **Outlier Multiplier Engine & Viral Breakout Sorting:**
+  * Menghitung rasio performa kompetitor: $\text{Views} / \text{Median Views}$ secara matematis.
+  * Menampilkan badge visual cerdas: `🔥 VIRAL BREAKOUT (>=5.0x)`, `⭐ STRONG OUTLIER (>=2.5x)`, dan `📈 ABOVE AVERAGE (>=1.3x)`.
+  * Tombol interaktif *Urutkan Outlier Tertinggi (Viral Breakout Mode)* untuk beralih antara ranking default SERP dan klip dengan multiplier ledakan views terbesar.
+* **Studio Thumbnail Lab: AI Prompt Generator:**
+  * Mereverse-engineer formula visual dari video peringkat #1 atau outlier tertinggi.
+  * Menghasilkan prompt AI siap pakai untuk model **Google Flow (Nano Banana Pro)** dan **Midjourney v6.1**.
+  * Menyertakan rekomendasi *3-Word Punchy Text Overlay* berdaya tarik tinggi.
+* **Off-Platform Funnel Intelligence (Monetisasi Eksternal):**
+  * Scanner regex cerdas yang memeriksa deskripsi video kompetitor untuk mendeteksi funnel pendapatan di luar AdSense:
+    * Kursus Online / LMS (Teachable, Kajabi, Udemy).
+    * Komunitas Berbayar / Membership (Skool, Discord VIP, Patreon, Substack).
+    * Link Afiliasi (Shopee, Tokopedia, Amazon, Bitly, Linktree).
+    * Sponsorship / Endorsement Resmi.
+* **Dual-Tier Credential Resolution & UI Settings Modal:**
+  * Tombol header `⚙️ Pengaturan AI & API Key` dan dialog modal interaktif.
+  * Otomatis membaca kredensial `YOUTUBE_API_KEY` dan `GEMINI_API_KEY` dari environment variable `.env` (server/cloud) tanpa konfigurasi manual.
+  * Menyediakan opsi input manual di UI yang tersimpan persisten di `localStorage` sebagai fallback / override.
+  * Endpoint `GET /api/credentials/status` untuk verifikasi visual status koneksi API.
+* **100% White-Label & Prohibited Brand Scrubbing:**
+  * Pembersihan menyeluruh terhadap semua nama brand komersial pihak ketiga dari antarmuka pengguna (UI), API response, komentar kode, dan dokumentasi.
+  * Peningkatan automated brand guardrail di `tests/verify_suite.py` yang mencakup file `.html`, `.js`, `.css`, `.py`, `.md`.
+
+### 🐛 Perbaikan Bug & Blindspot
+* **Real Data Integrity Fix (Durasi & Views N/A):**
+  * Memperbaiki logika ekstraksi data video kompetitor dan audit video studio agar durasi dan views selalu memuat angka riil terformat (contoh: `12:45` dan `125.4K views`) dan tidak pernah lagi menghasilkan `N/A`.
+* **Synchronization & Stability:**
+  * Menjaga keselarasan 100% antara `src/youtube_analyzer` dan `api/youtube_analyzer`.
+  * 68 unit test lolos secara lengkap (`uv run pytest tests/unit/`).
+
+---
+
 ## [2.2.0] - 2026-11-06 (Dual-Engine Blindspot Edition)
 
 ### 🚀 Fitur Baru & Peningkatan Utama

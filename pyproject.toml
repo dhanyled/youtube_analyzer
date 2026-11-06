@@ -1,6 +1,6 @@
 [project]
 name = "youtube-analyzer"
-version = "2.2.0"
+version = "2.3.0"
 description = "AI-powered YouTube SERP, Competitor Intelligence, Content Gaps, and SEO Optimization Engine (MCP & WebMCP)"
 readme = "README.md"
 requires-python = ">=3.12"

@@ -202,3 +202,33 @@ Setelah perubahan CSS/JS untuk menghilangkan elemen watermark atau avatar profil
    - *Proteksi di Proyek Ini:* Arsitektur dual-tier (YouTube Studio Data API v3 resmi via OAuth 2.0 untuk user autentikasi + InnerTube fallback unauthenticated untuk scraping publik). Fallback unauthenticated dilengkapi penanganan try-except berlapis dan fallback data aman tanpa memutus eksekusi dashboard (nol 500 error).
 2. **Caveat Kompatibilitas SQLAlchemy vs SQLModel (Dependabot PR #9):**
    - *Temuan Kritis:* Dependabot mengusulkan bump sqlalchemy ke >=2.1.6. Namun sqlmodel==0.0.22 memiliki constraint ketat sqlalchemy >= 2.0.14, < 2.1.0. Mem-merge PR #9 tanpa meng-upgrade SQLModel akan memicu dependency resolution conflict di uv sync. PR #9 wajib ditahan hingga SQLModel merilis kompatibilitas SQLAlchemy 2.1+.
+
+---
+
+## 10. ⚡ Intelligence Algoritmik, Dual-Tier Kredensial, dan Kebijakan Zero-Third-Party Brand Guardrail (v2.3.0)
+
+### 10.1. Arsitektur Resolusi Kredensial Dual-Tier (resolve_effective_keys)
+- **Masalah**: Pengguna ingin fleksibilitas penggunaan API Key: jika sudah tersimpan di .env lokal atau serverless environment variables, sistem harus langsung menggunakannya secara otomatis tanpa memaksa pengguna menginput manual. Namun jika belum ada di .env atau pengguna ingin menguji key alternatif, dashboard harus menyediakan modal pengaturan manual.
+- **Solusi**:
+  1. Dibuat fungsi helper resolve_effective_keys(override_key, env_var_name) di api/index.py.
+  2. Alur resolusi bertingkat: Override Key dari UI Modal -> Key dari os.environ / .env -> Fallback None.
+  3. UI menyediakan tombol 'Pengaturan AI & API Key' yang menyimpan input ke localStorage browser dan mengirimkannya via payload API.
+  4. Endpoint visual GET /api/credentials/status melaporkan status ketersediaan key tanpa membocorkan isi key rahasia ke publik (hanya mask 4 karakter awal).
+
+### 10.2. Algoritma Outlier Multiplier & Niche Scorecard
+- **Formula Outlier**: Multiplier = Views Video / Median Views Kompetitor Halaman 1.
+  - Multiplier >= 5.0x -> VIRAL BREAKOUT
+  - Multiplier >= 2.5x -> STRONG OUTLIER
+  - Multiplier >= 1.3x -> ABOVE AVERAGE
+- **Pilar Validasi Niche**:
+  1. *Channel Cluster*: Minimal 3 channel unik di SERP untuk memastikan niche tidak dimonopoli 1 kreator.
+  2. *Proof of Views*: Minimal ada 1 video berpenayangan >= 20.000 views sebagai bukti audiens aktif.
+  3. *Search Demand*: Autocomplete YouTube Suggest aktif >= 3 variasi kueri.
+
+### 10.3. Kebijakan Mutlak White-Label & Automated Brand Guardrail
+- **Larangan Pihak Ketiga**:
+  - Dilarang keras menampilkan nama platform komersial pihak ketiga mana pun pada UI, respons JSON, maupun komentar kode.
+  - Semua fitur menggunakan penamaan proprietary berbasis fungsi: Algorithmic Niche Validation Scorecard, Viral Breakout Mode, Off-Platform Funnel Intelligence, Studio Thumbnail Lab.
+- **Automated Guardrail (tests/verify_suite.py)**:
+  - Seluruh file berekstensi .html, .js, .css, .py, .md, .toml, .json dipindai secara rekursif dalam automated test suite.
+  - Jika kata terlarang terdeteksi, build otomatis dihentikan dengan status exit code 1.

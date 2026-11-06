@@ -40,7 +40,7 @@ except Exception as e:
 
 app = FastAPI(
     title="YouTube Search & Competitor Intelligence (Vercel Cloud + WebMCP)",
-    version="2.2.0",
+    version="2.3.0",
     docs_url="/docs",
     redoc_url=None,
 )
@@ -224,7 +224,7 @@ async def health_check():
     return {
         "status": "ok",
         "service": "youtube-analyzer-serverless",
-        "version": "2.2.0",
+        "version": "2.3.0",
         "cors_enabled": True,
         "engine_loaded": YouTubeConnector is not None,
         "import_error": IMPORT_ERROR_MSG,

@@ -310,7 +310,7 @@ class YouTubeConnector(BaseConnector):
             }
 
     INNERTUBE_PLAYER_URL = "https://www.youtube.com/youtubei/v1/player?prettyPrint=false"
-    INNERTUBE_WEB_CLIENT_VERSION = "2.20250312.04.00"
+    INNERTUBE_WEB_CLIENT_VERSION = "2.20260210.01.00"
 
     async def _fetch_innertube_player(self, video_id: str) -> dict[str, Any] | None:
         """Fetch real video metadata + creator Studio tags via YouTube Innertube player API."""
@@ -383,7 +383,7 @@ class YouTubeConnector(BaseConnector):
             "channel_id": str(v_det.get("channelId", "")),
             "published_at": published,
             "views": raw_views,
-            "views_display": self._format_views_display(raw_views) if raw_views else "N/A",
+            "views_display": self._format_views_display(raw_views),
             "likes": _to_int(mf.get("likeCount")),
             "comments": 0,
             "duration": dur_text,
@@ -400,7 +400,7 @@ class YouTubeConnector(BaseConnector):
         """Guarantee 100% real title, views, and duration even on cloud IPs by cascading public fallbacks."""
         needs_title = not meta.get("title") or meta.get("title") == f"Video {video_id}"
         needs_views = (
-            not meta.get("views") or meta.get("views") == 0 or meta.get("views_display") == "N/A"
+            meta.get("views") is None or meta.get("views_display") == "N/A"
         )
         needs_dur = (
             not meta.get("duration")
@@ -439,11 +439,11 @@ class YouTubeConnector(BaseConnector):
                     )
                     if ryd.status_code == 200:
                         ryd_d = ryd.json()
-                        v_cnt = int(ryd_d.get("viewCount") or 0)
-                        if v_cnt > 0:
+                        if "viewCount" in ryd_d:
+                            v_cnt = int(ryd_d.get("viewCount") or 0)
                             meta["views"] = v_cnt
                             meta["views_display"] = self._format_views_display(v_cnt)
-                        if not meta.get("likes") and ryd_d.get("likes"):
+                        if not meta.get("likes") and ryd_d.get("likes") is not None:
                             meta["likes"] = int(ryd_d.get("likes") or 0)
                 except Exception:
                     pass
@@ -517,6 +517,27 @@ class YouTubeConnector(BaseConnector):
                         )
                         if m_dur:
                             dur_sec = self.parse_duration_to_seconds(m_dur.group(1))
+
+                    # If still 0, try mobile YouTube URL (reliable on cloud/datacenter IPs)
+                    if dur_sec == 0:
+                        m_headers = self._get_natural_headers(hl="id", gl="ID", device="mobile")
+                        m_resp = await client.get(
+                            f"https://m.youtube.com/watch?v={video_id}&has_verified=1",
+                            headers=m_headers,
+                        )
+                        if m_resp.status_code == 200:
+                            m_html = m_resp.text
+                            m_mdur = re.search(
+                                r'<meta itemprop="duration" content="(PT.*?)">', m_html
+                            )
+                            m_mlen = re.search(r'"lengthSeconds"\s*:\s*"(\d+)"', m_html)
+                            m_mapp = re.search(r'"approxDurationMs"\s*:\s*"(\d+)"', m_html)
+                            if m_mdur:
+                                dur_sec = self.parse_duration_to_seconds(m_mdur.group(1))
+                            elif m_mlen:
+                                dur_sec = int(m_mlen.group(1))
+                            elif m_mapp:
+                                dur_sec = int(int(m_mapp.group(1)) / 1000)
 
                     # If still 0, try the direct Shorts URL (vital for YouTube Shorts on cloud IPs)
                     if dur_sec == 0:
@@ -820,9 +841,7 @@ class YouTubeConnector(BaseConnector):
                         "channel_id": channel_id,
                         "published_at": published_at,
                         "views": raw_views,
-                        "views_display": self._format_views_display(raw_views)
-                        if raw_views
-                        else "N/A",
+                        "views_display": self._format_views_display(raw_views),
                         "likes": likes,
                         "comments": 0,
                         "duration": dur_text,

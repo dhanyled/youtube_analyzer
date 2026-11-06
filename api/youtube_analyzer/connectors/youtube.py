@@ -1938,25 +1938,70 @@ class YouTubeConnector(BaseConnector):
             except Exception as e:
                 logger.warning(f"Error fetching API comments for '{clean_vid}': {e}")
 
-        # 2. Fallback: InnerTube player / next context comments if unauthenticated
+        # 2. Fallback: InnerTube public next endpoint if unauthenticated / no API key
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                payload = {
-                    "context": {
-                        "client": {
-                            "clientName": "WEB",
-                            "clientVersion": self.INNERTUBE_WEB_CLIENT_VERSION,
-                            "hl": "id",
-                            "gl": "ID",
-                        }
-                    },
-                    "videoId": clean_vid,
-                }
-                resp = await client.post("https://www.youtube.com/youtubei/v1/next", json=payload)
+            headers = self._get_natural_headers(hl="id", gl="ID")
+            payload = {
+                "context": {
+                    "client": {
+                        "clientName": "WEB",
+                        "clientVersion": self.INNERTUBE_WEB_CLIENT_VERSION,
+                        "hl": "id",
+                        "gl": "ID",
+                    }
+                },
+                "videoId": clean_vid,
+            }
+            async with httpx.AsyncClient(timeout=12.0) as client:
+                resp = await client.post("https://www.youtube.com/youtubei/v1/next", json=payload, headers=headers)
                 if resp.status_code == 200:
-                    pass
-        except Exception:
-            pass
+                    data = resp.json()
+                    panels = data.get("engagementPanels", [])
+                    token = None
+                    for p in panels:
+                        renderer = p.get("engagementPanelSectionListRenderer", {})
+                        if renderer.get("panelIdentifier") == "engagement-panel-comments-section":
+                            sec_list = renderer.get("content", {}).get("sectionListRenderer", {})
+                            for item in sec_list.get("contents", []):
+                                for ci in item.get("itemSectionRenderer", {}).get("contents", []):
+                                    if "continuationItemRenderer" in ci:
+                                        token = ci["continuationItemRenderer"].get("continuationEndpoint", {}).get("continuationCommand", {}).get("token")
+                                        break
+                    if token:
+                        c_payload = {"context": payload["context"], "continuation": token}
+                        r2 = await client.post("https://www.youtube.com/youtubei/v1/next", json=c_payload, headers=headers)
+                        if r2.status_code == 200:
+                            d2 = r2.json()
+                            mutations = d2.get("frameworkUpdates", {}).get("entityBatchUpdate", {}).get("mutations", [])
+                            innertube_comments: list[dict[str, Any]] = []
+                            import html as pyhtml
+                            for m in mutations:
+                                cep = m.get("payload", {}).get("commentEntityPayload")
+                                if cep:
+                                    raw_text = cep.get("properties", {}).get("content", {}).get("content", "")
+                                    clean_text = re.sub(r"<[^>]+>", " ", raw_text)
+                                    clean_text = pyhtml.unescape(clean_text)
+                                    clean_text = re.sub(r"\s+", " ", clean_text).strip()
+                                    if not clean_text:
+                                        continue
+                                    author = cep.get("author", {}).get("displayName", "Penonton")
+                                    toolbar = cep.get("toolbar", {})
+                                    like_str = str(toolbar.get("likeCountNotliked", "0")).strip()
+                                    likes = int(like_str) if like_str.isdigit() else 0
+                                    published = cep.get("properties", {}).get("publishedTime", "")
+                                    innertube_comments.append({
+                                        "video_id": clean_vid,
+                                        "author": author,
+                                        "text": clean_text,
+                                        "likes": likes,
+                                        "published": published,
+                                    })
+                                    if len(innertube_comments) >= max_results:
+                                        break
+                            if innertube_comments:
+                                return innertube_comments
+        except Exception as e:
+            logger.debug(f"InnerTube comments fallback failed for '{clean_vid}': {e}")
 
         return []
 

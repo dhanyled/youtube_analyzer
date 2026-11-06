@@ -75,8 +75,13 @@
             </select>
           </div>
           <div>
-            <label class="block text-[11px] text-slate-400 mb-1">API Key (Opsional):</label>
-            <input id="aiApiKey" type="password" oninput="updateAiBadge()" placeholder="Tempel API Key Anda di sini..." class="w-full bg-[#161b26] border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200">
+            <label class="block text-[11px] text-slate-400 mb-1">AI API Key (Gemini/Groq/OpenAI):</label>
+            <input id="aiApiKey" type="password" oninput="updateAiBadge()" placeholder="Tempel AI API Key Anda di sini..." class="w-full bg-[#161b26] border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200">
+          </div>
+          <div>
+            <label class="block text-[11px] text-slate-400 mb-1">YouTube Data API v3 Key (Opsional untuk Full Detail):</label>
+            <input id="youtubeApiKey" type="password" oninput="updateAiBadge()" placeholder="AIzaSy... (Opsional untuk durasi dan statistik resmi)" class="w-full bg-[#161b26] border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200">
+            <span class="text-[10px] text-slate-500 mt-0.5 block">Jika diisi, cloud server akan menarik durasi ISO dan statistik lengkap langsung dari Google.</span>
           </div>
           <div>
             <label class="block text-[11px] text-slate-400 mb-1">Model Name (Opsional):</label>
@@ -1001,25 +1006,31 @@ https://www.youtube.com/@ppm_consulting</textarea>
 
     function updateAiBadge() {
       const key = document.getElementById('aiApiKey').value.trim();
+      const ytKey = document.getElementById('youtubeApiKey') ? document.getElementById('youtubeApiKey').value.trim() : '';
+      if (ytKey) {
+        localStorage.setItem('youtube_api_key', ytKey);
+      }
       const prov = document.getElementById('aiProvider').value.toUpperCase();
       const box = document.getElementById('aiModeStatus');
       if (key) {
         box.className = 'p-2.5 rounded-lg bg-emerald-950/40 border border-emerald-800/50 text-[11px] text-emerald-300';
-        box.innerHTML = `🟢 <b>Mode: AI Enhanced (${prov})</b><br><span class="text-slate-400">Judul diracik langsung oleh AI membaca 5 video kompetitor.</span>`;
+        box.innerHTML = `🟢 <b>Mode: AI Enhanced (${prov})</b> ${ytKey ? ' | ⚡ YouTube API v3 Active' : ''}<br><span class="text-slate-400">Judul & naskah diracik langsung oleh AI membaca video riil kompetitor.</span>`;
       } else {
         box.className = 'p-2.5 rounded-lg bg-sky-950/40 border border-sky-800/50 text-[11px] text-sky-300';
-        box.innerHTML = `🧠 <b>Mode: Smart Competitor Heuristic</b><br><span class="text-slate-400">Tanpa API Key, sistem mengekstrak entitas penting dari video riil kompetitor.</span>`;
+        box.innerHTML = `🧠 <b>Mode: Smart Competitor Heuristic</b> ${ytKey ? ' | ⚡ YouTube API v3 Active' : ''}<br><span class="text-slate-400">Sistem mengekstrak entitas penting dari video riil kompetitor secara otomatis.</span>`;
       }
     }
 
     function getAiConfig() {
       const key = document.getElementById('aiApiKey').value.trim();
-      if (!key) return null;
+      const ytKey = (document.getElementById('youtubeApiKey') ? document.getElementById('youtubeApiKey').value.trim() : '') || localStorage.getItem('youtube_api_key') || null;
+      if (!key && !ytKey) return null;
       return {
         provider: document.getElementById('aiProvider').value,
-        api_key: key,
+        api_key: key || null,
         model_name: document.getElementById('aiModelName').value.trim() || null,
-        custom_base_url: document.getElementById('aiCustomUrl').value.trim() || null
+        custom_base_url: document.getElementById('aiCustomUrl').value.trim() || null,
+        youtube_api_key: ytKey
       };
     }
 
@@ -1564,7 +1575,7 @@ https://www.youtube.com/@ppm_consulting</textarea>
           <div class="bg-[#161b26] border border-slate-800 rounded-xl p-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
             <div>
               <img src="${escapeHtml(v.thumbnail_url || '')}" class="rounded-lg w-full mb-2">
-              <div class="text-slate-400">⏱️ Durasi: ${escapeHtml(durText)} | 👁️ Views: ${escapeHtml(viewsText)}</div>
+              <div class="text-slate-400">⏱️ Durasi: <b class="text-white">${escapeHtml(durText)}</b> ${v.format ? `<span class="px-1.5 py-0.5 rounded bg-slate-800 text-[10px] text-slate-300 ml-1">${escapeHtml(v.format)}</span>` : ''} | 👁️ Views: <b class="text-white">${escapeHtml(viewsText)}</b></div>
             </div>
             <div class="md:col-span-2 space-y-2">
               <div class="text-sm font-bold text-white">${escapeHtml(v.title)}</div>
@@ -2209,6 +2220,11 @@ https://www.youtube.com/@ppm_consulting</textarea>
 
     // Initialize on load
     window.addEventListener('DOMContentLoaded', () => {
+      if (localStorage.getItem('youtube_api_key')) {
+        const yEl = document.getElementById('youtubeApiKey');
+        if (yEl) yEl.value = localStorage.getItem('youtube_api_key');
+        updateAiBadge();
+      }
       loadHistory();
       renderSavedChannelsPills();
       loadMyChannelData();

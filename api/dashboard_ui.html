@@ -349,6 +349,35 @@
         <button onclick="loadMyChannelData()" class="self-start text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-1.5 rounded-lg flex items-center gap-1.5">🔄 Segarkan Data Channel</button>
       </div>
 
+      <!-- Multi-Channel Switcher Toolbar (Same Gmail or Different Gmail Accounts) -->
+      <div class="bg-[#131926] border border-slate-700/80 rounded-xl p-4 space-y-3">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-700/60 pb-2.5">
+          <div class="flex items-center gap-2">
+            <span class="text-base">🔄</span>
+            <span class="text-xs font-bold text-white">Ganti Channel Saya (Multi-Channel di 1 Gmail atau Beda Akun Gmail)</span>
+          </div>
+          <button onclick="toggleOAuthGuideModal()" class="text-[11px] text-sky-400 hover:text-sky-300 underline flex items-center gap-1 self-start sm:self-auto">
+            <span>ℹ️ Panduan OAuth Multi-Channel & Brand Account</span>
+          </button>
+        </div>
+        <div class="flex flex-col sm:flex-row gap-2">
+          <input id="inputCustomChannelHandle" type="text" onkeydown="if(event.key==='Enter') switchMyChannelToCustom()" placeholder="Masukkan @handle, URL channel, atau Channel ID lain (misal: @KanalBisnis, https://youtube.com/@channel)..." class="flex-1 bg-[#0e1117] border border-slate-700 rounded-lg px-3.5 py-2 text-xs text-white focus:outline-none focus:border-red-500">
+          <button onclick="switchMyChannelToCustom()" id="btnSwitchChannel" class="bg-red-600 hover:bg-red-500 text-white font-semibold px-4 py-2 rounded-lg text-xs whitespace-nowrap">
+            Ganti Channel
+          </button>
+          <button onclick="resetToPrimaryChannel()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-2 rounded-lg text-xs whitespace-nowrap">
+            🏠 Channel Utama
+          </button>
+        </div>
+        <!-- Quick Channel History Pills -->
+        <div class="flex items-center gap-1.5 flex-wrap text-[11px] text-slate-400 pt-1">
+          <span class="font-semibold text-slate-300">Pilih Cepat:</span>
+          <div id="savedChannelsPills" class="flex items-center gap-1.5 flex-wrap">
+            <span class="text-slate-500 italic">Belum ada channel tambahan</span>
+          </div>
+        </div>
+      </div>
+
       <!-- Channel Profile Header Banner -->
       <div id="myChannelCard" class="bg-[#161b26] border border-slate-800 rounded-xl p-5">
         <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -1738,13 +1767,20 @@ https://www.youtube.com/@ppm_consulting</textarea>
     // Tab 3: My Channel Data & Multi-Channel Competitor Comparison
     let myChannelProfileCache = null;
 
-    async function loadMyChannelData() {
+    let currentActiveChannelHandle = null;
+
+    async function loadMyChannelData(customIdentifier = null) {
       try {
-        const res = await fetch('/api/dashboard/my-channel');
+        let url = '/api/dashboard/my-channel';
+        if (customIdentifier) {
+          url += '?identifier=' + encodeURIComponent(customIdentifier);
+        }
+        const res = await fetch(url);
         const d = await res.json();
         if (d && d.profile) {
           const p = d.profile;
           myChannelProfileCache = p;
+          currentActiveChannelHandle = p.custom_url || p.channel_id || customIdentifier;
           document.getElementById('myChannelTitle').textContent = p.title || 'Channel Saya';
           document.getElementById('myChannelHandle').textContent = p.custom_url || '';
           document.getElementById('myChannelSubs').textContent = p.subscribers_display || p.subscribers || '0';
@@ -1754,6 +1790,23 @@ https://www.youtube.com/@ppm_consulting</textarea>
             document.getElementById('myChannelAvatar').src = p.thumbnail_url;
           }
           document.getElementById('roadChannelName').textContent = p.title || 'Channel Saya';
+
+          // Update badge
+          const badgeEl = document.getElementById('myChannelAuthBadge');
+          if (d.is_custom_channel) {
+            badgeEl.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-sky-950 text-sky-400 border border-sky-800';
+            badgeEl.textContent = '🔄 Channel Terpilih (Kustom)';
+          } else {
+            badgeEl.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800';
+            badgeEl.textContent = '🟢 Terhubung Resmi (Lifetime Token)';
+          }
+
+          // Save to localStorage recent channels if custom
+          if (customIdentifier) {
+            saveChannelToRecents(p.custom_url || customIdentifier, p.title);
+          }
+        } else if (d.error) {
+          showToast('⚠️ ' + d.error);
         }
         
         // Render My Videos
@@ -1778,9 +1831,65 @@ https://www.youtube.com/@ppm_consulting</textarea>
         } else {
           vBody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-400">Belum ada video yang ditemukan dari channel ini.</td></tr>`;
         }
+
+        // Auto re-run multi channel benchmark with new active channel stats if competitors are present
+        const compText = document.getElementById('multiCompetitorsInput')?.value?.trim();
+        if (compText) {
+          runMultiChannelComparison();
+        }
       } catch (e) {
         console.warn('Error loading my channel data:', e);
       }
+    }
+
+    function switchMyChannelToCustom() {
+      const val = document.getElementById('inputCustomChannelHandle').value.trim();
+      if (!val) {
+        showToast('⚠️ Masukkan @handle atau URL channel terlebih dahulu!');
+        return;
+      }
+      loadMyChannelData(val);
+      showToast('🔄 Memuat data channel: ' + val);
+    }
+
+    function resetToPrimaryChannel() {
+      document.getElementById('inputCustomChannelHandle').value = '';
+      loadMyChannelData(null);
+      showToast('🏠 Kembali ke Channel Utama');
+    }
+
+    function saveChannelToRecents(handle, title) {
+      if (!handle) return;
+      try {
+        let recents = JSON.parse(localStorage.getItem('saved_my_channels') || '[]');
+        recents = recents.filter(c => c.handle.toLowerCase() !== handle.toLowerCase());
+        recents.unshift({ handle, title });
+        if (recents.length > 5) recents.pop();
+        localStorage.setItem('saved_my_channels', JSON.stringify(recents));
+        renderSavedChannelsPills();
+      } catch (e) {}
+    }
+
+    function renderSavedChannelsPills() {
+      const box = document.getElementById('savedChannelsPills');
+      if (!box) return;
+      try {
+        let recents = JSON.parse(localStorage.getItem('saved_my_channels') || '[]');
+        if (!recents.length) {
+          box.innerHTML = '<span class="text-slate-500 italic">Belum ada channel tambahan</span>';
+          return;
+        }
+        box.innerHTML = recents.map(c => `
+          <button onclick="document.getElementById('inputCustomChannelHandle').value='${escapeHtml(c.handle)}'; loadMyChannelData('${escapeHtml(c.handle)}');" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 font-mono text-[10px]">
+            ${escapeHtml(c.handle)}
+          </button>
+        `).join('');
+      } catch (e) {}
+    }
+
+    function toggleOAuthGuideModal() {
+      const m = document.getElementById('oauthGuideModal');
+      if (m) m.classList.toggle('hidden');
     }
 
     async function runMultiChannelComparison() {
@@ -2095,9 +2204,68 @@ https://www.youtube.com/@ppm_consulting</textarea>
     // Initialize on load
     window.addEventListener('DOMContentLoaded', () => {
       loadHistory();
+      renderSavedChannelsPills();
       loadMyChannelData();
       runFullAnalysis();
     });
   </script>
+
+  <!-- OAuth Multi-Channel & Brand Account Guide Modal -->
+  <div id="oauthGuideModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-[#161b26] border border-slate-700 rounded-2xl max-w-2xl w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto text-xs shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-2.5">
+          <span class="text-xl">🔐</span>
+          <h3 class="text-base font-bold text-white">Panduan Mengganti Channel Saya (Multi-Channel & Brand Account)</h3>
+        </div>
+        <button onclick="toggleOAuthGuideModal()" class="text-slate-400 hover:text-white text-lg px-2">✕</button>
+      </div>
+      
+      <div class="space-y-3.5 text-slate-300 leading-relaxed">
+        <div class="p-3.5 rounded-xl bg-sky-950/40 border border-sky-800 text-sky-200">
+          💡 <b>Cara Tercepat & Praktis (Tanpa Login Ulang):</b><br>
+          Gunakan fitur <b>Instant Switcher</b> di bilah atas tab ini. Anda cukup memasukkan <code>@handle</code> atau URL channel Anda yang lain (misal: <code>@KanalBisnisAnda</code>), lalu klik <b>Ganti Channel</b>. Sistem akan langsung memuat statistik subscriber, total video, total views, membedah rasio format video (Landscape vs Shorts), dan menghitung gap monetisasinya!
+        </div>
+
+        <div>
+          <h4 class="font-bold text-white text-sm flex items-center gap-1.5">
+            <span>📌</span> Kasus 1: Satu Akun Gmail dengan Banyak Channel (Brand Accounts)
+          </h4>
+          <p class="text-slate-400 mt-1">YouTube mengizinkan 1 alamat email Gmail memiliki banyak sub-channel (*Brand Accounts*). Jika Anda ingin mengganti otorisasi resmi Google OAuth ke Brand Account lain:</p>
+          <ol class="list-decimal list-inside space-y-1 text-slate-400 mt-1 pl-1">
+            <li>Jalankan perintah di terminal lokal: <code class="text-amber-300 bg-slate-900 px-1 py-0.5 rounded">python login_youtube.py</code></li>
+            <li>Browser akan terbuka otomatis. Google akan menampilkan layar: <i>"Pilih akun atau channel untuk melanjutkan ke YouTube Studio"</i>.</li>
+            <li>Pilih nama Brand Account spesifik yang ingin Anda sambungkan. Token otorisasi akan otomatis diperbarui di file <code class="text-slate-200">.youtube_token.json</code>.</li>
+          </ol>
+        </div>
+
+        <div>
+          <h4 class="font-bold text-white text-sm flex items-center gap-1.5">
+            <span>📌</span> Kasus 2: Channel Terdaftar di Akun Gmail yang Berbeda
+          </h4>
+          <p class="text-slate-400 mt-1">Jika channel Anda berada di bawah alamat email Google yang berbeda (misalnya Gmail pribadi vs Gmail kantor):</p>
+          <ol class="list-decimal list-inside space-y-1 text-slate-400 mt-1 pl-1">
+            <li>Jalankan script otorisasi: <code class="text-amber-300 bg-slate-900 px-1 py-0.5 rounded">python login_youtube.py</code></li>
+            <li>Pada pop-up Google Login di browser, klik tombol <b>"Gunakan akun lain" (Use another account)</b>.</li>
+            <li>Masukkan email Gmail kedua dan password Anda, lalu setujui izin YouTube Studio.</li>
+            <li>Token baru berhasil dibuat untuk Gmail tersebut.</li>
+          </ol>
+        </div>
+
+        <div>
+          <h4 class="font-bold text-white text-sm flex items-center gap-1.5">
+            <span>🌐</span> Kasus 3: Di Lingkungan Cloud / Vercel
+          </h4>
+          <p class="text-slate-400 mt-1">Pada hosting cloud (Vercel Serverless), token file OAuth tidak disimpan demi alasan keamanan data pribadi. Anda dapat bebas berganti channel kapan pun menggunakan <b>Instant Switcher</b> tanpa batasan akun Gmail.</p>
+        </div>
+      </div>
+
+      <div class="pt-3 border-t border-slate-800 flex justify-end">
+        <button onclick="toggleOAuthGuideModal()" class="px-5 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white font-semibold text-xs transition">
+          Mengerti & Tutup
+        </button>
+      </div>
+    </div>
+  </div>
 </body>
 </html>

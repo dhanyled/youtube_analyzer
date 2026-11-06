@@ -88,3 +88,14 @@ async def test_mine_comments_endpoint_validation():
             "/api/dashboard/mine-comments", json={"video_urls": [], "keyword": ""}
         )
         assert resp.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_my_channel_endpoint_switch():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.get("/api/dashboard/my-channel")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "profile" in data
+        assert "videos" in data

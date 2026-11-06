@@ -504,18 +504,55 @@ async def api_dashboard_pre_upload(req: PreUploadRequest):
 
 
 @app.get("/api/dashboard/my-channel")
-async def api_dashboard_my_channel():
+async def api_dashboard_my_channel(identifier: str | None = None):
     try:
         from youtube_analyzer.connectors.youtube_studio import YouTubeStudioConnector
 
         studio = YouTubeStudioConnector()
+        yt_conn = YouTubeConnector()
+
+        target_handle = (identifier or "").strip()
+
+        # If user explicitly requested a specific channel handle/ID to switch to:
+        if target_handle:
+            ch_data = await yt_conn.get_channel_summary_and_format_breakdown(
+                target_handle, max_videos=20
+            )
+            if ch_data:
+                profile = {
+                    "id": ch_data.get("channel_id"),
+                    "title": ch_data.get("title", target_handle),
+                    "custom_url": ch_data.get("handle", target_handle),
+                    "subscribers": ch_data.get("subscribers", 0),
+                    "subscribers_display": ch_data.get("subscribers_display", "0"),
+                    "video_count": ch_data.get("video_count", 0),
+                    "video_count_display": ch_data.get("video_count_display", "0"),
+                    "view_count": ch_data.get("total_views", 0),
+                    "view_count_display": ch_data.get("total_views_display", "0"),
+                    "thumbnail_url": ch_data.get("thumbnail_url", ""),
+                }
+                videos = ch_data.get("videos", [])
+                return {
+                    "authenticated": True,
+                    "is_custom_channel": True,
+                    "profile": profile,
+                    "videos": videos,
+                }
+            else:
+                return {
+                    "authenticated": False,
+                    "is_custom_channel": True,
+                    "profile": None,
+                    "videos": [],
+                    "error": f"Channel '{target_handle}' tidak ditemukan atau bersifat privat.",
+                }
+
         profile = studio.get_channel_profile()
         videos = studio.get_channel_videos(limit=20) if profile else []
 
         if not profile:
             # Fallback for serverless/cloud environments where local OAuth token file is absent:
             # Automatically fetch registered channel profile & videos using YouTube Data API v3
-            yt_conn = YouTubeConnector()
             ch_data = await yt_conn.get_channel_summary_and_format_breakdown(
                 "@mrleddhany", max_videos=20
             )
@@ -536,6 +573,7 @@ async def api_dashboard_my_channel():
 
         return {
             "authenticated": studio.is_authenticated() or (profile is not None),
+            "is_custom_channel": False,
             "profile": profile,
             "videos": videos,
         }

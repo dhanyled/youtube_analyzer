@@ -140,7 +140,7 @@ class YouTubeStudioConnector:
             # Run local server flow on an available port
             creds = flow.run_local_server(
                 port=0,
-                prompt="consent",
+                prompt="select_account consent",
                 authorization_prompt_message=prompt_msg,
                 success_message="Otorisasi Berhasil! Token YouTube Studio telah tersimpan. Anda boleh menutup tab ini.",
                 open_browser=True,

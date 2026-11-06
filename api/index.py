@@ -278,9 +278,6 @@ class AuditBlindspotsRequest(BaseModel):
     target_format: str = "LANDSCAPE (16:9)"
 
 
-DEFAULT_YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY", "AIzaSyDP8oOn6ZFfia3ujFMwUQnTt_w2crxZssM").strip()
-
-
 def resolve_effective_keys(
     ai_cfg: dict[str, Any] | None,
 ) -> tuple[str | None, str | None, str, str | None, str | None]:
@@ -289,13 +286,13 @@ def resolve_effective_keys(
     Priority:
     1. Explicit User Manual Input from UI (Override)
     2. Server Environment Credentials (.env)
-    3. Server Default Fallback Key
+    3. None (Smart Heuristic Fallback)
     """
     ai_cfg = ai_cfg or {}
 
     # 1. YouTube Data API Key
     yt_manual = (ai_cfg.get("youtube_api_key") or "").strip()
-    yt_key = yt_manual or os.getenv("YOUTUBE_API_KEY") or DEFAULT_YOUTUBE_API_KEY
+    yt_key = yt_manual or os.getenv("YOUTUBE_API_KEY") or None
 
     # 2. AI Provider & Key
     ai_manual = (ai_cfg.get("api_key") or "").strip()
@@ -341,7 +338,7 @@ async def api_credentials_status():
 
     without leaking raw secrets.
     """
-    yt_key = os.getenv("YOUTUBE_API_KEY", "").strip() or DEFAULT_YOUTUBE_API_KEY
+    yt_key = os.getenv("YOUTUBE_API_KEY", "").strip()
     gemini_key = os.getenv("GEMINI_API_KEY", "").strip() or os.getenv("GOOGLE_API_KEY", "").strip()
     groq_key = os.getenv("GROQ_API_KEY", "").strip()
     openai_key = os.getenv("OPENAI_API_KEY", "").strip()

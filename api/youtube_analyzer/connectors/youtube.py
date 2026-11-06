@@ -76,10 +76,8 @@ class YouTubeConnector(BaseConnector):
         """Introduce natural, human-like random pause (typing/navigation jitter)."""
         await asyncio.sleep(random.uniform(min_sec, max_sec))
 
-    DEFAULT_YOUTUBE_API_KEY = "AIzaSyDP8oOn6ZFfia3ujFMwUQnTt_w2crxZssM"
-
     def __init__(self, api_key: str | None = None):
-        key = api_key or os.getenv("YOUTUBE_API_KEY") or self.DEFAULT_YOUTUBE_API_KEY
+        key = api_key or os.getenv("YOUTUBE_API_KEY") or None
         super().__init__(platform=PlatformEnum.YOUTUBE_SEARCH, api_key=key)
         self._last_innertube_debug: list[str] = []
 

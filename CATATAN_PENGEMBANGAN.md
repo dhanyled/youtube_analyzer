@@ -173,3 +173,32 @@ Setelah perubahan CSS/JS untuk menghilangkan elemen watermark atau avatar profil
   2. **OAuth Brand Account Switcher (Lokal)**:
      - Pada `YouTubeStudioConnector.authenticate_interactive`, parameter disetel menjadi `prompt="select_account consent"`.
      - Google OAuth akan selalu memunculkan layar dialog pemilihan akun dan daftar *Brand Accounts*, memungkinkan otorisasi resmi berpindah ke sub-channel mana pun.
+
+
+---
+
+## 3. AUDIT BLINDSPOT GITHUB & PENGUATAN EKOSISTEM (v2.2.0 Hardening)
+
+### A. Temuan Blindspot Repositori GitHub (dhanyled/youtube_analyzer)
+1. **Nol Git Release Tag di GitHub Remote (SELESAI DIPERBAIKI):**
+   - *Masalah:* Meskipun codebase telah mencapai v2.0.0 dan v2.2.0, perintah git tag -l kosong. Repositori GitHub tidak memiliki release tags resmi sehingga tool eksternal atau developer tidak bisa menarik tarball versi stabil.
+   - *Solusi:* Dibuat dan di-push tag resmi v2.0.0 dan v2.2.0 ke remote origin.
+2. **Metadata Package Placeholder di pyproject.toml (SELESAI DIPERBAIKI):**
+   - *Masalah:* description = 'Add your description here' masih tertinggal sejak inisialisasi repositori.
+   - *Solusi:* Diperbarui dengan deskripsi produksi lengkap serta tautan [project.urls] (Homepage Vercel dan GitHub Repository) dan keywords.
+3. **Absennya Dependabot Security Updates (SELESAI DIPERBAIKI):**
+   - *Masalah:* Belum ada .github/dependabot.yml, sehingga scanning dependensi otomatis dihentikan oleh GitHub.
+   - *Solusi:* Dibuat konfigurasi .github/dependabot.yml untuk ekosistem github-actions dan pip. Saat diaktifkan, Dependabot langsung mendeteksi 6 pembaruan dependensi (PR #4 s.d. PR #9).
+4. **Pytest Asyncio Deprecation Warning (SELESAI DIPERBAIKI):**
+   - *Masalah:* Muncul PytestDeprecationWarning: The configuration option 'asyncio_default_fixture_loop_scope' is unset pada setiap eksekusi unit test.
+   - *Solusi:* Ditambahkan asyncio_default_fixture_loop_scope = 'function' pada [tool.pytest.ini_options] di pyproject.toml.
+5. **Celah Kebocoran Secret di .gitignore (SELESAI DIPERBAIKI):**
+   - *Masalah:* File .gitignore hanya mencantumkan string singular client_secret.json. Padahal Google Cloud Console secara default menamai file kredensial OAuth sebagai client_secrets.json atau client_secret_<client_id>.json.
+   - *Solusi:* Diganti dengan pola glob client_secret*.json, client_secrets*.json, credentials*.json, token*.json, *.token.json.
+
+### B. Temuan Blindspot Komunitas Open Source YouTube di GitHub
+1. **YouTube BotGuard / Proof-of-Origin (PO) Token Rollout (2024-2025):**
+   - *Fenomena Komunitas (yt-dlp, pytube, youtube-transcript-api):* YouTube memperketat request unauthenticated dari IP datacenter (AWS, Vercel, GCP) dengan challenge 'Sign in to confirm you are not a bot'.
+   - *Proteksi di Proyek Ini:* Arsitektur dual-tier (YouTube Studio Data API v3 resmi via OAuth 2.0 untuk user autentikasi + InnerTube fallback unauthenticated untuk scraping publik). Fallback unauthenticated dilengkapi penanganan try-except berlapis dan fallback data aman tanpa memutus eksekusi dashboard (nol 500 error).
+2. **Caveat Kompatibilitas SQLAlchemy vs SQLModel (Dependabot PR #9):**
+   - *Temuan Kritis:* Dependabot mengusulkan bump sqlalchemy ke >=2.1.6. Namun sqlmodel==0.0.22 memiliki constraint ketat sqlalchemy >= 2.0.14, < 2.1.0. Mem-merge PR #9 tanpa meng-upgrade SQLModel akan memicu dependency resolution conflict di uv sync. PR #9 wajib ditahan hingga SQLModel merilis kompatibilitas SQLAlchemy 2.1+.

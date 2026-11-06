@@ -65,15 +65,16 @@ Desktop.ini
 $RECYCLE.BIN/
 .DS_Store
 
-# Secret files
+# Secret files & OAuth Credentials
 .env*.local
 *.key
 *.pem
-credentials.json
-
-# Secret files & OAuth Tokens
-client_secret.json
-.youtube_token.json*
+credentials*.json
+client_secret*.json
+client_secrets*.json
+.youtube_token*.json
+token*.json
+*.token.json
 *.bak
 
 # Scratch & Temporary Notes

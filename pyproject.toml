@@ -1,9 +1,10 @@
 [project]
 name = "youtube-analyzer"
 version = "2.2.0"
-description = "Add your description here"
+description = "AI-powered YouTube SERP, Competitor Intelligence, Content Gaps, and SEO Optimization Engine (MCP & WebMCP)"
 readme = "README.md"
 requires-python = ">=3.12"
+keywords = ["youtube", "seo", "mcp", "webmcp", "youtube-api", "fastapi", "ai-agents"]
 dependencies = [
     "alembic>=1.20.0",
     "fastapi>=0.162.0",
@@ -23,6 +24,10 @@ dependencies = [
     "youtube-transcript-api>=1.2.4",
 ]
 
+[project.urls]
+Homepage = "https://youtubeanalyzer-sand.vercel.app/"
+Repository = "https://github.com/dhanyled/youtube_analyzer"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
@@ -41,6 +46,7 @@ minversion = "8.0"
 addopts = "-ra -q"
 testpaths = ["tests"]
 pythonpath = ["src"]
+asyncio_default_fixture_loop_scope = "function"
 
 [tool.ruff]
 line-length = 100

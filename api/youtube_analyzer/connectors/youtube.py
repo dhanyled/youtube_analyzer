@@ -359,6 +359,7 @@ class YouTubeConnector(BaseConnector):
                 if resp.status_code == 200:
                     cand_data = resp.json()
                     cand_vdet = cand_data.get("videoDetails") or {}
+                    debug_trace.append(f"{client_name}: keys={list(cand_data.keys())}, playability={cand_data.get('playabilityStatus')}")
                     debug_trace.append(f"{client_name}: has_vdet={bool(cand_vdet)}, title={cand_vdet.get('title')}, len_sec={cand_vdet.get('lengthSeconds')}")
                     if cand_vdet.get("videoId") and cand_vdet.get("title"):
                         data = cand_data

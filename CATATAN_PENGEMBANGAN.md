@@ -117,3 +117,59 @@ Setelah perubahan CSS/JS untuk menghilangkan elemen watermark atau avatar profil
 ### 5.3. Konfigurasi Bundling Vercel (`vercel.json` & `api/requirements.txt`)
 - `vercel.json` menyertakan `"includeFiles": "{src/**,api/*.html}"` agar seluruh modul `src/youtube_analyzer` dan template `api/dashboard_ui.html` ikut ter-bundle ke dalam fungsi serverless Vercel.
 - `api/requirements.txt` dijaga tetap ramping (< 45MB, tanpa `streamlit`/`pyarrow`) agar selalu lolos batas 250MB AWS Lambda/Vercel dan memiliki *cold-start* instan (< 1 detik).
+
+---
+
+## 6. 🌐 Mesin Google People Also Ask (PAA) & Google Key Moments Timestamps (`v2.1.0`)
+
+### 6.1. Latar Belakang & Solusi
+- **Masalah**: Deskripsi video YouTube sering kehilangan potensi ribuan penayangan gratis dari Google Web Search karena stempel waktu (timestamps) tidak selaras dengan query pencarian interogatif Google.
+- **Solusi (`GoogleSearchConnector` & `get_people_also_ask`)**:
+  - Mengekstrak pertanyaan PAA riil langsung dari Google SERP menggunakan query prefix interogatif bahasa Indonesia (misal: *bagaimana cara*, *berapa biaya*, *apa penyebab*, *kenapa*, *apakah*).
+  - Menyuntikkan pertanyaan PAA terpilih sebagai babak bertanda `[Google Key Moment]` pada stempel waktu video Landscape 16:9 di Tab 7 dan Tab 9 (*Cross-Surface Keywords*).
+
+---
+
+## 7. 💬 Penambangan Komentar Kompetitor & InnerTube Fallback (`v2.1.0`)
+
+### 7.1. Latar Belakang & Arsitektur Dual Engine
+- **Masalah**: Kreator sering kali hanya menyalin topik kompetitor tanpa mengetahui kendala atau pertanyaan penonton yang belum terjawab di video kompetitor. Selain itu, di serverless cloud Vercel, kuota YouTube Data API v3 dapat habis atau API Key tidak terpasang.
+- **Solusi (`mine_competitor_comments`)**:
+  1. *Mesin Utama (YouTube Data API v3)*: Membaca `commentThreads.list` dengan metrik likes dan balasan.
+  2. *Mesin Fallback Mandiri (Unauthenticated InnerTube)*: Menembak endpoint publik YouTube `/youtubei/v1/next` dengan client `WEB` dan context publik untuk mengambil token kelanjutan komentar (`reloadContinuationData`) serta mem-parsing mutasi `commentEntityPayload`. **100% Berfungsi tanpa API Key!**
+  3. Menyaring komentar menggunakan NLP heuristik untuk mengekstrak pertanyaan penonton, keluhan (*friction*), dan langsung merumuskan *Topic Gap Opportunities* di Tab 5 (*Content Gap*).
+
+---
+
+## 8. 🛡️ Arsitektur 5-Pillar Blindspot Audit Gate & Tag Relevancy Checker (`v2.2.0`)
+
+### 8.1. Deteksi Blindspot Semantik & Metadata
+- **Masalah**: Penggunaan tag generik spam seperti `fyp`, `viral`, `trending`, atau kata pemicu clickbait seperti `gratis` pada video berbayar memicu penalti retensi penonton dan melanggar kebijakan YouTube Spam & Metadata Deception.
+- **Solusi (`TopicNormalizer.audit_tags_detailed` & `audit_content_blindspots`)**:
+  1. **5 Pilar Audit Pengemasan Video**:
+     - *Pillar 1: Judul (Title)* — Validasi panjang 45–65 karakter, deteksi risiko pemotongan layar mobile (>70 karakter).
+     - *Pillar 2: Google Key Moments Timestamps* — Validasi wajib mulai di `00:00`, minimal 3 babak, dan memetakan kata kunci interogatif PAA.
+     - *Pillar 3: Relevansi Tag & Anti-Spam* — Menyaring tag spam generik dan kata kunci bersyarat.
+     - *Pillar 4: First-Fold Description Hook* — Memastikan 2 baris awal deskripsi memuat kata kunci utama sebelum tombol `...more`.
+     - *Pillar 5: Kesesuaian Format & Pacing* — Memvalidasi pacing Shorts (<60s) vs Longform (>8 min untuk monetisasi mid-roll ad RPM).
+  2. **Aturan Relevansi Tag "Gratis"**:
+     - Jika naskah/topik video secara eksplisit membahas materi atau fitur gratis $\rightarrow$ status **`PASS (Relevan)`**.
+     - Jika naskah tidak menawarkan hal gratis $\rightarrow$ status **`FAIL (Clickbait Unsupported)`** untuk melindungi channel dari bounce rate tinggi.
+  3. **Penguji Tag Real-time di UI**:
+     - Ditambahkan widget interaktif di Tab *Studio Optimasi Video (Audit & Revamp)* sehingga pengguna dapat mengetikkan kata kunci apa pun untuk diuji seketika terhadap naskah.
+
+---
+
+## 9. 🔄 Arsitektur Instant Multi-Channel Switcher & OAuth Brand Account Manager (`v2.2.0`)
+
+### 9.1. Latar Belakang & Solusi
+- **Masalah**: Pengguna memiliki banyak channel (baik Brand Accounts di bawah 1 Gmail yang sama maupun akun Gmail terpisah) dan ingin memantau performa, membedah rasio format video, serta menghitung target monetisasi tanpa harus login/logout Google berulang kali.
+- **Solusi Dua Jalur**:
+  1. **Instant Switcher (Dashboard UI)**:
+     - Endpoint `GET /api/dashboard/my-channel?identifier=@handle` memungkinkan pergantian channel secara instan.
+     - Mengambil profil, subscribers, total views, dan 20 video terbaru menggunakan YouTube Data API & Scraper publik.
+     - Menyimpan daftar channel yang sering dibuka ke dalam `localStorage` browser (*Quick Switch Pills*).
+     - Memperbarui matriks perbandingan multi-kompetitor dan roadmap monetisasi secara otomatis.
+  2. **OAuth Brand Account Switcher (Lokal)**:
+     - Pada `YouTubeStudioConnector.authenticate_interactive`, parameter disetel menjadi `prompt="select_account consent"`.
+     - Google OAuth akan selalu memunculkan layar dialog pemilihan akun dan daftar *Brand Accounts*, memungkinkan otorisasi resmi berpindah ke sub-channel mana pun.

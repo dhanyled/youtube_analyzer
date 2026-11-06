@@ -79,6 +79,7 @@ class YouTubeConnector(BaseConnector):
     def __init__(self, api_key: str | None = None):
         key = api_key or os.getenv("YOUTUBE_API_KEY")
         super().__init__(platform=PlatformEnum.YOUTUBE_SEARCH, api_key=key)
+        self._last_innertube_debug: list[str] = []
 
     async def get_autocomplete(
         self, query: str, client_type: str = "youtube", hl: str = "id"
@@ -326,6 +327,7 @@ class YouTubeConnector(BaseConnector):
         }
 
         data = None
+        debug_trace: list[str] = []
         for client_name, client_ver, client_id, dev_type in clients_to_try:
             payload = {
                 "context": {
@@ -353,16 +355,21 @@ class YouTubeConnector(BaseConnector):
             try:
                 async with httpx.AsyncClient(timeout=10.0, cookies=cookies) as client:
                     resp = await client.post(self.INNERTUBE_PLAYER_URL, json=payload, headers=headers)
+                debug_trace.append(f"{client_name}: status={resp.status_code}, len={len(resp.text)}")
                 if resp.status_code == 200:
                     cand_data = resp.json()
                     cand_vdet = cand_data.get("videoDetails") or {}
+                    debug_trace.append(f"{client_name}: has_vdet={bool(cand_vdet)}, title={cand_vdet.get('title')}, len_sec={cand_vdet.get('lengthSeconds')}")
                     if cand_vdet.get("videoId") and cand_vdet.get("title"):
                         data = cand_data
                         break
             except Exception as e:
+                debug_trace.append(f"{client_name}: err={e}")
                 logger.warning(f"Innertube player ({client_name}) failed for '{video_id}': {e}")
 
+        self._last_innertube_debug = debug_trace
         if not data:
+            logger.info(f"Innertube failed: {debug_trace}")
             return None
 
         v_det = data.get("videoDetails") or {}
@@ -424,6 +431,7 @@ class YouTubeConnector(BaseConnector):
             "category": str(mf.get("category", "")),
             "thumbnail_url": thumb_url,
             "data_source": "INNERTUBE_PLAYER",
+            "debug_trace": self._last_innertube_debug,
         }
         return await self._enrich_video_metadata(meta, video_id)
 
@@ -926,6 +934,7 @@ class YouTubeConnector(BaseConnector):
                         "format": format_type,
                         "thumbnail_url": thumb_url,
                         "data_source": "SCRAPED_PLAYER_RESPONSE",
+                        "debug_trace": self._last_innertube_debug,
                     }
                     return await self._enrich_video_metadata(meta, video_id)
         except Exception:

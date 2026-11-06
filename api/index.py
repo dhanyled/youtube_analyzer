@@ -133,6 +133,38 @@ WEBMCP_TOOLS_CATALOG = [
             "properties": {"country": {"type": "string", "default": "ID"}},
         },
     },
+    {
+        "name": "get_people_also_ask",
+        "description": "Mengambil daftar pertanyaan People Also Ask (PAA) dan pertanyaan interogatif asli dari Google Search berdasarkan topik (bagaimana cara, berapa biaya, kenapa, apakah, dll).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "keyword": {"type": "string", "description": "Topik atau kata kunci pencarian"},
+                "hl": {"type": "string", "default": "id", "description": "Kode bahasa (id / en)"},
+                "gl": {"type": "string", "default": "ID", "description": "Kode negara (ID / US)"},
+            },
+            "required": ["keyword"],
+        },
+    },
+    {
+        "name": "mine_competitor_comments",
+        "description": "Menambang komentar penonton dari video kompetitor YouTube untuk menemukan kendala, pertanyaan yang belum terjawab, dan kesenjangan topik (audience pain points).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "video_ids_or_urls": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Daftar ID atau URL video kompetitor",
+                },
+                "keyword": {
+                    "type": "string",
+                    "description": "Topik pencarian untuk mencari otomatis 3 video kompetitor teratas",
+                },
+                "max_comments": {"type": "integer", "default": 30},
+            },
+        },
+    },
 ]
 
 
@@ -185,6 +217,12 @@ class PreUploadRequest(BaseModel):
 class CompareChannelsRequest(BaseModel):
     channels: list[str]
     my_channel_stats: dict[str, Any] | None = None
+
+
+class MineCommentsRequest(BaseModel):
+    video_urls: list[str] = []
+    keyword: str | None = None
+    max_comments: int = 30
 
 
 def _build_surfaces_and_clusters(
@@ -245,11 +283,26 @@ async def api_dashboard_analyze(req: AnalyzeRequest):
     if not kw:
         raise HTTPException(status_code=400, detail="Keyword wajib diisi.")
     yt_conn = YouTubeConnector()
-    competitors, live_suggestions = await asyncio.gather(
+    competitors, live_suggestions, paa_questions = await asyncio.gather(
         yt_conn.get_top_competitors(kw, limit=10),
         yt_conn.get_autocomplete(kw),
+        yt_conn.get_people_also_ask(kw, hl="id", gl="ID"),
     )
     top_comp = competitors[0] if competitors else None
+
+    # Mine top 3 competitor comments for audience pain points & content gaps
+    top_vids = [c["id"] for c in competitors[:3] if c.get("id")]
+    mined_comments = (
+        await yt_conn.mine_competitor_comments(top_vids, max_comments_per_video=25)
+        if top_vids
+        else {
+            "total_comments_analyzed": 0,
+            "total_questions_found": 0,
+            "videos_analyzed": [],
+            "top_pain_points": [],
+            "topic_gap_opportunities": [],
+        }
+    )
 
     surfaces_out, clusters_out, _ = _build_surfaces_and_clusters(kw, live_suggestions)
 
@@ -266,6 +319,7 @@ async def api_dashboard_analyze(req: AnalyzeRequest):
         competitor=top_comp,
         competitors=competitors,
         ai_config=req.ai_config,
+        paa_questions=paa_questions,
     )
     if comp_spy.get("recommended_tags_copy"):
         outranking_plan["video_tags"] = comp_spy["recommended_tags_copy"]
@@ -296,12 +350,31 @@ async def api_dashboard_analyze(req: AnalyzeRequest):
         "surfaces": surfaces_out,
         "clusters": clusters_out,
         "live_autocomplete": live_suggestions,
+        "people_also_ask": paa_questions,
+        "mined_comments": mined_comments,
         "data_provenance": {
             "competitors": "youtube_live_serp" if competitors else "unavailable",
             "autocomplete": "youtube_suggest_live" if live_suggestions else "unavailable",
+            "people_also_ask": "google_question_autocomplete" if paa_questions else "unavailable",
+            "mined_comments": "youtube_api_comment_threads" if mined_comments.get("total_comments_analyzed") else "unavailable",
             "tags": "creator_studio_tags_via_innertube",
         },
     }
+
+
+@app.post("/api/dashboard/mine-comments")
+async def api_dashboard_mine_comments(req: MineCommentsRequest):
+    yt_conn = YouTubeConnector()
+    vids = req.video_urls or []
+    if not vids and req.keyword:
+        comps = await yt_conn.get_top_competitors(req.keyword.strip(), limit=3)
+        vids = [c["id"] for c in comps if c.get("id")]
+    if not vids:
+        raise HTTPException(
+            status_code=400,
+            detail="Minimal sertakan satu URL/ID video atau keyword pencarian untuk menambang komentar.",
+        )
+    return await yt_conn.mine_competitor_comments(vids, max_comments_per_video=req.max_comments)
 
 
 @app.post("/api/dashboard/audit-video")
@@ -566,6 +639,28 @@ async def call_webmcp_tool(payload: WebMCPCallRequest):
             "keyword_metrics": SearchIntelligence.estimate_keyword_metrics(seed, competitors),
             "ai_presence": SearchIntelligence.analyze_ai_competitor_presence(competitors),
         }
+
+    elif name == "get_people_also_ask":
+        seed = str(args.get("keyword", "")).strip()
+        if not seed:
+            raise HTTPException(status_code=400, detail="keyword wajib diisi.")
+        hl = str(args.get("hl", "id"))
+        gl = str(args.get("gl", "ID"))
+        yt_conn = YouTubeConnector()
+        paa = await yt_conn.get_people_also_ask(seed, hl=hl, gl=gl)
+        return {"keyword": seed, "language": hl, "country": gl, "people_also_ask": paa, "count": len(paa)}
+
+    elif name == "mine_competitor_comments":
+        vids = args.get("video_ids_or_urls", [])
+        kw = str(args.get("keyword", "")).strip()
+        yt_conn = YouTubeConnector()
+        if not vids and kw:
+            comps = await yt_conn.get_top_competitors(kw, limit=3)
+            vids = [c["id"] for c in comps if c.get("id")]
+        if not vids:
+            raise HTTPException(status_code=400, detail="video_ids_or_urls atau keyword wajib diisi.")
+        max_comm = int(args.get("max_comments", 30))
+        return await yt_conn.mine_competitor_comments(vids, max_comments_per_video=max_comm)
 
     else:
         raise HTTPException(status_code=404, detail=f"WebMCP tool '{name}' tidak dikenal.")

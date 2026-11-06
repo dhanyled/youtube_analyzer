@@ -447,5 +447,37 @@ async def generate_shorts_clipping_ideas(topic: str, title: str = "") -> str:
     )
 
 
+@mcp.tool()
+async def get_people_also_ask(keyword: str, hl: str = "id", gl: str = "ID") -> str:
+    """
+    Fetch 100% real Google People Also Ask (PAA) question tree and interrogative intents.
+    Categorizes questions into How-To, Commercial/Pricing, Definitive, and Troubleshooting,
+    providing chapter candidates for Google Key Moments indexation.
+    """
+    yt_conn = YouTubeConnector()
+    questions = await yt_conn.get_people_also_ask(keyword, hl=hl, gl=gl)
+    return json.dumps(
+        {
+            "keyword": keyword,
+            "language": hl,
+            "country": gl,
+            "total_questions": len(questions),
+            "questions": questions,
+        },
+        indent=2,
+    )
+
+
+@mcp.tool()
+async def mine_competitor_comments(video_ids_or_urls: list[str], max_comments: int = 30) -> str:
+    """
+    Mine audience friction, unanswered questions, and goldmine content gaps from competitor video comments.
+    Extracts real viewer pain points, categorizes them, and suggests high-CTR response video hooks.
+    """
+    yt_conn = YouTubeConnector()
+    result = await yt_conn.mine_competitor_comments(video_ids_or_urls, max_comments_per_video=max_comments)
+    return json.dumps(result, indent=2)
+
+
 if __name__ == "__main__":
     mcp.run()

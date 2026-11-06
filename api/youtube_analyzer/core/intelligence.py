@@ -1059,6 +1059,7 @@ class SearchIntelligence:
         competitor: dict[str, Any] | None = None,
         competitors: list[dict[str, Any]] | None = None,
         ai_config: dict[str, Any] | None = None,
+        paa_questions: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         """
         Generate an actionable Outranking Blueprint:
@@ -2418,8 +2419,15 @@ class SearchIntelligence:
         comp_dur = competitor.get("duration", "10:00") if competitor else "10:00"
         max_sec = parse_duration_to_seconds(comp_dur)
 
+        paa_labels = None
+        if paa_questions and len(paa_questions) >= 3:
+            paa_labels = [f"Pengantar & Urgensi {clean}"]
+            for pq in paa_questions[:5]:
+                q_text = str(pq.get("question", "")).rstrip("?")
+                paa_labels.append(f"{q_text} [Google Key Moment]")
+
         longform_timestamps = AITitleGenerator.generate_synchronized_timestamps(
-            clean, "15:00" if max_sec <= 60 else comp_dur
+            clean, "15:00" if max_sec <= 60 else comp_dur, chapter_labels=paa_labels
         )
         if comp_format == "SHORTS" or "short" in str(comp_format).lower() or max_sec <= 60:
             timestamps = []
@@ -2432,8 +2440,8 @@ class SearchIntelligence:
                     if sec > max_sec:
                         has_overflow = True
                         break
-            if has_overflow or len(timestamps) < 3:
-                timestamps = AITitleGenerator.generate_synchronized_timestamps(clean, comp_dur)
+            if has_overflow or len(timestamps) < 3 or paa_labels:
+                timestamps = AITitleGenerator.generate_synchronized_timestamps(clean, comp_dur, chapter_labels=paa_labels)
 
         ts_section = (
             "⏱️ TIMESTAMPS / DAFTAR ISI:\n" + "\n".join(timestamps) + "\n\n" if timestamps else ""

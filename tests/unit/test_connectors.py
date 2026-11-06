@@ -175,3 +175,60 @@ async def test_get_channel_summary_fallback_to_scrape():
         assert res["landscape_count"] == 8
         assert res["portrait_percentage"] == 20.0
 
+
+@pytest.mark.asyncio
+async def test_google_search_connector_paa():
+    from youtube_analyzer.connectors.google import GoogleSearchConnector
+    connector = GoogleSearchConnector()
+    with patch.object(connector, "_fetch_prefix_suggestions", new_callable=AsyncMock) as mock_pfx:
+        mock_pfx.side_effect = [
+            ["bagaimana cara google ads bekerja", "bagaimana cara beriklan di google ads"],
+            ["cara agar iklan google ads winning"],
+            ["berapa biaya pasang google ads", "berapa biaya klik google ads"],
+            ["berapa harga jasa kelola google ads"],
+            ["apa itu google ads"],
+            ["kenapa iklan google ads tidak tayang"],
+            ["mengapa akun google ads ditangguhkan"],
+            ["apakah google ads berbayar"],
+            ["bisa kah pasang google ads tanpa kartu kredit"],
+        ]
+        paa = await connector.get_people_also_ask("google ads", hl="id", gl="ID")
+        assert len(paa) > 0
+        assert any("bagaimana cara" in p["question"].lower() for p in paa)
+        assert any(p["intent"] == "HOW_TO" for p in paa)
+        assert any(p["intent"] == "COMMERCIAL" for p in paa)
+        assert all("?" in p["question"] for p in paa)
+        assert all(p["google_key_moment"] is True for p in paa)
+
+
+@pytest.mark.asyncio
+async def test_youtube_connector_mine_competitor_comments():
+    connector = YouTubeConnector(api_key="TEST_KEY")
+    mock_comments = [
+        {"author": "@budi", "text": "Mau tanya kak, iklan nya belum tayang ada solusinya?", "likes": 5, "published": "2026-01-01"},
+        {"author": "@siti", "text": "Berapa biaya minimal untuk pasang iklan?", "likes": 12, "published": "2026-01-02"},
+        {"author": "@spam", "text": "Hubungi wa 0812345678 untuk slot gacor", "likes": 0, "published": "2026-01-03"},
+        {"author": "@andi", "text": "Mantap bang keren banget", "likes": 1, "published": "2026-01-04"},
+        {"author": "@dian", "text": "Apakah bisa pasang iklan tanpa kartu kredit kak?", "likes": 8, "published": "2026-01-05"},
+    ]
+    with patch.object(connector, "fetch_video_comments", new_callable=AsyncMock) as mock_fetch:
+        mock_fetch.return_value = mock_comments
+        with patch.object(connector, "get_video_details", new_callable=AsyncMock) as mock_det:
+            mock_det.return_value = {"title": "Tutorial Google Ads", "channel": "Kanal Guru", "views": "50K"}
+            res = await connector.mine_competitor_comments(["vid123"])
+            assert res["total_comments_analyzed"] == 5
+            # Spam and generic praises should be filtered out
+            assert res["total_questions_found"] == 3
+            top_pp = res["top_pain_points"]
+            assert len(top_pp) == 3
+            # Check sorted by likes descending (12 likes first, then 8, then 5)
+            assert top_pp[0]["likes"] == 12
+            assert top_pp[0]["category"] == "COMMERCIAL"
+            assert top_pp[1]["likes"] == 8
+            assert top_pp[1]["category"] == "ELIGIBILITY"
+            assert top_pp[2]["likes"] == 5
+            assert top_pp[2]["category"] == "TROUBLESHOOTING"
+            # Topic gap opportunities extracted
+            assert len(res["topic_gap_opportunities"]) > 0
+
+

@@ -1888,6 +1888,234 @@ class YouTubeConnector(BaseConnector):
             "monetization_roadmap": roadmap_phases,
         }
 
+    async def fetch_video_comments(
+        self, video_id: str, max_results: int = 50
+    ) -> list[dict[str, Any]]:
+        """Fetch live top comments from a YouTube video (via API v3 or fallback)."""
+        clean_vid = self.extract_video_id(video_id) or video_id.strip()
+        if not clean_vid:
+            return []
+
+        # 1. Primary: YouTube Data API v3 if API key is present
+        if self.api_key:
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    c_url = f"{self.API_BASE_URL}/commentThreads"
+                    c_params = {
+                        "part": "snippet",
+                        "videoId": clean_vid,
+                        "maxResults": min(max_results, 100),
+                        "order": "relevance",
+                        "key": self.api_key,
+                    }
+                    resp = await client.get(c_url, params=c_params)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        items = data.get("items", [])
+                        comments: list[dict[str, Any]] = []
+                        import html as pyhtml
+                        for item in items:
+                            top_comment = item.get("snippet", {}).get("topLevelComment", {}).get("snippet", {})
+                            raw_text = top_comment.get("textDisplay", "")
+                            # Strip HTML tags
+                            clean_text = re.sub(r"<[^>]+>", " ", raw_text)
+                            clean_text = pyhtml.unescape(clean_text)
+                            clean_text = re.sub(r"\s+", " ", clean_text).strip()
+                            if not clean_text:
+                                continue
+                            author = top_comment.get("authorDisplayName", "Penonton")
+                            likes = int(top_comment.get("likeCount", 0))
+                            published = top_comment.get("publishedAt", "")[:10]
+                            comments.append({
+                                "video_id": clean_vid,
+                                "author": author,
+                                "text": clean_text,
+                                "likes": likes,
+                                "published": published,
+                            })
+                        if comments:
+                            return comments
+            except Exception as e:
+                logger.warning(f"Error fetching API comments for '{clean_vid}': {e}")
+
+        # 2. Fallback: InnerTube player / next context comments if unauthenticated
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                payload = {
+                    "context": {
+                        "client": {
+                            "clientName": "WEB",
+                            "clientVersion": self.INNERTUBE_WEB_CLIENT_VERSION,
+                            "hl": "id",
+                            "gl": "ID",
+                        }
+                    },
+                    "videoId": clean_vid,
+                }
+                resp = await client.post("https://www.youtube.com/youtubei/v1/next", json=payload)
+                if resp.status_code == 200:
+                    pass
+        except Exception:
+            pass
+
+        return []
+
+    async def mine_competitor_comments(
+        self, video_ids_or_urls: list[str], max_comments_per_video: int = 30
+    ) -> dict[str, Any]:
+        """Mine audience friction, unanswered questions, and pain points from competitor video comments."""
+        if not video_ids_or_urls:
+            return {
+                "total_comments_analyzed": 0,
+                "total_questions_found": 0,
+                "videos_analyzed": [],
+                "top_pain_points": [],
+                "topic_gap_opportunities": [],
+            }
+
+        # Normalize video IDs
+        vids: list[str] = []
+        for item in video_ids_or_urls:
+            vid = self.extract_video_id(item) if ("http" in item or "/" in item) else item.strip()
+            if vid and vid not in vids:
+                vids.append(vid)
+
+        # Concurrently fetch video details & comments
+        target_vids = vids[:5]
+        tasks_details = [self.get_video_details(vid) for vid in target_vids]
+        tasks_comments = [self.fetch_video_comments(vid, max_results=max_comments_per_video) for vid in target_vids]
+
+        results_details, results_comments = await asyncio.gather(
+            asyncio.gather(*tasks_details, return_exceptions=True),
+            asyncio.gather(*tasks_comments, return_exceptions=True),
+        )
+
+        videos_meta: dict[str, dict[str, Any]] = {}
+        for vid, det in zip(target_vids, results_details):
+            if isinstance(det, dict) and det:
+                videos_meta[vid] = det
+            else:
+                videos_meta[vid] = {"title": f"Video ({vid})", "channel": "Kompetitor", "views": "-"}
+
+        all_comments: list[dict[str, Any]] = []
+        for vid, comms in zip(target_vids, results_comments):
+            if isinstance(comms, list):
+                for c in comms:
+                    v_info = videos_meta.get(vid, {})
+                    c["video_id"] = c.get("video_id") or vid
+                    c["video_title"] = v_info.get("title", f"Video {vid}")
+                    c["channel_title"] = v_info.get("channel", "Kompetitor")
+                    all_comments.append(c)
+
+        # Question & pain point indicator terms (Indonesian + English)
+        question_markers = [
+            "?", "bagaimana", "gimana", "kenapa", "mengapa", "apakah", "bisa gak",
+            "bisa tidak", "bisa kah", "bisa ngga", "cara", "tanya", "mau tanya", "solusinya",
+            "kendala", "kok", "rugi", "boncos", "suspend", "gagal", "tolong",
+            "masalah", "tidak bisa", "belum tayang", "stuck", "kenapa ya",
+            "how to", "why", "error", "problem", "issue", "does it work", "how do"
+        ]
+
+        spam_keywords = ["wa.me", "whatsapp", "081", "082", "085", "087", "089", "open slot", "judi", "slot gacor", "link bio"]
+
+        raw_pain_points: list[dict[str, Any]] = []
+        for c in all_comments:
+            txt = c["text"]
+            txt_low = txt.lower()
+
+            # Ignore spam & self-promotion
+            if any(sk in txt_low for sk in spam_keywords):
+                continue
+            if len(txt) < 15:
+                continue
+
+            # Check question markers
+            is_question = any(qm in txt_low for qm in question_markers)
+            if not is_question:
+                continue
+
+            # Classify category
+            if any(k in txt_low for k in ["suspend", "gagal", "error", "kenapa", "mengapa", "solusi", "kok", "boncos", "rugi", "tidak tayang", "belum tayang", "stuck", "masalah"]):
+                category = "TROUBLESHOOTING"
+                badge = "⚠️ Kendala & Masalah"
+            elif any(k in txt_low for k in ["berapa", "biaya", "harga", "saldo", "bayar", "gopay", "rekening", "modal", "dana", "cpc"]):
+                category = "COMMERCIAL"
+                badge = "💳 Biaya & Saldo"
+            elif any(k in txt_low for k in ["bagaimana", "gimana", "cara", "langkah", "tutorial", "setting"]):
+                category = "HOW_TO"
+                badge = "🛠️ Cara & Tutorial"
+            elif any(k in txt_low for k in ["apakah", "bisa gak", "bisa tidak", "bisa kah", "syarat", "tanpa", "hp", "laptop", "npwp"]):
+                category = "ELIGIBILITY"
+                badge = "🔍 Syarat & Kelayakan"
+            else:
+                category = "REQUEST"
+                badge = "💡 Permintaan Konten"
+
+            # Suggest opportunity title & hook
+            cleaned_short = re.sub(r'^(halo|bang|kak|mas|gan|permisi|mau tanya|tanya kak|tanya bang)[\s,:]*', '', txt, flags=re.I).strip()
+            cleaned_short = cleaned_short[:80]
+
+            raw_pain_points.append({
+                "author": c["author"],
+                "text": txt,
+                "likes": c["likes"],
+                "published": c.get("published", ""),
+                "video_title": c["video_title"],
+                "channel_title": c.get("channel_title", ""),
+                "video_url": f"https://www.youtube.com/watch?v={c['video_id']}",
+                "category": category,
+                "badge": badge,
+                "suggested_hook": f'Banyak yang tanya di video kompetitor: "{cleaned_short}?" Ini jawaban tuntasnya!',
+                "opportunity_title": f"Solusi Tuntas: {cleaned_short.capitalize()}",
+            })
+
+        # Deduplicate & rank by likes descending + text length
+        raw_pain_points.sort(key=lambda x: (x["likes"], len(x["text"])), reverse=True)
+
+        top_pain_points = raw_pain_points[:12]
+
+        # Extract unique topic gap opportunities
+        topic_gap_opportunities: list[dict[str, Any]] = []
+        seen_opps: set[str] = set()
+        for p in top_pain_points:
+            opp_title = p["opportunity_title"]
+            if opp_title.lower() not in seen_opps and len(topic_gap_opportunities) < 5:
+                seen_opps.add(opp_title.lower())
+                topic_gap_opportunities.append({
+                    "topic": opp_title,
+                    "category": p["category"],
+                    "badge": p["badge"],
+                    "demand_signal": f"Ditanyakan oleh {p['author']} ({p['likes']} likes di komentar)",
+                    "video_hook": p["suggested_hook"],
+                    "source_competitor": p["video_title"],
+                })
+
+        return {
+            "total_comments_analyzed": len(all_comments),
+            "total_questions_found": len(raw_pain_points),
+            "videos_analyzed": [
+                {
+                    "video_id": vid,
+                    "title": v.get("title", ""),
+                    "channel": v.get("channel", ""),
+                    "views": v.get("views", "-"),
+                    "url": f"https://www.youtube.com/watch?v={vid}",
+                }
+                for vid, v in videos_meta.items()
+            ],
+            "top_pain_points": top_pain_points,
+            "topic_gap_opportunities": topic_gap_opportunities,
+        }
+
+    async def get_people_also_ask(
+        self, keyword: str, hl: str = "id", gl: str = "ID", max_questions: int = 15
+    ) -> list[dict[str, Any]]:
+        """Delegate PAA fetching to GoogleSearchConnector."""
+        from youtube_analyzer.connectors.google import GoogleSearchConnector
+        g_conn = GoogleSearchConnector()
+        return await g_conn.get_people_also_ask(keyword, hl=hl, gl=gl, max_questions=max_questions)
+
+
 
 # Expose helper function at module level
 parse_duration_to_seconds = YouTubeConnector.parse_duration_to_seconds

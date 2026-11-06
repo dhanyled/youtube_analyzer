@@ -614,6 +614,39 @@ https://www.youtube.com/@ppm_consulting</textarea>
         <h4 class="text-sm font-bold text-white">✂️ AI Shorts Clipping & Highlights Generator (3 Ide Klip 45 Detik)</h4>
         <div id="clippingIdeasGrid" class="grid grid-cols-1 md:grid-cols-3 gap-4"></div>
       </div>
+
+      <!-- Audience Pain Points & Competitor Comment Mining -->
+      <div class="bg-[#161b26] border border-slate-800 rounded-xl p-5 space-y-4">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div>
+            <h4 class="text-sm font-bold text-white flex items-center gap-2">
+              <span>💬 Tambang Masalah Penonton: Analisis Komentar Kompetitor</span>
+              <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">100% Real Live Comments</span>
+            </h4>
+            <p class="text-xs text-slate-400">Pertanyaan belum terjawab dan kendala penonton di video kompetitor teratas — ide emas untuk mencuri traffic kompetitor.</p>
+          </div>
+          <div class="flex gap-2">
+            <input id="mineCustomUrlInput" type="text" placeholder="Paste URL video kompetitor spesifik..." class="bg-[#0e1117] border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-500 w-64 focus:outline-none focus:border-red-500" />
+            <button onclick="mineCustomVideoComments()" class="bg-red-600 hover:bg-red-500 text-white font-semibold px-3 py-1.5 rounded-lg text-xs transition">⚡ Tambang</button>
+          </div>
+        </div>
+
+        <div id="minedCommentsSummary" class="text-xs text-slate-300 p-3 rounded-lg bg-[#0e1117] border border-slate-800">
+          Belum ada komentar yang ditambang. Silakan lakukan analisa keyword atau tambang video spesifik.
+        </div>
+
+        <!-- Top Audience Questions Grid -->
+        <div class="space-y-2">
+          <h5 class="text-xs font-bold text-slate-300 uppercase">🎯 Top Pertanyaan & Friksi Penonton di Video Kompetitor:</h5>
+          <div id="painPointsGrid" class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs"></div>
+        </div>
+
+        <!-- Topic Gap Opportunities from Comments -->
+        <div class="space-y-2 pt-2 border-t border-slate-800/80">
+          <h5 class="text-xs font-bold text-amber-300 uppercase">💡 Peluang Konten Baru (Derived from Unanswered Comments):</h5>
+          <div id="commentTopicGapsContainer" class="space-y-2 text-xs"></div>
+        </div>
+      </div>
     </section>
 
     <!-- ================= TAB 6: STUDIO STORYBOARD VIDEO AI ================= -->
@@ -676,7 +709,10 @@ https://www.youtube.com/@ppm_consulting</textarea>
             <pre id="landscapeTitleCode" class="bg-[#0e1117] border border-slate-700 rounded-lg p-3 text-xs text-emerald-300 whitespace-pre-wrap"></pre>
           </div>
           <div>
-            <h5 class="text-xs font-bold text-slate-300 uppercase mb-1.5">⏱️ Kerangka Timestamps / Daftar Isi Otomatis</h5>
+            <div class="flex justify-between items-center mb-1.5">
+              <h5 class="text-xs font-bold text-slate-300 uppercase">⏱️ Kerangka Timestamps / Google Key Moments</h5>
+              <span class="text-[10px] text-emerald-400 font-semibold bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-800/50">Google PAA Synchronized</span>
+            </div>
             <ul id="landscapeTimestampsList" class="space-y-1.5 text-xs font-mono text-sky-300"></ul>
           </div>
         </div>
@@ -686,7 +722,7 @@ https://www.youtube.com/@ppm_consulting</textarea>
             <li>✅ <b>Durasi Ideal:</b> 12 – 22 Menit (memungkinkan iklan mid-roll otomatis).</li>
             <li>✅ <b>Hook 30 Detik Awal:</b> Jangan buang waktu salam berbelit! Langsung perlihatkan cuplikan utama / poin paling krusial topik.</li>
             <li>✅ <b>Thumbnail:</b> Maksimal 3–4 kata besar + ekspresi wajah atau grafik kontras.</li>
-            <li>✅ <b>Bab/Chapters:</b> Wajib pasang timestamps di deskripsi untuk SEO Google Search Key Moments.</li>
+            <li>✅ <b>Google Key Moments:</b> Timestamps bertanda <span class="text-emerald-400 font-bold">[Google Key Moment]</span> dioptimasi langsung dari pertanyaan Google People Also Ask (PAA) agar Google Search otomatis menampilkan cuplikan video di SERP web!</li>
           </ul>
         </div>
       </div>
@@ -753,6 +789,26 @@ https://www.youtube.com/@ppm_consulting</textarea>
             <tbody id="intentClustersTableBody" class="divide-y divide-slate-800/60"></tbody>
           </table>
         </div>
+      </div>
+
+      <!-- Google People Also Ask (PAA) Question Tree -->
+      <div class="bg-[#161b26] border border-slate-800 rounded-xl p-5 space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h4 class="text-sm font-bold text-white flex items-center gap-2">
+              <span>❓ Pohon Pertanyaan Google People Also Ask (PAA) — "Orang Lain Juga Bertanya"</span>
+              <span class="text-[10px] px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30">100% Real Live Google Data</span>
+            </h4>
+            <p class="text-xs text-slate-400">Pertanyaan nyata pengguna Google seputar topik ini. Jadikan bab video (chapter timestamps) untuk merebut Google Key Moments!</p>
+          </div>
+          <button onclick="copyAllPaaQuestions()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-3 py-1.5 rounded-lg border border-slate-700 transition">📋 Salin Semua PAA</button>
+        </div>
+
+        <div id="paaQuestionsSummary" class="text-xs text-slate-300 p-2.5 rounded-lg bg-[#0e1117] border border-slate-800">
+          Memuat pertanyaan Google People Also Ask...
+        </div>
+
+        <div id="paaQuestionsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-xs"></div>
       </div>
     </section>
 
@@ -1222,7 +1278,14 @@ https://www.youtube.com/@ppm_consulting</textarea>
       document.getElementById('landscapeIntroText').textContent = `Potensi AdSense RPM ${rpm.rpm_range_usd || '$2-$5'} (${(rpm.detected_niche || 'general').toUpperCase()}).`;
       document.getElementById('landscapeTitleCode').textContent = plan.outranking_title || '';
       const tsList = (plan.longform_timestamps && plan.longform_timestamps.length) ? plan.longform_timestamps : (plan.timestamps || []);
-      document.getElementById('landscapeTimestampsList').innerHTML = tsList.map(ts => `<li>• ${escapeHtml(ts)}</li>`).join('');
+      document.getElementById('landscapeTimestampsList').innerHTML = tsList.map(ts => {
+        const isKm = ts.includes('[Google Key Moment]');
+        const cleanTs = ts.replace(' [Google Key Moment]', '');
+        return `<li class="flex items-center gap-2">
+          <span>• ${escapeHtml(cleanTs)}</span>
+          ${isKm ? '<span class="text-[9px] bg-emerald-950/90 text-emerald-300 font-bold px-1.5 py-0.5 rounded border border-emerald-800">Google Key Moment</span>' : ''}
+        </li>`;
+      }).join('');
 
       // Tab 8: Shorts Blueprint
       const sp = plan.shorts_package || {};
@@ -1245,6 +1308,41 @@ https://www.youtube.com/@ppm_consulting</textarea>
           <td class="p-3 text-slate-300">${escapeHtml(c.aeo_query_sample || '-')}</td>
         </tr>
       `).join('');
+
+      // Google People Also Ask (PAA)
+      const paa = d.people_also_ask || [];
+      window._lastPaaQuestions = paa;
+      const paaSummaryEl = document.getElementById('paaQuestionsSummary');
+      const paaGridEl = document.getElementById('paaQuestionsGrid');
+      if (paa.length) {
+        paaSummaryEl.innerHTML = `✅ Ditemukan <b>${paa.length} pertanyaan interogatif Google People Also Ask</b> langsung dari mesin pencari Google (Intent: Cara Kerja, Biaya, Kendala, & Verifikasi).`;
+        paaGridEl.innerHTML = paa.map((p, idx) => `
+          <div class="p-3 rounded-xl bg-[#0e1117] border border-slate-800 hover:border-slate-700 transition flex flex-col justify-between space-y-2">
+            <div>
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-[10px] px-2 py-0.5 rounded font-semibold ${
+                  p.intent === 'TROUBLESHOOTING' ? 'bg-amber-950/60 text-amber-300 border border-amber-800/40' :
+                  p.intent === 'COMMERCIAL' ? 'bg-emerald-950/60 text-emerald-300 border border-emerald-800/40' :
+                  p.intent === 'HOW_TO' ? 'bg-sky-950/60 text-sky-300 border border-sky-800/40' :
+                  'bg-purple-950/60 text-purple-300 border border-purple-800/40'
+                }">${escapeHtml(p.badge || p.intent)}</span>
+                <span class="text-[10px] text-emerald-400 font-mono">🌟 Key Moment</span>
+              </div>
+              <p class="text-white font-medium text-xs">"${escapeHtml(p.question)}"</p>
+            </div>
+            <div class="flex justify-between items-center pt-1 border-t border-slate-800/60 text-[10px]">
+              <span class="text-slate-500 font-mono">Kategori: ${escapeHtml(p.prefix)}</span>
+              <button onclick="navigator.clipboard.writeText('${escapeHtml(p.question)}'); alert('Pertanyaan berhasil disalin!');" class="text-sky-400 hover:text-sky-300">📋 Salin</button>
+            </div>
+          </div>
+        `).join('');
+      } else {
+        paaSummaryEl.textContent = 'Tidak ada pertanyaan Google PAA untuk kueri ini.';
+        paaGridEl.innerHTML = '';
+      }
+
+      // Tab 5: Mined Comments & Audience Pain Points
+      renderMinedComments(d.mined_comments);
     }
 
     function renderFlowShotlist(shotlist) {
@@ -1302,6 +1400,106 @@ https://www.youtube.com/@ppm_consulting</textarea>
       a.href = URL.createObjectURL(blob);
       a.download = `prompts_${kw}.txt`;
       a.click();
+    }
+
+    function renderMinedComments(mined) {
+      if (!mined) return;
+      const sumEl = document.getElementById('minedCommentsSummary');
+      const gridEl = document.getElementById('painPointsGrid');
+      const topicGapsEl = document.getElementById('commentTopicGapsContainer');
+
+      const totalComments = mined.total_comments_analyzed || 0;
+      const totalQuestions = mined.total_questions_found || 0;
+      const vidsCount = (mined.videos_analyzed || []).length;
+
+      if (totalComments > 0) {
+        sumEl.innerHTML = `📊 Ditambang <b>${totalComments} komentar penonton</b> dari <b>${vidsCount} video kompetitor</b>. Terdeteksi <b>${totalQuestions} pertanyaan friksi & kendala penonton nyata</b>!`;
+      } else {
+        sumEl.innerHTML = `ℹ️ Belum ada komentar yang ditambang. Silakan masukkan URL video spesifik di samping atau lakukan analisa topik.`;
+      }
+
+      const painPoints = mined.top_pain_points || [];
+      if (painPoints.length) {
+        gridEl.innerHTML = painPoints.map(pp => `
+          <div class="p-3.5 rounded-xl bg-[#0e1117] border border-slate-800 hover:border-slate-700 transition space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] px-2 py-0.5 rounded font-semibold ${
+                pp.category === 'TROUBLESHOOTING' ? 'bg-amber-950/70 text-amber-300 border border-amber-800/50' :
+                pp.category === 'COMMERCIAL' ? 'bg-emerald-950/70 text-emerald-300 border border-emerald-800/50' :
+                pp.category === 'HOW_TO' ? 'bg-sky-950/70 text-sky-300 border border-sky-800/50' :
+                'bg-purple-950/70 text-purple-300 border border-purple-800/50'
+              }">${escapeHtml(pp.badge)}</span>
+              <span class="text-[11px] text-amber-400 font-bold">👍 ${pp.likes || 0} Likes</span>
+            </div>
+            <p class="text-white text-xs italic">"${escapeHtml(pp.text)}"</p>
+            <div class="text-[10px] text-slate-400">
+              Penonton: <b class="text-slate-300">${escapeHtml(pp.author)}</b> | Sumber: <a href="${escapeHtml(pp.video_url)}" target="_blank" class="text-red-400 hover:underline">${escapeHtml(pp.video_title.substring(0, 35))}...</a>
+            </div>
+            <div class="p-2 rounded bg-emerald-950/30 border border-emerald-800/40 text-[11px] text-emerald-300">
+              💡 <b>Hook Video Solusi:</b> ${escapeHtml(pp.suggested_hook)}
+            </div>
+          </div>
+        `).join('');
+      } else {
+        gridEl.innerHTML = '<div class="text-slate-500 col-span-2">Tidak ada pertanyaan spesifik terdeteksi pada komentar video ini.</div>';
+      }
+
+      const topicGaps = mined.topic_gap_opportunities || [];
+      if (topicGaps.length) {
+        topicGapsEl.innerHTML = topicGaps.map(tg => `
+          <div class="p-3 rounded-lg bg-[#0e1117] border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <div class="flex items-center gap-2 mb-1">
+                <span class="px-2 py-0.5 rounded bg-slate-800 text-[10px] text-amber-300 font-semibold">${escapeHtml(tg.badge)}</span>
+                <b class="text-white text-xs">${escapeHtml(tg.topic)}</b>
+              </div>
+              <div class="text-[11px] text-slate-400">${escapeHtml(tg.demand_signal)} | Sumber: <span class="text-slate-300">${escapeHtml(tg.source_competitor.substring(0, 40))}...</span></div>
+            </div>
+            <button onclick="document.getElementById('keywordInput').value='${escapeHtml(tg.topic)}'; runAnalysis();" class="whitespace-nowrap bg-red-600/80 hover:bg-red-600 text-white font-semibold px-3 py-1.5 rounded-lg text-xs transition">🚀 Analisa Topik Ini</button>
+          </div>
+        `).join('');
+      } else {
+        topicGapsEl.innerHTML = '<div class="text-slate-500">Peluang kesenjangan topik otomatis muncul saat komentar teranalisa.</div>';
+      }
+    }
+
+    async function mineCustomVideoComments() {
+      const input = document.getElementById('mineCustomUrlInput');
+      const url = (input.value || '').trim();
+      if (!url) {
+        alert('Silakan masukkan URL atau ID video YouTube.');
+        return;
+      }
+      const sumEl = document.getElementById('minedCommentsSummary');
+      sumEl.textContent = '⏳ Sedang menambang komentar langsung dari YouTube... Mohon tunggu.';
+      try {
+        const resp = await fetch('/api/dashboard/mine-comments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ video_urls: [url], max_comments: 40 })
+        });
+        if (!resp.ok) {
+          const err = await resp.json();
+          alert('Gagal menambang: ' + (err.detail || 'Terjadi kesalahan'));
+          return;
+        }
+        const data = await resp.json();
+        renderMinedComments(data);
+        showToast('💬 Komentar berhasil ditambang!');
+      } catch (e) {
+        alert('Koneksi gagal: ' + e.message);
+      }
+    }
+
+    function copyAllPaaQuestions() {
+      const paa = window._lastPaaQuestions || [];
+      if (!paa.length) {
+        alert('Belum ada pertanyaan Google PAA untuk disalin.');
+        return;
+      }
+      const text = paa.map((p, i) => `${i + 1}. [${p.badge}] ${p.question}`).join('\n');
+      navigator.clipboard.writeText(text);
+      alert(`Berhasil menyalin ${paa.length} pertanyaan Google People Also Ask ke clipboard!`);
     }
 
     // 4. Tab 2: Video Audit & Pre-Upload

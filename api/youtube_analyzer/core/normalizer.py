@@ -489,7 +489,9 @@ class TopicNormalizer:
         if not tags_str:
             return ""
         raw_tags = [
-            re.sub(r"#\S*", "", t).strip() if "#" in t else t.strip()
+            re.sub(r"\s+", " ", re.sub(r"#\S*", "", t)).strip()
+            if "#" in t
+            else re.sub(r"\s+", " ", t).strip()
             for t in tags_str.split(",")
             if t.strip()
         ]
@@ -574,7 +576,7 @@ class TopicNormalizer:
             if not clean_t:
                 clean_t = raw_t.replace("#", "").strip()
             if clean_t:
-                raw_t = clean_t
+                raw_t = re.sub(r"\s+", " ", clean_t).strip()
             t_low = raw_t.lower()
 
             if t_low in seen_lower:

@@ -278,6 +278,94 @@ class AuditBlindspotsRequest(BaseModel):
     target_format: str = "LANDSCAPE (16:9)"
 
 
+def resolve_effective_keys(
+    ai_cfg: dict[str, Any] | None,
+) -> tuple[str | None, str | None, str, str | None, str | None]:
+    """Resolves effective YouTube Key, AI API Key, Provider, Model, and Custom Base URL.
+
+    Priority:
+    1. Explicit User Manual Input from UI (Override)
+    2. Server Environment Credentials (.env)
+    3. None (Smart Heuristic Fallback)
+    """
+    ai_cfg = ai_cfg or {}
+
+    # 1. YouTube Data API Key
+    yt_manual = (ai_cfg.get("youtube_api_key") or "").strip()
+    yt_key = yt_manual or os.getenv("YOUTUBE_API_KEY") or None
+
+    # 2. AI Provider & Key
+    ai_manual = (ai_cfg.get("api_key") or "").strip()
+    prov_manual = (ai_cfg.get("provider") or "").strip().lower()
+
+    env_gemini = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    env_groq = os.getenv("GROQ_API_KEY")
+    env_openai = os.getenv("OPENAI_API_KEY")
+
+    if ai_manual:
+        ai_key = ai_manual
+        provider = prov_manual or "gemini"
+    else:
+        # Fallback to server environment variables (.env)
+        if prov_manual == "groq" and env_groq:
+            ai_key = env_groq
+            provider = "groq"
+        elif prov_manual == "openai" and env_openai:
+            ai_key = env_openai
+            provider = "openai"
+        elif env_gemini:
+            ai_key = env_gemini
+            provider = "gemini"
+        elif env_groq:
+            ai_key = env_groq
+            provider = "groq"
+        elif env_openai:
+            ai_key = env_openai
+            provider = "openai"
+        else:
+            ai_key = None
+            provider = prov_manual or "gemini"
+
+    model_name = ai_cfg.get("model_name") or None
+    custom_base_url = ai_cfg.get("custom_base_url") or None
+
+    return yt_key, ai_key, provider, model_name, custom_base_url
+
+
+@app.get("/api/credentials/status")
+async def api_credentials_status():
+    """Report whether API keys are pre-configured in server credentials (.env)
+
+    without leaking raw secrets.
+    """
+    yt_key = os.getenv("YOUTUBE_API_KEY", "").strip()
+    gemini_key = (
+        os.getenv("GEMINI_API_KEY", "").strip()
+        or os.getenv("GOOGLE_API_KEY", "").strip()
+    )
+    groq_key = os.getenv("GROQ_API_KEY", "").strip()
+    openai_key = os.getenv("OPENAI_API_KEY", "").strip()
+
+    def _mask_key(k: str) -> str:
+        if not k:
+            return ""
+        if len(k) <= 8:
+            return f"{k[:2]}...{k[-2:]}"
+        return f"{k[:6]}...{k[-4:]}"
+
+    return {
+        "has_youtube_credential": bool(yt_key),
+        "youtube_key_preview": _mask_key(yt_key),
+        "has_gemini_credential": bool(gemini_key),
+        "gemini_key_preview": _mask_key(gemini_key),
+        "has_groq_credential": bool(groq_key),
+        "groq_key_preview": _mask_key(groq_key),
+        "has_openai_credential": bool(openai_key),
+        "openai_key_preview": _mask_key(openai_key),
+        "default_ai_provider": "gemini" if gemini_key else ("groq" if groq_key else "gemini"),
+    }
+
+
 def _build_surfaces_and_clusters(
     seed_keyword: str, live_suggestions: list[str] | None = None
 ) -> tuple[dict[str, list[dict[str, str]]], list[dict[str, str]], list[str]]:
@@ -335,7 +423,11 @@ async def api_dashboard_analyze(req: AnalyzeRequest):
     kw = (req.keyword or "").strip()
     if not kw:
         raise HTTPException(status_code=400, detail="Keyword wajib diisi.")
-    yt_conn = YouTubeConnector()
+
+    # Resolve effective YouTube and AI credentials from Server (.env) with UI manual override support
+    yt_key, ai_key, provider, model_name, custom_base_url = resolve_effective_keys(req.ai_config)
+    yt_conn = YouTubeConnector(api_key=yt_key)
+
     competitors, live_suggestions, paa_questions = await asyncio.gather(
         yt_conn.get_top_competitors(kw, limit=10),
         yt_conn.get_autocomplete(kw),
@@ -367,11 +459,24 @@ async def api_dashboard_analyze(req: AnalyzeRequest):
         if competitors
         else {}
     )
+
+    effective_ai_cfg = (
+        {
+            "provider": provider,
+            "api_key": ai_key,
+            "model_name": model_name,
+            "custom_base_url": custom_base_url,
+            "youtube_api_key": yt_key,
+        }
+        if (ai_key or yt_key)
+        else None
+    )
+
     outranking_plan = SearchIntelligence.generate_outranking_plan(
         kw,
         competitor=top_comp,
         competitors=competitors,
-        ai_config=req.ai_config,
+        ai_config=effective_ai_cfg,
         paa_questions=paa_questions,
     )
     if comp_spy.get("recommended_tags_copy"):
@@ -387,6 +492,57 @@ async def api_dashboard_analyze(req: AnalyzeRequest):
         seed=kw, format_type=comp_format, num_scenes=5
     )
 
+    # ------------------------------------------------------------------
+    # NexLev Niche Validation Scorecard (Cluster 3-5 Channels & Proof)
+    # ------------------------------------------------------------------
+    unique_channels = {c.get("channel") for c in competitors if c.get("channel")}
+    channel_cluster_pass = len(unique_channels) >= 3
+
+    has_breakout_proof = any(
+        (c.get("views_count") or 0) >= 20000
+        or (
+            c.get("views")
+            and (
+                "K" in str(c.get("views"))
+                or "M" in str(c.get("views"))
+                or "rb" in str(c.get("views")).lower()
+                or "jt" in str(c.get("views")).lower()
+            )
+        )
+        for c in competitors
+    )
+
+    demand_pass = bool(live_suggestions and len(live_suggestions) >= 3)
+    scorecard_passes = sum([1 for p in [channel_cluster_pass, has_breakout_proof, demand_pass] if p])
+
+    niche_scorecard = {
+        "status": "VALIDATED" if scorecard_passes >= 2 else "CAUTION",
+        "score": f"{scorecard_passes}/3 Syarat Lolos",
+        "score_numeric": scorecard_passes,
+        "criteria": [
+            {
+                "rule": "Klaster 3-5 Channel Berhasil (Bukan One-Hit Wonder)",
+                "passed": channel_cluster_pass,
+                "evidence": f"Ditemukan {len(unique_channels)} channel berbeda mendominasi SERP ini.",
+            },
+            {
+                "rule": "Low Barrier to Entry (Bukti Breakout Views Nyata)",
+                "passed": has_breakout_proof,
+                "evidence": "Terdapat video dengan views tinggi membuktikan audiens aktif di topik ini.",
+            },
+            {
+                "rule": "Search Demand Kuat (YouTube Suggest & Autocomplete Aktif)",
+                "passed": demand_pass,
+                "evidence": f"{len(live_suggestions)} variasi kueri autocomplete aktif dicari audiens.",
+            },
+        ],
+        "verdict": (
+            "Topik ini tervalidasi menurut framework NexLev. Aman & potensial untuk diproduksi."
+            if scorecard_passes >= 2
+            else "Perhatian: Niche ini masih sangat sempit atau didominasi oleh 1-2 channel saja. Uji coba dengan 1 video pilot terlebih dahulu."
+        ),
+    }
+
     return {
         "keyword": kw,
         "competitors": competitors,
@@ -400,6 +556,7 @@ async def api_dashboard_analyze(req: AnalyzeRequest):
         "faceless_info": faceless_info,
         "clipping_ideas": clipping_ideas,
         "flow_shotlist": flow_shotlist,
+        "niche_scorecard": niche_scorecard,
         "surfaces": surfaces_out,
         "clusters": clusters_out,
         "live_autocomplete": live_suggestions,
@@ -456,8 +613,7 @@ async def api_dashboard_audit_video(req: AuditVideoRequest):
     if not vid_id:
         raise HTTPException(status_code=400, detail="Format URL atau Video ID YouTube tidak valid.")
 
-    ai_cfg = req.ai_config or {}
-    yt_key = ai_cfg.get("youtube_api_key") or os.getenv("YOUTUBE_API_KEY")
+    yt_key, ai_key, provider, model_name, custom_base_url = resolve_effective_keys(req.ai_config)
     yt_conn = YouTubeConnector(api_key=yt_key)
     vid_meta = await yt_conn.get_video_details(vid_id)
     if not vid_meta:
@@ -483,15 +639,14 @@ async def api_dashboard_audit_video(req: AuditVideoRequest):
 
     rel_competitors = await yt_conn.get_top_competitors(vid_meta.get("title", vid_id), limit=5)
 
-    ai_cfg = req.ai_config or {}
     audit_res = AITitleGenerator.audit_and_revamp(
         video_details=vid_meta,
         transcript_data=vid_transcript,
         competitors=rel_competitors,
-        provider=ai_cfg.get("provider"),
-        api_key=ai_cfg.get("api_key"),
-        model_name=ai_cfg.get("model_name"),
-        custom_base_url=ai_cfg.get("custom_base_url"),
+        provider=provider,
+        api_key=ai_key,
+        model_name=model_name,
+        custom_base_url=custom_base_url,
     )
 
     return {
@@ -503,9 +658,9 @@ async def api_dashboard_audit_video(req: AuditVideoRequest):
 
 @app.post("/api/dashboard/pre-upload")
 async def api_dashboard_pre_upload(req: PreUploadRequest):
-    yt_conn = YouTubeConnector()
+    yt_key, ai_key, provider, model_name, custom_base_url = resolve_effective_keys(req.ai_config)
+    yt_conn = YouTubeConnector(api_key=yt_key)
     comp_for_draft = await yt_conn.get_top_competitors(req.topic, limit=5)
-    ai_cfg = req.ai_config or {}
 
     return AITitleGenerator.plan_pre_upload(
         topic=req.topic,
@@ -513,10 +668,10 @@ async def api_dashboard_pre_upload(req: PreUploadRequest):
         target_format=req.target_format,
         duration=req.duration,
         competitors=comp_for_draft,
-        provider=ai_cfg.get("provider"),
-        api_key=ai_cfg.get("api_key"),
-        model_name=ai_cfg.get("model_name"),
-        custom_base_url=ai_cfg.get("custom_base_url"),
+        provider=provider,
+        api_key=ai_key,
+        model_name=model_name,
+        custom_base_url=custom_base_url,
     )
 
 

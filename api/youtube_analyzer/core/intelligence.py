@@ -7,6 +7,7 @@ Incorporates proven algorithms for:
 """
 
 import math
+import os
 import re
 from datetime import UTC, datetime
 from typing import Any
@@ -1082,9 +1083,14 @@ class SearchIntelligence:
         all_comps = competitors or ([competitor] if competitor else [])
 
         # ------------------------------------------------------------------
-        # OPSI 1: AI GENERATOR (AUTO-DETECT JIKA API KEY TERSEDIA)
+        # OPSI 1: AI GENERATOR (AUTO-DETECT DARI KREDENSIAL SERVER .ENV / MANUAL OVERRIDE)
         # ------------------------------------------------------------------
-        if ai_config and ai_config.get("api_key"):
+        effective_ai_key = (
+            (ai_config.get("api_key") if ai_config else None)
+            or os.getenv("GEMINI_API_KEY")
+            or os.getenv("GOOGLE_API_KEY")
+        )
+        if effective_ai_key:
             try:
                 from youtube_analyzer.core.ai_generator import AITitleGenerator
 
@@ -1092,10 +1098,10 @@ class SearchIntelligence:
                     seed=seed,
                     niche=niche,
                     competitors=all_comps,
-                    provider=ai_config.get("provider", "gemini"),
-                    api_key=ai_config["api_key"],
-                    model_name=ai_config.get("model_name"),
-                    custom_base_url=ai_config.get("custom_base_url"),
+                    provider=(ai_config.get("provider") if ai_config else None) or "gemini",
+                    api_key=effective_ai_key,
+                    model_name=ai_config.get("model_name") if ai_config else None,
+                    custom_base_url=ai_config.get("custom_base_url") if ai_config else None,
                 )
 
                 psych_angles = ai_res.get("psychological_angles", {})
@@ -3190,13 +3196,18 @@ class SearchIntelligence:
                 max_mult = multiplier
                 golden_video = c
 
-            status = "⚖️ Standard (1.0x)"
+            status = f"⚖️ Standard ({multiplier}x)"
             if multiplier >= 5.0:
                 status = f"🔥 VIRAL BREAKOUT ({multiplier}x)"
             elif multiplier >= 2.5:
                 status = f"⭐ STRONG OUTLIER ({multiplier}x)"
             elif multiplier >= 1.3:
                 status = f"📈 ABOVE AVERAGE ({multiplier}x)"
+
+            # Attach to competitor directly for frontend tables
+            c["outlier_status"] = status
+            c["multiplier"] = multiplier
+            c["is_outlier"] = multiplier >= 2.0
 
             outlier_items.append(
                 {

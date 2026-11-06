@@ -10,6 +10,7 @@ Supports multi-provider LLMs via direct HTTP requests (no extra heavy SDK depend
 
 import json
 import logging
+import os
 import re
 from datetime import datetime
 from typing import Any
@@ -629,12 +630,21 @@ KEMBALIKAN HANYA FORMAT JSON MURNI TANPA MARKDOWN LAIN dengan struktur persis se
         clean_topic = raw_title.split("-")[0].split("|")[0].strip()
         raw_dur = video_details.get("duration", "10:00")
 
-        if api_key and provider:
+        # AI mode is triggered when provider is requested and key exists
+        effective_key = (
+            api_key
+            or os.getenv("GEMINI_API_KEY")
+            or os.getenv("GOOGLE_API_KEY")
+            or os.getenv("GROQ_API_KEY")
+        )
+        effective_provider = provider or "gemini"
+
+        if effective_key and provider is not None:
             try:
                 res = cls._execute_llm(
                     prompt=prompt,
-                    provider=provider,
-                    api_key=api_key,
+                    provider=effective_provider,
+                    api_key=effective_key,
                     model_name=model_name,
                     custom_base_url=custom_base_url,
                 )
@@ -837,12 +847,21 @@ KEMBALIKAN HANYA FORMAT JSON MURNI TANPA MARKDOWN LAIN dengan struktur persis se
             topic, content_notes, target_format, duration, competitors
         )
 
-        if api_key and provider:
+        # AI mode is triggered when provider is requested and key exists
+        effective_key = (
+            api_key
+            or os.getenv("GEMINI_API_KEY")
+            or os.getenv("GOOGLE_API_KEY")
+            or os.getenv("GROQ_API_KEY")
+        )
+        effective_provider = provider or "gemini"
+
+        if effective_key and provider is not None:
             try:
                 res = cls._execute_llm(
                     prompt=prompt,
-                    provider=provider,
-                    api_key=api_key,
+                    provider=effective_provider,
+                    api_key=effective_key,
                     model_name=model_name,
                     custom_base_url=custom_base_url,
                 )

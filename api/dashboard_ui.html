@@ -253,6 +253,7 @@
               <button onclick="copyTextById('videoTagsCode')" class="text-xs bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded text-slate-300">📋 Salin Tags</button>
             </div>
             <pre id="videoTagsCode" class="bg-[#161b26] border border-slate-700 rounded-xl p-3 text-xs text-amber-300 whitespace-pre-wrap break-words"></pre>
+            <p class="text-[11px] text-slate-400 mt-1 flex items-center gap-1.5"><span class="text-emerald-400 font-semibold">🛡️ Filter Relevansi Aktif:</span> Tag clickbait (seperti 'gratis', 'download', 'viral') otomatis disaring agar 100% relevan, kecuali jika materi video memang membahas topik gratis/unduhan.</p>
           </div>
           <div class="space-y-2">
             <h4 class="text-xs font-bold text-slate-300 uppercase">🕵️ Tags Paling Sering Dipakai Kompetitor #1-5:</h4>
@@ -1348,8 +1349,9 @@ https://www.youtube.com/@ppm_consulting</textarea>
                 <textarea rows="6" class="w-full bg-[#0e1117] border border-slate-700 rounded-lg p-2.5 text-xs text-slate-200 font-mono">${escapeHtml(ar.full_description || '')}</textarea>
               </div>
               <div>
-                <span class="text-slate-400 block mb-1">🏷️ Video Tags Baru:</span>
+                <span class="text-slate-400 block mb-1">🏷️ Video Tags Baru (100% Relevan):</span>
                 <pre class="bg-[#0e1117] border border-slate-700 rounded-lg p-2.5 text-xs text-amber-300 whitespace-pre-wrap">${escapeHtml(ar.video_tags || '')}</pre>
+                <p class="text-[10px] text-slate-400 mt-1"><span class="text-emerald-400 font-semibold">🛡️ Relevansi Ketat:</span> Tag clickbait tidak relevan (seperti 'gratis', 'viral') otomatis disaring kecuali transkrip video memang membahas materi gratis.</p>
               </div>
             </div>
           </div>
@@ -1395,8 +1397,9 @@ https://www.youtube.com/@ppm_consulting</textarea>
               <textarea rows="6" class="w-full bg-[#0e1117] border border-slate-700 rounded-lg p-2.5 text-xs text-slate-200 font-mono">${escapeHtml(d.full_description || '')}</textarea>
             </div>
             <div>
-              <span class="text-slate-400 block mb-1">🏷️ Video Tags Siap Pakai:</span>
+              <span class="text-slate-400 block mb-1">🏷️ Video Tags Siap Pakai (100% Relevan):</span>
               <pre class="bg-[#0e1117] border border-slate-700 rounded-lg p-2.5 text-xs text-amber-300 whitespace-pre-wrap">${escapeHtml(d.video_tags || '')}</pre>
+              <p class="text-[10px] text-slate-400 mt-1"><span class="text-emerald-400 font-semibold">🛡️ Relevansi Ketat:</span> Tag clickbait tidak relevan (seperti 'gratis', 'viral') otomatis disaring kecuali materi naskah memang membahas materi gratis.</p>
             </div>
           </div>
         `;

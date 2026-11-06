@@ -406,3 +406,98 @@ class TopicNormalizer:
                     )
                 clusters.append(c)
         return clusters
+
+    @staticmethod
+    def is_tag_relevant(tag: str, context_text: str = "") -> bool:
+        """
+        Verify whether a tag is strictly relevant to the video topic / context.
+        Filters out clickbait/spam keywords (e.g. 'gratis', 'free', 'tanpa modal', 'download', 'viral', 'fyp')
+        UNLESS the video topic / context explicitly discusses or mentions them.
+        """
+        if not tag or not tag.strip():
+            return False
+        t_clean = tag.strip().lower()
+        ctx_clean = context_text.lower() if context_text else ""
+
+        # 1. Unconditional spam / stuffing (never professional for Studio tags)
+        unconditional_spam = {
+            "fyp",
+            "#fyp",
+            "viral",
+            "#viral",
+            "trending",
+            "#trending",
+            "foryou",
+            "foryoupage",
+            "tiktok",
+            "reels",
+            "shorts",
+            "#shorts",
+            "sub4sub",
+            "subscribe",
+            "like",
+            "share",
+            "comment",
+        }
+        if t_clean in unconditional_spam:
+            return False
+
+        # 2. Conditional spam (clickbait if not explicitly in video context)
+        conditional_checks = [
+            # (trigger_keywords in tag, required_keywords in context)
+            (
+                ["gratis", "free", "cuma-cuma", "freemium"],
+                ["gratis", "free", "cuma-cuma", "tanpa biaya", "freemium"],
+            ),
+            (["tanpa modal", "modal nol", "modal 0", "modal kecil"], ["modal"]),
+            (
+                ["download", "unduh", "apk", "mod", "crack"],
+                ["download", "unduh", "apk", "mod", "crack", "software", "aplikasi", "file"],
+            ),
+            (
+                ["cepat kaya", "cara kaya", "jutawan", "milyarder"],
+                ["kaya", "jutawan", "milyarder", "finansial"],
+            ),
+        ]
+
+        for triggers, required_ctx in conditional_checks:
+            if any(tr in t_clean for tr in triggers):
+                # Must be present in context, otherwise reject as irrelevant clickbait
+                if not any(req in ctx_clean for req in required_ctx):
+                    return False
+
+        return True
+
+    @classmethod
+    def filter_relevant_tags(cls, tags: list[str], context_text: str = "") -> list[str]:
+        """Deduplicate and filter a list of tags for strict relevance against context."""
+        seen: set[str] = set()
+        result: list[str] = []
+        for t in tags:
+            if not t or not t.strip():
+                continue
+            t_str = t.strip()
+            t_low = t_str.lower()
+            if t_low not in seen and cls.is_tag_relevant(t_str, context_text):
+                seen.add(t_low)
+                result.append(t_str)
+        return result
+
+    @classmethod
+    def clean_comma_tags(cls, tags_str: str, context_text: str = "", max_chars: int = 450) -> str:
+        """Parse comma-separated tags, filter for strict relevance, and format under max_chars."""
+        if not tags_str:
+            return ""
+        raw_tags = [t.strip() for t in tags_str.split(",") if t.strip()]
+        filtered = cls.filter_relevant_tags(raw_tags, context_text)
+
+        selected: list[str] = []
+        cur_len = 0
+        for t in filtered:
+            add_len = len(t) + (2 if selected else 0)
+            if cur_len + add_len > max_chars:
+                break
+            selected.append(t)
+            cur_len += add_len
+        return ", ".join(selected)
+

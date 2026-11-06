@@ -815,22 +815,19 @@ class YouTubeConnector(BaseConnector):
         target_comps = competitors[:limit_competitors]
         await asyncio.gather(*[_ensure_comp_tags(c) for c in target_comps])
 
+        # Build context from seed topic and competitor video titles for relevance validation
+        comp_titles = " ".join(c.get("title", "") for c in target_comps)
+        context_text = f"{seed_topic or ''} {comp_titles}".strip()
+
+        from youtube_analyzer.core.normalizer import TopicNormalizer
+
         for comp in target_comps:
             v_id = comp.get("video_id") or self.extract_video_id(comp.get("url", ""))
             # Real data only: use the creator's actual Studio tags.
             tags = comp.get("tags") or []
 
-            # Deduplicate tags within the same video (case-insensitive)
-            seen_in_vid: set[str] = set()
-            clean_tags: list[str] = []
-            for t in tags:
-                if not t or not t.strip():
-                    continue
-                t_str = t.strip()
-                t_low = t_str.lower()
-                if t_low not in seen_in_vid:
-                    seen_in_vid.add(t_low)
-                    clean_tags.append(t_str)
+            # Deduplicate and filter tags for strict relevance against content (filter out clickbait like 'gratis', 'viral', etc. unless in context)
+            clean_tags = TopicNormalizer.filter_relevant_tags(tags, context_text=context_text)
 
             competitor_breakdown.append(
                 {
@@ -875,7 +872,11 @@ class YouTubeConnector(BaseConnector):
 
             for q_term in live_queries[:15]:
                 q_clean = q_term.strip()
-                if q_clean and q_clean.lower() not in all_tags_with_counts:
+                if (
+                    q_clean
+                    and TopicNormalizer.is_tag_relevant(q_clean, context_text=context_text)
+                    and q_clean.lower() not in all_tags_with_counts
+                ):
                     all_tags_with_counts[q_clean.lower()] = 1
                     canonical_display_map[q_clean.lower()] = q_clean
 
@@ -916,8 +917,9 @@ class YouTubeConnector(BaseConnector):
         best_practices = [
             "1. Urutan Prioritas: Letakkan Target Keyword Utama di posisi 1-3 tag teratas karena memiliki bobot indexing algoritma tertinggi.",
             "2. Pola 3 Lapis: Padukan 1 tag umum kategori, 3-5 tag spesifik isi video, dan 1-2 variasi ejaan/typo yang sering dicari.",
-            "3. Intip Kompetitor: Tiru tag yang terbukti dipakai bersama oleh ranking #1-#3 untuk masuk ke carousel 'Up Next / Suggested Videos'.",
-            "4. Hindari Tag Stuffing: Batasi total panjang tag di bawah 450 karakter dan jangan pernah menaruh daftar tag di kolom deskripsi (melanggar ToS YouTube).",
+            "3. Relevansi 100% (Anti-Clickbait): Seluruh tag wajib sesuai dengan materi aktual video. Jangan gunakan kata 'gratis', 'download', atau 'viral' kecuali materi video memang membahas konten gratis/unduhan.",
+            "4. Intip Kompetitor: Tiru tag yang terbukti dipakai bersama oleh ranking #1-#3 untuk masuk ke carousel 'Up Next / Suggested Videos'.",
+            "5. Hindari Tag Stuffing: Batasi total panjang tag di bawah 450 karakter dan jangan pernah menaruh daftar tag di kolom deskripsi (melanggar ToS YouTube).",
         ]
 
         return {

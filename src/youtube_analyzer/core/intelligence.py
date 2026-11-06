@@ -1139,7 +1139,10 @@ class SearchIntelligence:
                         )
 
                 clean_tag = "".join(w.capitalize() for w in clean.split() if w.isalnum())
-                hashtags = ai_res.get(
+                comp_context = f"{seed} {clean} {' '.join(c.get('title', '') for c in all_comps or [])}".strip()
+                from youtube_analyzer.core.normalizer import TopicNormalizer
+
+                raw_hashtags = ai_res.get(
                     "hashtags",
                     [
                         f"#{clean_tag}",
@@ -1148,13 +1151,22 @@ class SearchIntelligence:
                         f"#Tutorial{clean_tag}",
                     ],
                 )
+                hashtags = [
+                    h
+                    for h in raw_hashtags
+                    if TopicNormalizer.is_tag_relevant(h.lstrip("#"), context_text=comp_context)
+                ]
+                if not hashtags:
+                    hashtags = [f"#{clean_tag}", f"#{clean_tag}Indonesia"]
 
-                # Collect competitor tags
+                # Collect competitor tags and filter for strict content relevance (anti-clickbait)
                 comp_tags = []
                 for c in all_comps or []:
                     if c.get("tags"):
                         comp_tags.extend(c.get("tags", []))
-                comp_tags = list(dict.fromkeys(t.strip() for t in comp_tags if t and t.strip()))
+                comp_tags = TopicNormalizer.filter_relevant_tags(
+                    comp_tags, context_text=comp_context
+                )
 
                 if comp_tags:
                     merged_tags = comp_tags[:12]
@@ -1167,11 +1179,16 @@ class SearchIntelligence:
                     for ft in focus_tags:
                         if ft not in [t.lower() for t in merged_tags]:
                             merged_tags.append(ft)
-                    ai_video_tags = ", ".join(merged_tags[:18])
+                    ai_video_tags = TopicNormalizer.clean_comma_tags(
+                        ", ".join(merged_tags[:18]), context_text=comp_context
+                    )
                 else:
-                    ai_video_tags = (
+                    raw_tags = (
                         ai_res.get("video_tags")
                         or f"{seed}, {clean.lower()}, {niche}, cara {seed}, tips {seed}"
+                    )
+                    ai_video_tags = TopicNormalizer.clean_comma_tags(
+                        raw_tags, context_text=comp_context
                     )
 
                 ts_section = (

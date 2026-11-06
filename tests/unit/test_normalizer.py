@@ -95,3 +95,42 @@ def test_create_intent_clusters_all_intents():
     tx_cluster = next(c for c in clusters if c.cluster_name == "Transaksi & Pembelian")
     assert tx_cluster.intent_type == IntentEnum.TRANSACTIONAL
     assert tx_cluster.google_term_sample is not None
+
+
+def test_tag_relevance_filters_irrelevant_gratis():
+    """Verify that 'gratis' tags are filtered out when the video is about general/paid topics."""
+    context = "Tutorial Google Ads untuk UMKM strategi budget harian campaign"
+    tags = ["Google Ads", "Google Ads Gratis", "Setting Google Ads", "Download Gratis", "fyp", "viral"]
+    filtered = TopicNormalizer.filter_relevant_tags(tags, context_text=context)
+    assert "Google Ads" in filtered
+    assert "Setting Google Ads" in filtered
+    assert "Google Ads Gratis" not in filtered
+    assert "Download Gratis" not in filtered
+    assert "fyp" not in filtered
+    assert "viral" not in filtered
+
+
+def test_tag_relevance_keeps_gratis_when_context_is_free():
+    """Verify that 'gratis' tags ARE KEPT when the content explicitly discusses free resources/services."""
+    context = "Cara mendapatkan saldo kupon Google Ads gratis tanpa biaya promo resmi"
+    tags = ["Google Ads", "Google Ads Gratis", "Saldo Google Ads Gratis", "Voucher Google Ads", "fyp"]
+    filtered = TopicNormalizer.filter_relevant_tags(tags, context_text=context)
+    assert "Google Ads" in filtered
+    assert "Google Ads Gratis" in filtered
+    assert "Saldo Google Ads Gratis" in filtered
+    assert "Voucher Google Ads" in filtered
+    assert "fyp" not in filtered  # unconditional spam is still removed
+
+
+def test_clean_comma_tags_utility():
+    """Verify clean_comma_tags formats and filters comma-separated tag string."""
+    context = "Belajar Python Dasar untuk Pemula"
+    raw_str = "Python, Python Pemula, Python Gratis, Belajar Python, viral, Tutorial Python"
+    cleaned = TopicNormalizer.clean_comma_tags(raw_str, context_text=context)
+    assert "Python" in cleaned
+    assert "Python Pemula" in cleaned
+    assert "Belajar Python" in cleaned
+    assert "Tutorial Python" in cleaned
+    assert "Python Gratis" not in cleaned
+    assert "viral" not in cleaned
+

@@ -344,6 +344,10 @@ PANDUAN GAYA BAHASA & NLP (WAJIB DIPATUHI):
 - Gunakan Bahasa Indonesia yang 100% natural, humanis, luwes seperti YouTuber papan atas.
 - DILARANG menggunakan kata-kata klise robotik: "Semua yang wajib kamu tahu...", "Fakta mengejutkan...", "Jangan lakukan ini...", "Panduan pemula modal kecil".
 - Selaraskan judul dan deskripsi dengan apa yang BENAR-BENAR dibahas dalam transkrip/video.
+- ATURAN KETAT RELEVANSI TAGS & HASHTAGS (ANTI-CLICKBAIT):
+  * Seluruh tags dan hashtags WAJIB 100% relevan dengan apa yang benar-benar dibahas dalam transkrip/video.
+  * DILARANG KERAS menyematkan tag clickbait/spam yang tidak relevan (seperti 'gratis', 'free', 'tanpa modal', 'download', 'viral', 'fyp') KECUALI jika isi/topik video memang secara eksplisit membahas konten gratis/free/tanpa modal.
+  * Jika video membahas materi berbayar atau umum (bukan materi gratis), kata 'gratis' tidak boleh dimunculkan sama sekali di tags.
 
 KEMBALIKAN HANYA FORMAT JSON MURNI TANPA MARKDOWN LAIN dengan struktur persis seperti ini:
 {{
@@ -443,6 +447,10 @@ TUGAS ANDA:
 PANDUAN GAYA BAHASA & NLP (WAJIB DIPATUHI):
 - Bahasa Indonesia yang 100% natural, humanis, luwes tanpa kata-kata klise robotik.
 - Sesuaikan secara presisi dengan poin bahasan yang diberikan.
+- ATURAN KETAT RELEVANSI TAGS & HASHTAGS (ANTI-CLICKBAIT):
+  * Seluruh tags dan hashtags WAJIB 100% relevan dengan apa yang benar-benar dibahas dalam poin materi naskah.
+  * DILARANG KERAS menyematkan tag clickbait/spam yang tidak relevan (seperti 'gratis', 'free', 'tanpa modal', 'download', 'viral', 'fyp') KECUALI jika materi naskah memang secara eksplisit membahas konten gratis/free/tanpa modal.
+  * Jika video tidak membahas konten gratis, kata 'gratis' tidak boleh dimunculkan sama sekali di tags.
 
 KEMBALIKAN HANYA FORMAT JSON MURNI TANPA MARKDOWN LAIN dengan struktur persis seperti ini:
 {{
@@ -637,6 +645,22 @@ KEMBALIKAN HANYA FORMAT JSON MURNI TANPA MARKDOWN LAIN dengan struktur persis se
                         if h.lower() not in ["#youtubeseo", "#videomarketing"]
                     ]
 
+                from youtube_analyzer.core.normalizer import TopicNormalizer
+
+                full_audit_ctx = f"{raw_title} {video_details.get('description', '')} {transcript_text} {' '.join(c.get('title', '') for c in competitors)}".strip()
+                if "video_tags" in res and isinstance(res["video_tags"], str):
+                    res["video_tags"] = TopicNormalizer.clean_comma_tags(
+                        res["video_tags"], context_text=full_audit_ctx
+                    )
+                if "hashtags" in res and isinstance(res["hashtags"], list):
+                    res["hashtags"] = [
+                        h
+                        for h in res["hashtags"]
+                        if TopicNormalizer.is_tag_relevant(
+                            h.lstrip("#"), context_text=full_audit_ctx
+                        )
+                    ]
+
                 from youtube_analyzer.connectors.youtube import parse_duration_to_seconds
 
                 max_sec = parse_duration_to_seconds(raw_dur)
@@ -702,12 +726,15 @@ KEMBALIKAN HANYA FORMAT JSON MURNI TANPA MARKDOWN LAIN dengan struktur persis se
             f"#Tutorial{clean_tag}",
         ]
 
-        # Gather real competitor tags if provided
+        # Gather real competitor tags if provided and filter for strict content relevance
+        from youtube_analyzer.core.normalizer import TopicNormalizer
+
+        full_audit_ctx = f"{raw_title} {desc} {transcript_text} {' '.join(c.get('title', '') for c in competitors)}".strip()
         comp_tags = []
         for c in competitors or []:
             if c.get("tags"):
                 comp_tags.extend(c.get("tags", []))
-        comp_tags = list(dict.fromkeys(t.strip() for t in comp_tags if t and t.strip()))
+        comp_tags = TopicNormalizer.filter_relevant_tags(comp_tags, context_text=full_audit_ctx)
 
         if comp_tags:
             merged_tags = comp_tags[:12]
@@ -719,9 +746,12 @@ KEMBALIKAN HANYA FORMAT JSON MURNI TANPA MARKDOWN LAIN dengan struktur persis se
             for ft in focus_tags:
                 if ft not in [t.lower() for t in merged_tags]:
                     merged_tags.append(ft)
-            video_tags_str = ", ".join(merged_tags[:18])
+            video_tags_str = TopicNormalizer.clean_comma_tags(
+                ", ".join(merged_tags[:18]), context_text=full_audit_ctx
+            )
         else:
-            video_tags_str = f"{clean_topic.lower()}, panduan {clean_topic.lower()}, tips {clean_topic.lower()}, cara {clean_topic.lower()}, belajar {clean_topic.lower()}, {clean_topic.lower()} indonesia, tutorial {clean_topic.lower()}"
+            raw_vtags = f"{clean_topic.lower()}, panduan {clean_topic.lower()}, tips {clean_topic.lower()}, cara {clean_topic.lower()}, belajar {clean_topic.lower()}, {clean_topic.lower()} indonesia, tutorial {clean_topic.lower()}"
+            video_tags_str = TopicNormalizer.clean_comma_tags(raw_vtags, context_text=full_audit_ctx)
 
         return {
             "audit": {
@@ -782,13 +812,30 @@ KEMBALIKAN HANYA FORMAT JSON MURNI TANPA MARKDOWN LAIN dengan struktur persis se
 
         if api_key and provider:
             try:
-                return cls._execute_llm(
+                res = cls._execute_llm(
                     prompt=prompt,
                     provider=provider,
                     api_key=api_key,
                     model_name=model_name,
                     custom_base_url=custom_base_url,
                 )
+                from youtube_analyzer.core.normalizer import TopicNormalizer
+
+                pre_ctx = f"{topic} {content_notes} {' '.join(c.get('title', '') for c in competitors)}".strip()
+                if "video_tags" in res and isinstance(res["video_tags"], str):
+                    res["video_tags"] = TopicNormalizer.clean_comma_tags(
+                        res["video_tags"], context_text=pre_ctx
+                    )
+                if "hashtags" in res and isinstance(res["hashtags"], list):
+                    res["hashtags"] = [
+                        h
+                        for h in res["hashtags"]
+                        if h.lower() not in ["#youtubeseo", "#videomarketing"]
+                        and TopicNormalizer.is_tag_relevant(
+                            h.lstrip("#"), context_text=pre_ctx
+                        )
+                    ]
+                return res
             except Exception as e:
                 logger.warning(f"AI pre-upload plan failed: {e}. Falling back to heuristic plan.")
 
@@ -812,12 +859,15 @@ KEMBALIKAN HANYA FORMAT JSON MURNI TANPA MARKDOWN LAIN dengan struktur persis se
             f"#Tutorial{clean_tag}",
         ]
 
-        # Competitor tags integration if available
+        # Competitor tags integration if available, filtered for strict content relevance
+        from youtube_analyzer.core.normalizer import TopicNormalizer
+
+        pre_ctx = f"{topic} {content_notes} {' '.join(c.get('title', '') for c in competitors)}".strip()
         comp_tags = []
         for c in competitors or []:
             if c.get("tags"):
                 comp_tags.extend(c.get("tags", []))
-        comp_tags = list(dict.fromkeys(t.strip() for t in comp_tags if t and t.strip()))
+        comp_tags = TopicNormalizer.filter_relevant_tags(comp_tags, context_text=pre_ctx)
 
         if comp_tags:
             merged_tags = comp_tags[:12]
@@ -825,9 +875,12 @@ KEMBALIKAN HANYA FORMAT JSON MURNI TANPA MARKDOWN LAIN dengan struktur persis se
             for ft in focus_tags:
                 if ft not in [t.lower() for t in merged_tags]:
                     merged_tags.append(ft)
-            v_tags_str = ", ".join(merged_tags[:18])
+            v_tags_str = TopicNormalizer.clean_comma_tags(
+                ", ".join(merged_tags[:18]), context_text=pre_ctx
+            )
         else:
-            v_tags_str = f"{clean.lower()}, cara {clean.lower()}, tutorial {clean.lower()}, tips {clean.lower()}, belajar {clean.lower()}, strategi {clean.lower()}, {clean.lower()} indonesia, panduan {clean.lower()}"
+            raw_pre_tags = f"{clean.lower()}, cara {clean.lower()}, tutorial {clean.lower()}, tips {clean.lower()}, belajar {clean.lower()}, strategi {clean.lower()}, {clean.lower()} indonesia, panduan {clean.lower()}"
+            v_tags_str = TopicNormalizer.clean_comma_tags(raw_pre_tags, context_text=pre_ctx)
 
         return {
             "detected_content_summary": f"Video edukatif dan aplikatif mengenai {clean} yang fokus pada solusi nyata dan hasil terukur.",

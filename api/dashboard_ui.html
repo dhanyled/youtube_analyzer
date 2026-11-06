@@ -1554,11 +1554,17 @@ https://www.youtube.com/@ppm_consulting</textarea>
         const v = d.video_details || {};
         const ar = d.audit_result || {};
         const sc = ar.audit || {};
+        const durText = (v.duration && v.duration !== 'N/A')
+          ? v.duration
+          : (v.duration_seconds ? (Math.floor(v.duration_seconds / 60) + ':' + String(v.duration_seconds % 60).padStart(2, '0')) : 'N/A');
+        const viewsText = (v.views_display && v.views_display !== 'N/A')
+          ? v.views_display
+          : (v.views ? Number(v.views).toLocaleString('id-ID') + ' views' : 'N/A');
         box.innerHTML = `
           <div class="bg-[#161b26] border border-slate-800 rounded-xl p-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
             <div>
               <img src="${escapeHtml(v.thumbnail_url || '')}" class="rounded-lg w-full mb-2">
-              <div class="text-slate-400">⏱️ Durasi: ${escapeHtml(v.duration)} | 👁️ Views: ${escapeHtml(v.views_display)}</div>
+              <div class="text-slate-400">⏱️ Durasi: ${escapeHtml(durText)} | 👁️ Views: ${escapeHtml(viewsText)}</div>
             </div>
             <div class="md:col-span-2 space-y-2">
               <div class="text-sm font-bold text-white">${escapeHtml(v.title)}</div>

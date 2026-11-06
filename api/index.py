@@ -1,5 +1,6 @@
 import asyncio
 import os
+import re
 import sys
 import xml.etree.ElementTree as ET
 from typing import Any
@@ -455,7 +456,9 @@ async def api_dashboard_audit_video(req: AuditVideoRequest):
     if not vid_id:
         raise HTTPException(status_code=400, detail="Format URL atau Video ID YouTube tidak valid.")
 
-    yt_conn = YouTubeConnector()
+    ai_cfg = req.ai_config or {}
+    yt_key = ai_cfg.get("youtube_api_key") or os.getenv("YOUTUBE_API_KEY")
+    yt_conn = YouTubeConnector(api_key=yt_key)
     vid_meta = await yt_conn.get_video_details(vid_id)
     if not vid_meta:
         raise HTTPException(
@@ -464,6 +467,20 @@ async def api_dashboard_audit_video(req: AuditVideoRequest):
         )
 
     vid_transcript = yt_conn.get_video_transcript(vid_id)
+    # If duration or views still missing after primary fetch, enrich from transcript
+    if (
+        not vid_meta.get("duration")
+        or vid_meta.get("duration") == "N/A"
+        or not vid_meta.get("duration_seconds")
+    ) and vid_transcript.get("available"):
+        t_text = vid_transcript.get("timestamped_text", "")
+        # Look for the last timestamp in transcript text like [01:45] or [12:30]
+        ts_matches = re.findall(r"\[(\d{1,2}:\d{2}(?::\d{2})?)\]", t_text)
+        if ts_matches:
+            last_ts = ts_matches[-1]
+            vid_meta["duration"] = last_ts
+            vid_meta["duration_seconds"] = yt_conn.parse_duration_to_seconds(last_ts)
+
     rel_competitors = await yt_conn.get_top_competitors(vid_meta.get("title", vid_id), limit=5)
 
     ai_cfg = req.ai_config or {}

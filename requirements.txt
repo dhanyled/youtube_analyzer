@@ -8,5 +8,5 @@ pandas>=2.0.0
 pydantic>=2.5.0
 python-dotenv>=1.0.0
 sqlalchemy>=2.0.30
-alembic>=1.13.0
+alembic>=1.20.1
 mcp>=1.0.0

@@ -1,10 +1,8 @@
 """Google Search & People Also Ask (PAA) Connector."""
 
 import asyncio
-import json
 import logging
 import random
-import re
 from typing import Any
 
 import httpx
@@ -109,20 +107,20 @@ class GoogleSearchConnector(BaseConnector):
             return []
 
         # Choose prefix set based on language
-        prefix_defs = self.ID_QUESTION_PREFIXES if hl.lower() in ("id", "in") else self.EN_QUESTION_PREFIXES
+        prefix_defs = (
+            self.ID_QUESTION_PREFIXES if hl.lower() in ("id", "in") else self.EN_QUESTION_PREFIXES
+        )
 
         tasks = []
         async with httpx.AsyncClient(timeout=8.0) as client:
-            for pfx, intent_type, badge_label in prefix_defs:
-                tasks.append(
-                    self._fetch_prefix_suggestions(client, pfx, clean_kw, hl, gl)
-                )
+            for pfx, _intent_type, _badge_label in prefix_defs:
+                tasks.append(self._fetch_prefix_suggestions(client, pfx, clean_kw, hl, gl))
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
         paa_items: list[dict[str, Any]] = []
         seen_questions: set[str] = set()
 
-        for (pfx, intent_type, badge_label), suggestions in zip(prefix_defs, results):
+        for (pfx, intent_type, badge_label), suggestions in zip(prefix_defs, results, strict=False):
             if isinstance(suggestions, Exception) or not isinstance(suggestions, list):
                 continue
 
@@ -140,15 +138,17 @@ class GoogleSearchConnector(BaseConnector):
                 # Generate high-CTR chapter title for Google Key Moments
                 chapter_title = f"{pfx.capitalize()}: {formatted_q}"
 
-                paa_items.append({
-                    "question": formatted_q,
-                    "prefix": pfx,
-                    "intent": intent_type,
-                    "badge": badge_label,
-                    "google_key_moment": True,
-                    "chapter_title": chapter_title,
-                    "source": "google_question_autocomplete",
-                })
+                paa_items.append(
+                    {
+                        "question": formatted_q,
+                        "prefix": pfx,
+                        "intent": intent_type,
+                        "badge": badge_label,
+                        "google_key_moment": True,
+                        "chapter_title": chapter_title,
+                        "source": "google_question_autocomplete",
+                    }
+                )
 
                 if len(paa_items) >= max_questions:
                     break

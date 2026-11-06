@@ -501,3 +501,364 @@ class TopicNormalizer:
             cur_len += add_len
         return ", ".join(selected)
 
+    @classmethod
+    def audit_tags_detailed(
+        cls, tags: list[str] | str, context_text: str = "", max_chars: int = 450
+    ) -> dict[str, Any]:
+        """Perform exhaustive blindspot audit on a list or comma-separated string of tags.
+
+        Returns:
+            - total_tags_analyzed: int
+            - relevant_count: int
+            - rejected_count: int
+            - has_blindspot: bool
+            - clean_comma_string: str (under max_chars)
+            - audit_breakdown: list of dicts with status, category, badge_color, reason, recommendation
+            - summary_recommendation: str
+        """
+        if isinstance(tags, str):
+            raw_list = [t.strip() for t in tags.split(",") if t.strip()]
+        elif isinstance(tags, list):
+            raw_list = [str(t).strip() for t in tags if str(t).strip()]
+        else:
+            raw_list = []
+
+        ctx_clean = context_text.lower() if context_text else ""
+        seen_lower: set[str] = set()
+        audit_breakdown: list[dict[str, Any]] = []
+        approved_tags: list[str] = []
+
+        unconditional_spam = {
+            "fyp",
+            "#fyp",
+            "viral",
+            "#viral",
+            "trending",
+            "#trending",
+            "foryou",
+            "foryoupage",
+            "tiktok",
+            "reels",
+            "shorts",
+            "#shorts",
+            "sub4sub",
+            "subscribe",
+            "like",
+            "share",
+            "comment",
+        }
+
+        conditional_checks = [
+            (
+                ["gratis", "free", "cuma-cuma", "freemium"],
+                ["gratis", "free", "cuma-cuma", "tanpa biaya", "freemium"],
+            ),
+            (["tanpa modal", "modal nol", "modal 0", "modal kecil"], ["modal"]),
+            (
+                ["download", "unduh", "apk", "mod", "crack"],
+                ["download", "unduh", "apk", "mod", "crack", "software", "aplikasi", "file"],
+            ),
+            (
+                ["cepat kaya", "cara kaya", "jutawan", "milyarder"],
+                ["kaya", "jutawan", "milyarder", "finansial"],
+            ),
+        ]
+
+        for raw_t in raw_list:
+            t_low = raw_t.lower()
+
+            if t_low in seen_lower:
+                audit_breakdown.append(
+                    {
+                        "tag": raw_t,
+                        "status": "FAIL",
+                        "category": "duplicate",
+                        "badge_color": "yellow",
+                        "reason": "Tag duplikat.",
+                        "recommendation": "Hapus duplikasi untuk menghemat ruang kuota 500 karakter tag YouTube.",
+                    }
+                )
+                continue
+
+            seen_lower.add(t_low)
+
+            if len(raw_t) > 35:
+                audit_breakdown.append(
+                    {
+                        "tag": raw_t,
+                        "status": "FAIL",
+                        "category": "overlength",
+                        "badge_color": "yellow",
+                        "reason": f"Tag terlalu panjang ({len(raw_t)} karakter > 35).",
+                        "recommendation": "Persingkat menjadi frasa kunci 2-4 kata yang lebih padat.",
+                    }
+                )
+                continue
+
+            if t_low in unconditional_spam:
+                audit_breakdown.append(
+                    {
+                        "tag": raw_t,
+                        "status": "FAIL",
+                        "category": "unconditional_spam",
+                        "badge_color": "red",
+                        "reason": f"Dilarang: Tag '{raw_t}' adalah spam stuffing generik yang melanggar kebijakan YouTube Spam & Metadata Deception.",
+                        "recommendation": "Hapus tag ini. Algoritma YouTube mengabaikan tag generik dan dapat membatasi distribusi jika terdeteksi spam.",
+                    }
+                )
+                continue
+
+            # Conditional clickbait checks
+            matched_cond = False
+            for triggers, required_ctx in conditional_checks:
+                if any(tr in t_low for tr in triggers):
+                    matched_cond = True
+                    matched_tr = next(tr for tr in triggers if tr in t_low)
+                    if any(req in ctx_clean for req in required_ctx):
+                        audit_breakdown.append(
+                            {
+                                "tag": raw_t,
+                                "status": "PASS",
+                                "category": "relevant_conditional",
+                                "badge_color": "green",
+                                "reason": f"Lolos (Relevan): Tag '{raw_t}' valid karena topik/naskah video Anda secara eksplisit membahas materi terkait '{matched_tr}'.",
+                                "recommendation": "Pertahankan tag ini. Relevansinya tinggi dengan materi video.",
+                            }
+                        )
+                        approved_tags.append(raw_t)
+                    else:
+                        audit_breakdown.append(
+                            {
+                                "tag": raw_t,
+                                "status": "FAIL",
+                                "category": "clickbait_unsupported",
+                                "badge_color": "red",
+                                "reason": f"Ditolak: Tag mengandung kata pemicu '{matched_tr}', namun topik atau naskah video tidak membahas penawaran tersebut.",
+                                "recommendation": f"Jika video memang menyediakan materi '{matched_tr}', sebutkan secara eksplisit dalam naskah/deskripsi. Jika tidak, hapus tag ini untuk mencegah penalti bounce rate audiens.",
+                            }
+                        )
+                    break
+
+            if not matched_cond:
+                audit_breakdown.append(
+                    {
+                        "tag": raw_t,
+                        "status": "PASS",
+                        "category": "relevant_topical",
+                        "badge_color": "green",
+                        "reason": "Lolos: Tag memiliki relevansi tematik yang baik dengan topik bahasan.",
+                        "recommendation": "Gunakan tag ini untuk membantu YouTube mengindeks variasi pencarian audiens.",
+                    }
+                )
+                approved_tags.append(raw_t)
+
+        selected: list[str] = []
+        cur_len = 0
+        for t in approved_tags:
+            add_len = len(t) + (2 if selected else 0)
+            if cur_len + add_len > max_chars:
+                break
+            selected.append(t)
+            cur_len += add_len
+
+        clean_comma_string = ", ".join(selected)
+        relevant_count = len([a for a in audit_breakdown if a["status"] == "PASS"])
+        rejected_count = len([a for a in audit_breakdown if a["status"] == "FAIL"])
+        has_blindspot = rejected_count > 0
+
+        if rejected_count == 0:
+            summary = "Semua tag 100% relevan dan bebas dari spam stuffing maupun clickbait."
+        else:
+            summary = f"Terdeteksi {rejected_count} tag bermasalah (spam/clickbait tanpa dasar naskah). Sistem telah menyaringnya."
+
+        return {
+            "total_tags_analyzed": len(raw_list),
+            "relevant_count": relevant_count,
+            "rejected_count": rejected_count,
+            "has_blindspot": has_blindspot,
+            "clean_comma_string": clean_comma_string,
+            "audit_breakdown": audit_breakdown,
+            "summary_recommendation": summary,
+        }
+
+    @classmethod
+    def audit_content_blindspots(
+        cls,
+        title: str,
+        description: str,
+        tags: list[str] | str,
+        context_notes: str = "",
+        target_format: str = "LANDSCAPE (16:9)",
+    ) -> dict[str, Any]:
+        """Execute comprehensive 5-Pillar Packaging & SEO Blindspot Audit:
+
+        1. Title Length & Mobile Truncation Blindspot
+        2. Google Key Moments (Timestamps & Chapters) Blindspot
+        3. Tag Relevancy & Clickbait Blindspot
+        4. First-Fold Description Hook Blindspot
+        5. Format & Duration Alignment Blindspot
+        """
+        ctx_all = f"{title} {description} {context_notes}".strip()
+        tag_audit = cls.audit_tags_detailed(tags, context_text=ctx_all)
+
+        blindspots: list[dict[str, Any]] = []
+
+        # 1. Title Audit
+        t_len = len(title.strip())
+        if t_len == 0:
+            blindspots.append(
+                {
+                    "pillar": "Judul (Title)",
+                    "status": "FAIL",
+                    "severity": "CRITICAL",
+                    "issue": "Judul video kosong.",
+                    "action": "Buat judul dengan format 45-65 karakter.",
+                }
+            )
+        elif t_len > 70:
+            blindspots.append(
+                {
+                    "pillar": "Judul (Title)",
+                    "status": "WARNING",
+                    "severity": "MEDIUM",
+                    "issue": f"Judul terlalu panjang ({t_len} karakter). Terpotong (...) di aplikasi YouTube mobile.",
+                    "action": "Persingkat judul menjadi 45-65 karakter dan letakkan kata kunci utama di 30 karakter pertama.",
+                }
+            )
+        elif t_len < 30:
+            blindspots.append(
+                {
+                    "pillar": "Judul (Title)",
+                    "status": "WARNING",
+                    "severity": "LOW",
+                    "issue": f"Judul terlalu pendek ({t_len} karakter). Kurang memicu rasa penasaran atau janji hasil spesifik.",
+                    "action": "Tambahkan formula psikologis (misal: 'Rahasia...', 'Panduan Lengkap...', atau angka spesifik).",
+                }
+            )
+        else:
+            blindspots.append(
+                {
+                    "pillar": "Judul (Title)",
+                    "status": "PASS",
+                    "severity": "OK",
+                    "issue": f"Panjang judul ideal ({t_len} karakter), aman dari pemotongan di layar mobile.",
+                    "action": "Pertahankan struktur judul ini.",
+                }
+            )
+
+        # 2. Google Key Moments (Timestamps)
+        is_shorts = "9:16" in target_format or "short" in target_format.lower()
+        if not is_shorts:
+            ts_matches = re.findall(
+                r"(?:\[)?(\d{1,2}:\d{2}(?::\d{2})?)(?:\])?\s*[-–:]?\s*(.+)", description
+            )
+            has_zero = any("00:00" in t[0] or "0:00" in t[0] for t in ts_matches)
+            if not ts_matches:
+                blindspots.append(
+                    {
+                        "pillar": "Google Key Moments (Timestamps)",
+                        "status": "FAIL",
+                        "severity": "HIGH",
+                        "issue": "Tidak ada timestamps pembahasan di deskripsi video panjang.",
+                        "action": "Tambahkan minimal 3-5 timestamps diawali 00:00 agar Google Search menampilkan fitur Key Moments di SERP.",
+                    }
+                )
+            elif not has_zero:
+                blindspots.append(
+                    {
+                        "pillar": "Google Key Moments (Timestamps)",
+                        "status": "FAIL",
+                        "severity": "HIGH",
+                        "issue": "Timestamps tidak diawali dengan 00:00.",
+                        "action": "YouTube mewajibkan babak pertama dimulai tepat di 00:00 (misal: '00:00 - Pengantar').",
+                    }
+                )
+            elif len(ts_matches) < 3:
+                blindspots.append(
+                    {
+                        "pillar": "Google Key Moments (Timestamps)",
+                        "status": "WARNING",
+                        "severity": "MEDIUM",
+                        "issue": f"Jumlah babak timestamps hanya {len(ts_matches)} (minimal 3 babak).",
+                        "action": "Tambahkan minimal 3 babak terpisah agar bab video aktif di pemutar YouTube.",
+                    }
+                )
+            else:
+                blindspots.append(
+                    {
+                        "pillar": "Google Key Moments (Timestamps)",
+                        "status": "PASS",
+                        "severity": "OK",
+                        "issue": f"Timestamps lengkap ({len(ts_matches)} babak, diawali 00:00). Memenuhi syarat Google Key Moments.",
+                        "action": "Bagus! Video siap bersaing memperebutkan video snippet di Google Web.",
+                    }
+                )
+        else:
+            blindspots.append(
+                {
+                    "pillar": "Format Pacing Shorts",
+                    "status": "PASS",
+                    "severity": "OK",
+                    "issue": "Format Shorts (9:16) tidak memerlukan timestamps. Mengutamakan retensi visual cepat 60 detik.",
+                    "action": "Fokus pada hook 3 detik pertama.",
+                }
+            )
+
+        # 3. Tag Relevancy
+        if tag_audit["rejected_count"] > 0:
+            blindspots.append(
+                {
+                    "pillar": "Relevansi Tags & Anti-Spam",
+                    "status": "FAIL",
+                    "severity": "HIGH",
+                    "issue": f"Ditemukan {tag_audit['rejected_count']} tag tidak relevan / spam stuffing / clickbait.",
+                    "action": f"Gunakan tag yang telah disaring: {tag_audit['clean_comma_string']}",
+                }
+            )
+        else:
+            blindspots.append(
+                {
+                    "pillar": "Relevansi Tags & Anti-Spam",
+                    "status": "PASS",
+                    "severity": "OK",
+                    "issue": f"Semua tag ({tag_audit['relevant_count']} tag) relevan dan aman dari penalti spam.",
+                    "action": "Siap disalin ke kolom Tags YouTube Studio.",
+                }
+            )
+
+        # 4. First-Fold Description Hook
+        desc_lines = [line.strip() for line in description.splitlines() if line.strip()]
+        first_fold = " ".join(desc_lines[:2]) if desc_lines else ""
+        if len(first_fold) < 40:
+            blindspots.append(
+                {
+                    "pillar": "First-Fold Hook Deskripsi",
+                    "status": "WARNING",
+                    "severity": "MEDIUM",
+                    "issue": "Dua baris pertama deskripsi terlalu pendek atau belum merangkum inti video sebelum tombol '...more'.",
+                    "action": "Tulis 1-2 kalimat pemikat yang mengandung kata kunci utama di awal deskripsi.",
+                }
+            )
+        else:
+            blindspots.append(
+                {
+                    "pillar": "First-Fold Hook Deskripsi",
+                    "status": "PASS",
+                    "severity": "OK",
+                    "issue": "First-fold deskripsi informatif dan memikat penonton sebelum klik '...more'.",
+                    "action": "Pertahankan hook deskripsi ini.",
+                }
+            )
+
+        critical_count = len([b for b in blindspots if b["status"] == "FAIL"])
+        warning_count = len([b for b in blindspots if b["status"] == "WARNING"])
+        overall_score = max(10, 100 - (critical_count * 25) - (warning_count * 10))
+
+        return {
+            "overall_score": overall_score,
+            "overall_status": "EXCELLENT"
+            if overall_score >= 85
+            else ("NEEDS_IMPROVEMENT" if overall_score >= 60 else "POOR"),
+            "blindspots": blindspots,
+            "tag_audit": tag_audit,
+        }

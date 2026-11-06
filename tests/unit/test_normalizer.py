@@ -100,7 +100,14 @@ def test_create_intent_clusters_all_intents():
 def test_tag_relevance_filters_irrelevant_gratis():
     """Verify that 'gratis' tags are filtered out when the video is about general/paid topics."""
     context = "Tutorial Google Ads untuk UMKM strategi budget harian campaign"
-    tags = ["Google Ads", "Google Ads Gratis", "Setting Google Ads", "Download Gratis", "fyp", "viral"]
+    tags = [
+        "Google Ads",
+        "Google Ads Gratis",
+        "Setting Google Ads",
+        "Download Gratis",
+        "fyp",
+        "viral",
+    ]
     filtered = TopicNormalizer.filter_relevant_tags(tags, context_text=context)
     assert "Google Ads" in filtered
     assert "Setting Google Ads" in filtered
@@ -113,7 +120,13 @@ def test_tag_relevance_filters_irrelevant_gratis():
 def test_tag_relevance_keeps_gratis_when_context_is_free():
     """Verify that 'gratis' tags ARE KEPT when the content explicitly discusses free resources/services."""
     context = "Cara mendapatkan saldo kupon Google Ads gratis tanpa biaya promo resmi"
-    tags = ["Google Ads", "Google Ads Gratis", "Saldo Google Ads Gratis", "Voucher Google Ads", "fyp"]
+    tags = [
+        "Google Ads",
+        "Google Ads Gratis",
+        "Saldo Google Ads Gratis",
+        "Voucher Google Ads",
+        "fyp",
+    ]
     filtered = TopicNormalizer.filter_relevant_tags(tags, context_text=context)
     assert "Google Ads" in filtered
     assert "Google Ads Gratis" in filtered
@@ -134,3 +147,41 @@ def test_clean_comma_tags_utility():
     assert "Python Gratis" not in cleaned
     assert "viral" not in cleaned
 
+
+def test_audit_tags_detailed_diagnostics():
+    """Verify audit_tags_detailed returns breakdown, statuses, and actionable recommendations."""
+    context = "Strategi Beriklan Google Ads Berbayar untuk Perusahaan"
+    tags = "Google Ads, Belajar Google Ads, Kupon Gratis, fyp, viral, Tag Yang Sengaja Dibuat Sangat Panjang Melebihi Batas Tiga Puluh Lima Karakter"
+
+    audit = TopicNormalizer.audit_tags_detailed(tags, context_text=context)
+    assert audit["total_tags_analyzed"] == 6
+    assert audit["has_blindspot"] is True
+    assert audit["rejected_count"] >= 3
+
+    statuses = {b["tag"]: b["status"] for b in audit["audit_breakdown"]}
+    assert statuses["Google Ads"] == "PASS"
+    assert statuses["Belajar Google Ads"] == "PASS"
+    assert statuses["Kupon Gratis"] == "FAIL"  # unsupported clickbait
+    assert statuses["fyp"] == "FAIL"  # unconditional spam
+    assert statuses["viral"] == "FAIL"  # unconditional spam
+
+
+def test_audit_content_blindspots_scoring():
+    """Verify 5-pillar blindspot audit detects missing timestamps, long title, and tag issues."""
+    audit = TopicNormalizer.audit_content_blindspots(
+        title="Tutorial Singkat",  # too short
+        description="Deskripsi pendek tanpa babak sama sekali.",  # no timestamps
+        tags="Google Ads, fyp",  # fyp is spam
+        context_notes="Membahas Google Ads",
+        target_format="LANDSCAPE (16:9)",
+    )
+    assert "overall_score" in audit
+    assert audit["overall_score"] < 80
+    assert any(
+        b["pillar"] == "Google Key Moments (Timestamps)" and b["status"] == "FAIL"
+        for b in audit["blindspots"]
+    )
+    assert any(
+        b["pillar"] == "Relevansi Tags & Anti-Spam" and b["status"] == "FAIL"
+        for b in audit["blindspots"]
+    )

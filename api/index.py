@@ -39,7 +39,7 @@ except Exception as e:
 
 app = FastAPI(
     title="YouTube Search & Competitor Intelligence (Vercel Cloud + WebMCP)",
-    version="2.1.0",
+    version="2.2.0",
     docs_url="/docs",
     redoc_url=None,
 )
@@ -165,6 +165,44 @@ WEBMCP_TOOLS_CATALOG = [
             },
         },
     },
+    {
+        "name": "audit_tag_relevance",
+        "description": "Melakukan audit ketat pada daftar tag YouTube terhadap topik dan naskah video untuk mencegah penalti spam stuffing, menghapus tag generik (fyp, viral), dan memverifikasi kata pemicu clickbait (seperti 'gratis', 'download') hanya diizinkan bila didukung naskah video.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "tags": {
+                    "type": "string",
+                    "description": "Daftar tag yang dipisahkan koma atau teks tag",
+                },
+                "context_text": {
+                    "type": "string",
+                    "description": "Naskah, ringkasan isi konten, atau topik video untuk memvalidasi relevansi",
+                },
+                "max_chars": {"type": "integer", "default": 450},
+            },
+            "required": ["tags"],
+        },
+    },
+    {
+        "name": "audit_content_blindspots",
+        "description": "Audit komprehensif 5 pilar blindspot pengemasan video: Judul (pemotongan layar mobile), Google Key Moments timestamps (00:00 start & chapters), Relevansi Tag & Anti-Spam (gratis/viral), First-Fold Description hook, dan Kesesuaian Format (Landscape vs Shorts).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "title": {"type": "string", "description": "Judul video"},
+                "description": {"type": "string", "description": "Deskripsi lengkap video"},
+                "tags": {"type": "string", "description": "Tags video dipisahkan koma"},
+                "context_notes": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Naskah atau poin bahasan isi video",
+                },
+                "target_format": {"type": "string", "default": "LANDSCAPE (16:9)"},
+            },
+            "required": ["title", "description", "tags"],
+        },
+    },
 ]
 
 
@@ -185,7 +223,7 @@ async def health_check():
     return {
         "status": "ok",
         "service": "youtube-analyzer-serverless",
-        "version": "2.1.0",
+        "version": "2.2.0",
         "cors_enabled": True,
         "engine_loaded": YouTubeConnector is not None,
         "import_error": IMPORT_ERROR_MSG,
@@ -223,6 +261,20 @@ class MineCommentsRequest(BaseModel):
     video_urls: list[str] = []
     keyword: str | None = None
     max_comments: int = 30
+
+
+class AuditTagsRequest(BaseModel):
+    tags: str | list[str]
+    context_text: str = ""
+    max_chars: int = 450
+
+
+class AuditBlindspotsRequest(BaseModel):
+    title: str
+    description: str
+    tags: str | list[str]
+    context_notes: str = ""
+    target_format: str = "LANDSCAPE (16:9)"
 
 
 def _build_surfaces_and_clusters(
@@ -356,7 +408,9 @@ async def api_dashboard_analyze(req: AnalyzeRequest):
             "competitors": "youtube_live_serp" if competitors else "unavailable",
             "autocomplete": "youtube_suggest_live" if live_suggestions else "unavailable",
             "people_also_ask": "google_question_autocomplete" if paa_questions else "unavailable",
-            "mined_comments": "youtube_api_comment_threads" if mined_comments.get("total_comments_analyzed") else "unavailable",
+            "mined_comments": "youtube_api_comment_threads"
+            if mined_comments.get("total_comments_analyzed")
+            else "unavailable",
             "tags": "creator_studio_tags_via_innertube",
         },
     }
@@ -375,6 +429,24 @@ async def api_dashboard_mine_comments(req: MineCommentsRequest):
             detail="Minimal sertakan satu URL/ID video atau keyword pencarian untuk menambang komentar.",
         )
     return await yt_conn.mine_competitor_comments(vids, max_comments_per_video=req.max_comments)
+
+
+@app.post("/api/dashboard/audit-tags")
+async def api_dashboard_audit_tags(req: AuditTagsRequest):
+    return TopicNormalizer.audit_tags_detailed(
+        tags=req.tags, context_text=req.context_text, max_chars=req.max_chars
+    )
+
+
+@app.post("/api/dashboard/audit-blindspots")
+async def api_dashboard_audit_blindspots(req: AuditBlindspotsRequest):
+    return TopicNormalizer.audit_content_blindspots(
+        title=req.title,
+        description=req.description,
+        tags=req.tags,
+        context_notes=req.context_notes,
+        target_format=req.target_format,
+    )
 
 
 @app.post("/api/dashboard/audit-video")
@@ -648,7 +720,13 @@ async def call_webmcp_tool(payload: WebMCPCallRequest):
         gl = str(args.get("gl", "ID"))
         yt_conn = YouTubeConnector()
         paa = await yt_conn.get_people_also_ask(seed, hl=hl, gl=gl)
-        return {"keyword": seed, "language": hl, "country": gl, "people_also_ask": paa, "count": len(paa)}
+        return {
+            "keyword": seed,
+            "language": hl,
+            "country": gl,
+            "people_also_ask": paa,
+            "count": len(paa),
+        }
 
     elif name == "mine_competitor_comments":
         vids = args.get("video_ids_or_urls", [])
@@ -658,9 +736,27 @@ async def call_webmcp_tool(payload: WebMCPCallRequest):
             comps = await yt_conn.get_top_competitors(kw, limit=3)
             vids = [c["id"] for c in comps if c.get("id")]
         if not vids:
-            raise HTTPException(status_code=400, detail="video_ids_or_urls atau keyword wajib diisi.")
+            raise HTTPException(
+                status_code=400, detail="video_ids_or_urls atau keyword wajib diisi."
+            )
         max_comm = int(args.get("max_comments", 30))
         return await yt_conn.mine_competitor_comments(vids, max_comments_per_video=max_comm)
+
+    elif name == "audit_tag_relevance":
+        tags_input = args.get("tags", "")
+        ctx = str(args.get("context_text", ""))
+        max_c = int(args.get("max_chars", 450))
+        return TopicNormalizer.audit_tags_detailed(tags_input, context_text=ctx, max_chars=max_c)
+
+    elif name == "audit_content_blindspots":
+        title = str(args.get("title", ""))
+        desc = str(args.get("description", ""))
+        tags_input = args.get("tags", "")
+        ctx = str(args.get("context_notes", ""))
+        fmt = str(args.get("target_format", "LANDSCAPE (16:9)"))
+        return TopicNormalizer.audit_content_blindspots(
+            title=title, description=desc, tags=tags_input, context_notes=ctx, target_format=fmt
+        )
 
     else:
         raise HTTPException(status_code=404, detail=f"WebMCP tool '{name}' tidak dikenal.")

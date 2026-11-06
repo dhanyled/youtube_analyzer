@@ -1304,7 +1304,9 @@ class YouTubeConnector(BaseConnector):
         self, clean_id: str, max_videos: int = 50
     ) -> dict[str, Any] | None:
         """Zero-quota public scraping fallback for channel stats and format breakdown."""
-        handle = clean_id if clean_id.startswith("@") or clean_id.startswith("UC") else f"@{clean_id}"
+        handle = (
+            clean_id if clean_id.startswith("@") or clean_id.startswith("UC") else f"@{clean_id}"
+        )
         base_path = f"channel/{handle}" if handle.startswith("UC") else handle
         vid_url = f"https://www.youtube.com/{base_path}/videos"
         shorts_url = f"https://www.youtube.com/{base_path}/shorts"
@@ -1914,8 +1916,13 @@ class YouTubeConnector(BaseConnector):
                         items = data.get("items", [])
                         comments: list[dict[str, Any]] = []
                         import html as pyhtml
+
                         for item in items:
-                            top_comment = item.get("snippet", {}).get("topLevelComment", {}).get("snippet", {})
+                            top_comment = (
+                                item.get("snippet", {})
+                                .get("topLevelComment", {})
+                                .get("snippet", {})
+                            )
                             raw_text = top_comment.get("textDisplay", "")
                             # Strip HTML tags
                             clean_text = re.sub(r"<[^>]+>", " ", raw_text)
@@ -1926,13 +1933,15 @@ class YouTubeConnector(BaseConnector):
                             author = top_comment.get("authorDisplayName", "Penonton")
                             likes = int(top_comment.get("likeCount", 0))
                             published = top_comment.get("publishedAt", "")[:10]
-                            comments.append({
-                                "video_id": clean_vid,
-                                "author": author,
-                                "text": clean_text,
-                                "likes": likes,
-                                "published": published,
-                            })
+                            comments.append(
+                                {
+                                    "video_id": clean_vid,
+                                    "author": author,
+                                    "text": clean_text,
+                                    "likes": likes,
+                                    "published": published,
+                                }
+                            )
                         if comments:
                             return comments
             except Exception as e:
@@ -1953,7 +1962,9 @@ class YouTubeConnector(BaseConnector):
                 "videoId": clean_vid,
             }
             async with httpx.AsyncClient(timeout=12.0) as client:
-                resp = await client.post("https://www.youtube.com/youtubei/v1/next", json=payload, headers=headers)
+                resp = await client.post(
+                    "https://www.youtube.com/youtubei/v1/next", json=payload, headers=headers
+                )
                 if resp.status_code == 200:
                     data = resp.json()
                     panels = data.get("engagementPanels", [])
@@ -1965,20 +1976,38 @@ class YouTubeConnector(BaseConnector):
                             for item in sec_list.get("contents", []):
                                 for ci in item.get("itemSectionRenderer", {}).get("contents", []):
                                     if "continuationItemRenderer" in ci:
-                                        token = ci["continuationItemRenderer"].get("continuationEndpoint", {}).get("continuationCommand", {}).get("token")
+                                        token = (
+                                            ci["continuationItemRenderer"]
+                                            .get("continuationEndpoint", {})
+                                            .get("continuationCommand", {})
+                                            .get("token")
+                                        )
                                         break
                     if token:
                         c_payload = {"context": payload["context"], "continuation": token}
-                        r2 = await client.post("https://www.youtube.com/youtubei/v1/next", json=c_payload, headers=headers)
+                        r2 = await client.post(
+                            "https://www.youtube.com/youtubei/v1/next",
+                            json=c_payload,
+                            headers=headers,
+                        )
                         if r2.status_code == 200:
                             d2 = r2.json()
-                            mutations = d2.get("frameworkUpdates", {}).get("entityBatchUpdate", {}).get("mutations", [])
+                            mutations = (
+                                d2.get("frameworkUpdates", {})
+                                .get("entityBatchUpdate", {})
+                                .get("mutations", [])
+                            )
                             innertube_comments: list[dict[str, Any]] = []
                             import html as pyhtml
+
                             for m in mutations:
                                 cep = m.get("payload", {}).get("commentEntityPayload")
                                 if cep:
-                                    raw_text = cep.get("properties", {}).get("content", {}).get("content", "")
+                                    raw_text = (
+                                        cep.get("properties", {})
+                                        .get("content", {})
+                                        .get("content", "")
+                                    )
                                     clean_text = re.sub(r"<[^>]+>", " ", raw_text)
                                     clean_text = pyhtml.unescape(clean_text)
                                     clean_text = re.sub(r"\s+", " ", clean_text).strip()
@@ -1989,13 +2018,15 @@ class YouTubeConnector(BaseConnector):
                                     like_str = str(toolbar.get("likeCountNotliked", "0")).strip()
                                     likes = int(like_str) if like_str.isdigit() else 0
                                     published = cep.get("properties", {}).get("publishedTime", "")
-                                    innertube_comments.append({
-                                        "video_id": clean_vid,
-                                        "author": author,
-                                        "text": clean_text,
-                                        "likes": likes,
-                                        "published": published,
-                                    })
+                                    innertube_comments.append(
+                                        {
+                                            "video_id": clean_vid,
+                                            "author": author,
+                                            "text": clean_text,
+                                            "likes": likes,
+                                            "published": published,
+                                        }
+                                    )
                                     if len(innertube_comments) >= max_results:
                                         break
                             if innertube_comments:
@@ -2028,7 +2059,10 @@ class YouTubeConnector(BaseConnector):
         # Concurrently fetch video details & comments
         target_vids = vids[:5]
         tasks_details = [self.get_video_details(vid) for vid in target_vids]
-        tasks_comments = [self.fetch_video_comments(vid, max_results=max_comments_per_video) for vid in target_vids]
+        tasks_comments = [
+            self.fetch_video_comments(vid, max_results=max_comments_per_video)
+            for vid in target_vids
+        ]
 
         results_details, results_comments = await asyncio.gather(
             asyncio.gather(*tasks_details, return_exceptions=True),
@@ -2036,14 +2070,18 @@ class YouTubeConnector(BaseConnector):
         )
 
         videos_meta: dict[str, dict[str, Any]] = {}
-        for vid, det in zip(target_vids, results_details):
+        for vid, det in zip(target_vids, results_details, strict=False):
             if isinstance(det, dict) and det:
                 videos_meta[vid] = det
             else:
-                videos_meta[vid] = {"title": f"Video ({vid})", "channel": "Kompetitor", "views": "-"}
+                videos_meta[vid] = {
+                    "title": f"Video ({vid})",
+                    "channel": "Kompetitor",
+                    "views": "-",
+                }
 
         all_comments: list[dict[str, Any]] = []
-        for vid, comms in zip(target_vids, results_comments):
+        for vid, comms in zip(target_vids, results_comments, strict=False):
             if isinstance(comms, list):
                 for c in comms:
                     v_info = videos_meta.get(vid, {})
@@ -2054,14 +2092,54 @@ class YouTubeConnector(BaseConnector):
 
         # Question & pain point indicator terms (Indonesian + English)
         question_markers = [
-            "?", "bagaimana", "gimana", "kenapa", "mengapa", "apakah", "bisa gak",
-            "bisa tidak", "bisa kah", "bisa ngga", "cara", "tanya", "mau tanya", "solusinya",
-            "kendala", "kok", "rugi", "boncos", "suspend", "gagal", "tolong",
-            "masalah", "tidak bisa", "belum tayang", "stuck", "kenapa ya",
-            "how to", "why", "error", "problem", "issue", "does it work", "how do"
+            "?",
+            "bagaimana",
+            "gimana",
+            "kenapa",
+            "mengapa",
+            "apakah",
+            "bisa gak",
+            "bisa tidak",
+            "bisa kah",
+            "bisa ngga",
+            "cara",
+            "tanya",
+            "mau tanya",
+            "solusinya",
+            "kendala",
+            "kok",
+            "rugi",
+            "boncos",
+            "suspend",
+            "gagal",
+            "tolong",
+            "masalah",
+            "tidak bisa",
+            "belum tayang",
+            "stuck",
+            "kenapa ya",
+            "how to",
+            "why",
+            "error",
+            "problem",
+            "issue",
+            "does it work",
+            "how do",
         ]
 
-        spam_keywords = ["wa.me", "whatsapp", "081", "082", "085", "087", "089", "open slot", "judi", "slot gacor", "link bio"]
+        spam_keywords = [
+            "wa.me",
+            "whatsapp",
+            "081",
+            "082",
+            "085",
+            "087",
+            "089",
+            "open slot",
+            "judi",
+            "slot gacor",
+            "link bio",
+        ]
 
         raw_pain_points: list[dict[str, Any]] = []
         for c in all_comments:
@@ -2080,16 +2158,63 @@ class YouTubeConnector(BaseConnector):
                 continue
 
             # Classify category
-            if any(k in txt_low for k in ["suspend", "gagal", "error", "kenapa", "mengapa", "solusi", "kok", "boncos", "rugi", "tidak tayang", "belum tayang", "stuck", "masalah"]):
+            if any(
+                k in txt_low
+                for k in [
+                    "suspend",
+                    "gagal",
+                    "error",
+                    "kenapa",
+                    "mengapa",
+                    "solusi",
+                    "kok",
+                    "boncos",
+                    "rugi",
+                    "tidak tayang",
+                    "belum tayang",
+                    "stuck",
+                    "masalah",
+                ]
+            ):
                 category = "TROUBLESHOOTING"
                 badge = "⚠️ Kendala & Masalah"
-            elif any(k in txt_low for k in ["berapa", "biaya", "harga", "saldo", "bayar", "gopay", "rekening", "modal", "dana", "cpc"]):
+            elif any(
+                k in txt_low
+                for k in [
+                    "berapa",
+                    "biaya",
+                    "harga",
+                    "saldo",
+                    "bayar",
+                    "gopay",
+                    "rekening",
+                    "modal",
+                    "dana",
+                    "cpc",
+                ]
+            ):
                 category = "COMMERCIAL"
                 badge = "💳 Biaya & Saldo"
-            elif any(k in txt_low for k in ["bagaimana", "gimana", "cara", "langkah", "tutorial", "setting"]):
+            elif any(
+                k in txt_low
+                for k in ["bagaimana", "gimana", "cara", "langkah", "tutorial", "setting"]
+            ):
                 category = "HOW_TO"
                 badge = "🛠️ Cara & Tutorial"
-            elif any(k in txt_low for k in ["apakah", "bisa gak", "bisa tidak", "bisa kah", "syarat", "tanpa", "hp", "laptop", "npwp"]):
+            elif any(
+                k in txt_low
+                for k in [
+                    "apakah",
+                    "bisa gak",
+                    "bisa tidak",
+                    "bisa kah",
+                    "syarat",
+                    "tanpa",
+                    "hp",
+                    "laptop",
+                    "npwp",
+                ]
+            ):
                 category = "ELIGIBILITY"
                 badge = "🔍 Syarat & Kelayakan"
             else:
@@ -2097,22 +2222,29 @@ class YouTubeConnector(BaseConnector):
                 badge = "💡 Permintaan Konten"
 
             # Suggest opportunity title & hook
-            cleaned_short = re.sub(r'^(halo|bang|kak|mas|gan|permisi|mau tanya|tanya kak|tanya bang)[\s,:]*', '', txt, flags=re.I).strip()
+            cleaned_short = re.sub(
+                r"^(halo|bang|kak|mas|gan|permisi|mau tanya|tanya kak|tanya bang)[\s,:]*",
+                "",
+                txt,
+                flags=re.I,
+            ).strip()
             cleaned_short = cleaned_short[:80]
 
-            raw_pain_points.append({
-                "author": c["author"],
-                "text": txt,
-                "likes": c["likes"],
-                "published": c.get("published", ""),
-                "video_title": c["video_title"],
-                "channel_title": c.get("channel_title", ""),
-                "video_url": f"https://www.youtube.com/watch?v={c['video_id']}",
-                "category": category,
-                "badge": badge,
-                "suggested_hook": f'Banyak yang tanya di video kompetitor: "{cleaned_short}?" Ini jawaban tuntasnya!',
-                "opportunity_title": f"Solusi Tuntas: {cleaned_short.capitalize()}",
-            })
+            raw_pain_points.append(
+                {
+                    "author": c["author"],
+                    "text": txt,
+                    "likes": c["likes"],
+                    "published": c.get("published", ""),
+                    "video_title": c["video_title"],
+                    "channel_title": c.get("channel_title", ""),
+                    "video_url": f"https://www.youtube.com/watch?v={c['video_id']}",
+                    "category": category,
+                    "badge": badge,
+                    "suggested_hook": f'Banyak yang tanya di video kompetitor: "{cleaned_short}?" Ini jawaban tuntasnya!',
+                    "opportunity_title": f"Solusi Tuntas: {cleaned_short.capitalize()}",
+                }
+            )
 
         # Deduplicate & rank by likes descending + text length
         raw_pain_points.sort(key=lambda x: (x["likes"], len(x["text"])), reverse=True)
@@ -2126,14 +2258,16 @@ class YouTubeConnector(BaseConnector):
             opp_title = p["opportunity_title"]
             if opp_title.lower() not in seen_opps and len(topic_gap_opportunities) < 5:
                 seen_opps.add(opp_title.lower())
-                topic_gap_opportunities.append({
-                    "topic": opp_title,
-                    "category": p["category"],
-                    "badge": p["badge"],
-                    "demand_signal": f"Ditanyakan oleh {p['author']} ({p['likes']} likes di komentar)",
-                    "video_hook": p["suggested_hook"],
-                    "source_competitor": p["video_title"],
-                })
+                topic_gap_opportunities.append(
+                    {
+                        "topic": opp_title,
+                        "category": p["category"],
+                        "badge": p["badge"],
+                        "demand_signal": f"Ditanyakan oleh {p['author']} ({p['likes']} likes di komentar)",
+                        "video_hook": p["suggested_hook"],
+                        "source_competitor": p["video_title"],
+                    }
+                )
 
         return {
             "total_comments_analyzed": len(all_comments),
@@ -2157,9 +2291,9 @@ class YouTubeConnector(BaseConnector):
     ) -> list[dict[str, Any]]:
         """Delegate PAA fetching to GoogleSearchConnector."""
         from youtube_analyzer.connectors.google import GoogleSearchConnector
+
         g_conn = GoogleSearchConnector()
         return await g_conn.get_people_also_ask(keyword, hl=hl, gl=gl, max_questions=max_questions)
-
 
 
 # Expose helper function at module level

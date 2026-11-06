@@ -649,9 +649,22 @@ KEMBALIKAN HANYA FORMAT JSON MURNI TANPA MARKDOWN LAIN dengan struktur persis se
 
                 full_audit_ctx = f"{raw_title} {video_details.get('description', '')} {transcript_text} {' '.join(c.get('title', '') for c in competitors)}".strip()
                 if "video_tags" in res and isinstance(res["video_tags"], str):
-                    res["video_tags"] = TopicNormalizer.clean_comma_tags(
+                    res["tag_audit"] = TopicNormalizer.audit_tags_detailed(
                         res["video_tags"], context_text=full_audit_ctx
                     )
+                    res["video_tags"] = res["tag_audit"]["clean_comma_string"]
+                else:
+                    res["tag_audit"] = TopicNormalizer.audit_tags_detailed(
+                        "", context_text=full_audit_ctx
+                    )
+
+                res["blindspot_audit"] = TopicNormalizer.audit_content_blindspots(
+                    title=res.get("outranking_title", raw_title),
+                    description=res.get("full_description", ""),
+                    tags=res.get("video_tags", ""),
+                    context_notes=f"{transcript_text} {video_details.get('description', '')}",
+                    target_format=str(video_details.get("format", "LANDSCAPE (16:9)")),
+                )
                 if "hashtags" in res and isinstance(res["hashtags"], list):
                     res["hashtags"] = [
                         h
@@ -751,7 +764,19 @@ KEMBALIKAN HANYA FORMAT JSON MURNI TANPA MARKDOWN LAIN dengan struktur persis se
             )
         else:
             raw_vtags = f"{clean_topic.lower()}, panduan {clean_topic.lower()}, tips {clean_topic.lower()}, cara {clean_topic.lower()}, belajar {clean_topic.lower()}, {clean_topic.lower()} indonesia, tutorial {clean_topic.lower()}"
-            video_tags_str = TopicNormalizer.clean_comma_tags(raw_vtags, context_text=full_audit_ctx)
+            video_tags_str = TopicNormalizer.clean_comma_tags(
+                raw_vtags, context_text=full_audit_ctx
+            )
+
+        tag_audit = TopicNormalizer.audit_tags_detailed(video_tags_str, context_text=full_audit_ctx)
+        video_tags_str = tag_audit["clean_comma_string"]
+        blindspot_audit = TopicNormalizer.audit_content_blindspots(
+            title=outranking_title,
+            description=f"Apakah Anda yakin pemahaman tentang {clean_topic} sudah benar? Simak bedah tuntas fakta lapangan dan langkah praktisnya di video ini.\n\nDalam video ini, kita membedah secara mendalam topik {clean_topic} mulai dari konsep dasar hingga studi kasus nyata.\n\n{timestamps_block}\n\n📌 Jangan lupa Like, Comment, dan Subscribe agar tidak ketinggalan analisis mendalam berikutnya!\n\n{' '.join(hashtags)}",
+            tags=video_tags_str,
+            context_notes=f"{transcript_text} {video_details.get('description', '')}",
+            target_format=str(video_details.get("format", "LANDSCAPE (16:9)")),
+        )
 
         return {
             "audit": {
@@ -762,6 +787,8 @@ KEMBALIKAN HANYA FORMAT JSON MURNI TANPA MARKDOWN LAIN dengan struktur persis se
                 "tags_score": tags_score,
                 "tags_flaws": tags_flaws,
             },
+            "tag_audit": tag_audit,
+            "blindspot_audit": blindspot_audit,
             "outranking_title": outranking_title,
             "title_formula": "[Kontras/Bongkar Fakta] + [Topik Utama] + [Solusi Nyata]",
             "psychological_angles": {
@@ -823,18 +850,26 @@ KEMBALIKAN HANYA FORMAT JSON MURNI TANPA MARKDOWN LAIN dengan struktur persis se
 
                 pre_ctx = f"{topic} {content_notes} {' '.join(c.get('title', '') for c in competitors)}".strip()
                 if "video_tags" in res and isinstance(res["video_tags"], str):
-                    res["video_tags"] = TopicNormalizer.clean_comma_tags(
+                    res["tag_audit"] = TopicNormalizer.audit_tags_detailed(
                         res["video_tags"], context_text=pre_ctx
                     )
+                    res["video_tags"] = res["tag_audit"]["clean_comma_string"]
+                else:
+                    res["tag_audit"] = TopicNormalizer.audit_tags_detailed("", context_text=pre_ctx)
                 if "hashtags" in res and isinstance(res["hashtags"], list):
                     res["hashtags"] = [
                         h
                         for h in res["hashtags"]
                         if h.lower() not in ["#youtubeseo", "#videomarketing"]
-                        and TopicNormalizer.is_tag_relevant(
-                            h.lstrip("#"), context_text=pre_ctx
-                        )
+                        and TopicNormalizer.is_tag_relevant(h.lstrip("#"), context_text=pre_ctx)
                     ]
+                res["blindspot_audit"] = TopicNormalizer.audit_content_blindspots(
+                    title=res.get("outranking_title", topic),
+                    description=res.get("full_description", ""),
+                    tags=res.get("video_tags", ""),
+                    context_notes=content_notes,
+                    target_format=target_format,
+                )
                 return res
             except Exception as e:
                 logger.warning(f"AI pre-upload plan failed: {e}. Falling back to heuristic plan.")
@@ -862,7 +897,9 @@ KEMBALIKAN HANYA FORMAT JSON MURNI TANPA MARKDOWN LAIN dengan struktur persis se
         # Competitor tags integration if available, filtered for strict content relevance
         from youtube_analyzer.core.normalizer import TopicNormalizer
 
-        pre_ctx = f"{topic} {content_notes} {' '.join(c.get('title', '') for c in competitors)}".strip()
+        pre_ctx = (
+            f"{topic} {content_notes} {' '.join(c.get('title', '') for c in competitors)}".strip()
+        )
         comp_tags = []
         for c in competitors or []:
             if c.get("tags"):
@@ -882,9 +919,25 @@ KEMBALIKAN HANYA FORMAT JSON MURNI TANPA MARKDOWN LAIN dengan struktur persis se
             raw_pre_tags = f"{clean.lower()}, cara {clean.lower()}, tutorial {clean.lower()}, tips {clean.lower()}, belajar {clean.lower()}, strategi {clean.lower()}, {clean.lower()} indonesia, panduan {clean.lower()}"
             v_tags_str = TopicNormalizer.clean_comma_tags(raw_pre_tags, context_text=pre_ctx)
 
+        tag_audit = TopicNormalizer.audit_tags_detailed(v_tags_str, context_text=pre_ctx)
+        v_tags_str = tag_audit["clean_comma_string"]
+        heuristic_title = (
+            f"Rahasia Praktis {clean}: Langkah demi Langkah yang Benar-Benar Berhasil{suffix}"
+        )
+        heuristic_desc = f"Ingin tahu cara paling efektif dalam {clean}? Simak ringkasan poin-poin penting yang langsung bisa Anda terapkan hari ini.\n\nDalam video ini kita membahas tuntas materi {clean} dengan fokus pada hal-hal yang sering diabaikan namun berdampak besar.\n\n{ts_block}\n\n📌 Subscribe untuk tips dan strategi mendalam berikutnya!\n\n{' '.join(hashtags_pre)}"
+        blindspot_audit = TopicNormalizer.audit_content_blindspots(
+            title=heuristic_title,
+            description=heuristic_desc,
+            tags=v_tags_str,
+            context_notes=content_notes,
+            target_format=target_format,
+        )
+
         return {
             "detected_content_summary": f"Video edukatif dan aplikatif mengenai {clean} yang fokus pada solusi nyata dan hasil terukur.",
-            "outranking_title": f"Rahasia Praktis {clean}: Langkah demi Langkah yang Benar-Benar Berhasil{suffix}",
+            "tag_audit": tag_audit,
+            "blindspot_audit": blindspot_audit,
+            "outranking_title": heuristic_title,
             "title_formula": "[Janji Hasil] + [Topik Utama] + [Validasi/Bukti]",
             "psychological_angles": {
                 "curiosity_gap": {
@@ -909,7 +962,7 @@ KEMBALIKAN HANYA FORMAT JSON MURNI TANPA MARKDOWN LAIN dengan struktur persis se
                 },
             },
             "two_line_hook": f"Ingin tahu cara paling efektif dalam {clean}? Simak ringkasan poin-poin penting yang langsung bisa Anda terapkan hari ini.",
-            "full_description": f"Ingin tahu cara paling efektif dalam {clean}? Simak ringkasan poin-poin penting yang langsung bisa Anda terapkan hari ini.\n\nDalam video ini kita membahas tuntas materi {clean} dengan fokus pada hal-hal yang sering diabaikan namun berdampak besar.\n\n{ts_block}\n\n📌 Subscribe untuk tips dan strategi mendalam berikutnya!\n\n{' '.join(hashtags_pre)}",
+            "full_description": heuristic_desc,
             "video_tags": v_tags_str,
             "launch_checklist": [
                 "Upload video dalam status 'Unlisted' (Tidak Publik) selama 2-4 jam agar video selesai diproses dalam resolusi maksimal (1080p/4K) dan subtitle otomatis terbuat sebelum dipublikasikan.",

@@ -2441,7 +2441,9 @@ class SearchIntelligence:
                         has_overflow = True
                         break
             if has_overflow or len(timestamps) < 3 or paa_labels:
-                timestamps = AITitleGenerator.generate_synchronized_timestamps(clean, comp_dur, chapter_labels=paa_labels)
+                timestamps = AITitleGenerator.generate_synchronized_timestamps(
+                    clean, comp_dur, chapter_labels=paa_labels
+                )
 
         ts_section = (
             "⏱️ TIMESTAMPS / DAFTAR ISI:\n" + "\n".join(timestamps) + "\n\n" if timestamps else ""

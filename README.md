@@ -9,16 +9,20 @@ Powered by algorithmic search intelligence formulas:
 
 ---
 
-## 🎯 Core Features
+## 🎯 Core Features (v2.2.0 Dual-Engine Blindspot Edition)
 
 | Feature | Engine | Description |
 | :--- | :--- | :--- |
+| **5-Pillar Packaging & SEO Blindspot Audit** | Blindspot Gate | Automated audit for mobile title truncation, Google Key Moments timestamps (00:00 start), tag relevancy, first-fold description hook, and format alignment. |
+| **Tag Relevancy & Anti-Spam Gate** | Normalizer Core | Strict contextual tag filter. Disallows generic spam (`fyp`, `viral`) and verifies conditional clickbait (`gratis`, `download`) against video script/topic. |
+| **Audience Pain Point Comment Mining** | InnerTube + API v3 | Unauthenticated dual-engine scraper that mines competitor comments to discover unanswered viewer questions and content gaps. |
+| **Google People Also Ask (PAA) Engine** | Google Connector | Extracts real search questions from Google SERP and injects them as `[Google Key Moment]` chapters. |
 | **Cross-Surface Canonical Topics** | Blueprint Core | 1 Seed topic expands to native Google terms, YouTube tutorial queries, and AI conversational prompts. |
 | **Keyword Opportunity Score (0-100)** | Opportunity Engine | Logarithmic search volume weighted against competition density (`vol * 0.55 + (100 - comp) * 0.45`). |
 | **Outlier Breakout Multiplier** | Outlier Engine | Identifies 5x–10x breakout videos (`views / channel_median_views`) to spot viral topics before saturation. |
 | **Niche RPM & Earnings Projections** | Monetization Engine | Benchmark AdSense RPM ranges ($15-$35 for finance/ads, $8-$18 for tech, etc.) and earnings per 100k views across 12 niches. |
 | **High-CTR Psychological Titles** | Title Generator | Generates intent-specific title hooks (Step-by-Step, Curiosity Gaps, Budget Revelations, 2026 recency). |
-| **Global MCP Ecosystem Integration** | MCP Orchestrator | Seamlessly bridges to global `google-ads-mcp` (`generate_keyword_ideas`) and `google-trends-mcp` for live SERP analysis. |
+| **Global WebMCP & MCP Bridge** | Agent-Native Protocol | Exposes 8 structured tools via `window.WebMCP` and stdio MCP for Claude, Gemini, and Chrome DevTools AI Agents. |
 
 ---
 

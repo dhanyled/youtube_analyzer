@@ -470,13 +470,58 @@ async def get_people_also_ask(keyword: str, hl: str = "id", gl: str = "ID") -> s
 
 @mcp.tool()
 async def mine_competitor_comments(video_ids_or_urls: list[str], max_comments: int = 30) -> str:
-    """
-    Mine audience friction, unanswered questions, and goldmine content gaps from competitor video comments.
+    """Mine audience friction, unanswered questions, and goldmine content gaps from competitor video comments.
+
     Extracts real viewer pain points, categorizes them, and suggests high-CTR response video hooks.
     """
     yt_conn = YouTubeConnector()
-    result = await yt_conn.mine_competitor_comments(video_ids_or_urls, max_comments_per_video=max_comments)
+    result = await yt_conn.mine_competitor_comments(
+        video_ids_or_urls, max_comments_per_video=max_comments
+    )
     return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def audit_tag_relevance(tags: list[str] | str, context_text: str = "", max_chars: int = 450) -> str:
+    """Audit YouTube video tags for strict relevance against topic/script content.
+
+    Detects metadata stuffing, filters generic spam ('fyp', 'viral'), and verifies that conditional
+    clickbait words like 'gratis', 'download', or 'tanpa modal' are only permitted if explicitly
+    discussed in the video topic/script. Returns detailed status, badge color, and recommendations.
+    """
+    from youtube_analyzer.core.normalizer import TopicNormalizer
+
+    res = TopicNormalizer.audit_tags_detailed(tags, context_text=context_text, max_chars=max_chars)
+    return json.dumps(res, indent=2)
+
+
+@mcp.tool()
+def audit_content_blindspots(
+    title: str,
+    description: str,
+    tags: list[str] | str,
+    context_notes: str = "",
+    target_format: str = "LANDSCAPE (16:9)",
+) -> str:
+    """Comprehensive 5-Pillar Packaging & SEO Blindspot Audit for YouTube videos.
+
+    Evaluates:
+    1. Title length & mobile truncation risk (45-65 chars ideal)
+    2. Google Key Moments timestamps (00:00 start, at least 3 chapters)
+    3. Tag relevancy and clickbait gate (unsupported 'gratis', spam stuffing)
+    4. Description first-fold hook (before '...more' cut-off)
+    5. Video format pacing alignment (Shorts vs Longform mid-rolls).
+    """
+    from youtube_analyzer.core.normalizer import TopicNormalizer
+
+    res = TopicNormalizer.audit_content_blindspots(
+        title=title,
+        description=description,
+        tags=tags,
+        context_notes=context_notes,
+        target_format=target_format,
+    )
+    return json.dumps(res, indent=2)
 
 
 if __name__ == "__main__":

@@ -1455,7 +1455,7 @@ https://www.youtube.com/@ppm_consulting</textarea>
               </div>
               <div class="text-[11px] text-slate-400">${escapeHtml(tg.demand_signal)} | Sumber: <span class="text-slate-300">${escapeHtml(tg.source_competitor.substring(0, 40))}...</span></div>
             </div>
-            <button onclick="document.getElementById('keywordInput').value='${escapeHtml(tg.topic)}'; runAnalysis();" class="whitespace-nowrap bg-red-600/80 hover:bg-red-600 text-white font-semibold px-3 py-1.5 rounded-lg text-xs transition">🚀 Analisa Topik Ini</button>
+            <button onclick="document.getElementById('seedKeywordInput').value='${escapeHtml(tg.topic)}'; runFullAnalysis();" class="whitespace-nowrap bg-red-600/80 hover:bg-red-600 text-white font-semibold px-3 py-1.5 rounded-lg text-xs transition">🚀 Analisa Topik Ini</button>
           </div>
         `).join('');
       } else {

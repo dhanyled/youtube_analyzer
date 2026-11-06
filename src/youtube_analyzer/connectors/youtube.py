@@ -68,7 +68,7 @@ class YouTubeConnector(BaseConnector):
             "Sec-Fetch-Site": "none",
             "Sec-Fetch-User": "?1",
             "Upgrade-Insecure-Requests": "1",
-            "Cookie": f"PREF=tz=Asia.Jakarta&hl={hl}&gl={gl};",
+            "Cookie": f"PREF=tz=Asia.Jakarta&hl={hl}&gl={gl}; SOCS=CAESEwgDEgk2MTQ1NzU1OTQaAmVuIAEaBgiA_LyaBg; CONSENT=YES+cb.20210328-17-p0.en+FX+478;",
         }
 
     @staticmethod
@@ -483,6 +483,59 @@ class YouTubeConnector(BaseConnector):
             except Exception:
                 pass
 
+        # 4. Consent-bypassed HTML duration scrape if still missing
+        if needs_dur and (
+            not meta.get("duration")
+            or meta.get("duration") == "N/A"
+            or not meta.get("duration_seconds")
+        ):
+            try:
+                headers = self._get_natural_headers(hl="en", gl="US", device="desktop")
+                watch_url = (
+                    f"https://www.youtube.com/watch?v={video_id}&bpctr=9999999999&has_verified=1"
+                )
+                async with httpx.AsyncClient(timeout=8.0, follow_redirects=True) as client:
+                    w_resp = await client.get(watch_url, headers=headers)
+                    if w_resp.status_code == 200:
+                        w_html = w_resp.text
+                        dur_sec = 0
+                        m_len = re.search(r'"lengthSeconds"\s*:\s*"(\d+)"', w_html)
+                        if m_len:
+                            try:
+                                dur_sec = int(m_len.group(1))
+                            except (ValueError, TypeError):
+                                pass
+                        if dur_sec == 0:
+                            m_app = re.search(r'"approxDurationMs"\s*:\s*"(\d+)"', w_html)
+                            if m_app:
+                                try:
+                                    dur_sec = int(int(m_app.group(1)) / 1000)
+                                except (ValueError, TypeError):
+                                    pass
+                        if dur_sec == 0:
+                            m_dur = re.search(
+                                r'<meta itemprop="duration" content="(PT.*?)">', w_html
+                            )
+                            if m_dur:
+                                dur_sec = self.parse_duration_to_seconds(m_dur.group(1))
+                        if dur_sec > 0:
+                            meta["duration_seconds"] = dur_sec
+                            h, rem = divmod(dur_sec, 3600)
+                            m, s = divmod(rem, 60)
+                            meta["duration"] = (
+                                f"{h}:{m:02d}:{s:02d}" if h > 0 else f"{m:02d}:{s:02d}"
+                            )
+                            is_shorts, format_type = self.detect_video_format(
+                                video_id=video_id,
+                                title=meta.get("title", ""),
+                                duration_seconds=dur_sec,
+                                thumbnail_url=meta.get("thumbnail_url", ""),
+                            )
+                            meta["is_shorts"] = is_shorts
+                            meta["format"] = format_type
+            except Exception:
+                pass
+
         return meta
 
     async def get_video_details(self, video_id: str) -> dict[str, Any] | None:
@@ -556,7 +609,7 @@ class YouTubeConnector(BaseConnector):
 
         # Robust live scraping from YouTube HTML and ytInitialPlayerResponse
         try:
-            url = f"https://www.youtube.com/watch?v={video_id}"
+            url = f"https://www.youtube.com/watch?v={video_id}&bpctr=9999999999&has_verified=1"
             headers = self._get_natural_headers(hl="id", gl="ID", device="desktop")
             async with httpx.AsyncClient(timeout=12.0, follow_redirects=True) as client:
                 resp = await client.get(url, headers=headers)
@@ -636,6 +689,20 @@ class YouTubeConnector(BaseConnector):
                         m_dur = re.search(r'<meta itemprop="duration" content="(PT.*?)">', html)
                         if m_dur:
                             length_sec = self.parse_duration_to_seconds(m_dur.group(1))
+                    if length_sec == 0:
+                        m_len = re.search(r'"lengthSeconds"\s*:\s*"(\d+)"', html)
+                        if m_len:
+                            try:
+                                length_sec = int(m_len.group(1))
+                            except (ValueError, TypeError):
+                                pass
+                    if length_sec == 0:
+                        m_app = re.search(r'"approxDurationMs"\s*:\s*"(\d+)"', html)
+                        if m_app:
+                            try:
+                                length_sec = int(int(m_app.group(1)) / 1000)
+                            except (ValueError, TypeError):
+                                pass
 
                     if length_sec > 0:
                         h = length_sec // 3600

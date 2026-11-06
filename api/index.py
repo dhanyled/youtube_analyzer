@@ -339,10 +339,7 @@ async def api_credentials_status():
     without leaking raw secrets.
     """
     yt_key = os.getenv("YOUTUBE_API_KEY", "").strip()
-    gemini_key = (
-        os.getenv("GEMINI_API_KEY", "").strip()
-        or os.getenv("GOOGLE_API_KEY", "").strip()
-    )
+    gemini_key = os.getenv("GEMINI_API_KEY", "").strip() or os.getenv("GOOGLE_API_KEY", "").strip()
     groq_key = os.getenv("GROQ_API_KEY", "").strip()
     openai_key = os.getenv("OPENAI_API_KEY", "").strip()
 
@@ -513,7 +510,9 @@ async def api_dashboard_analyze(req: AnalyzeRequest):
     )
 
     demand_pass = bool(live_suggestions and len(live_suggestions) >= 3)
-    scorecard_passes = sum([1 for p in [channel_cluster_pass, has_breakout_proof, demand_pass] if p])
+    scorecard_passes = sum(
+        [1 for p in [channel_cluster_pass, has_breakout_proof, demand_pass] if p]
+    )
 
     niche_scorecard = {
         "status": "VALIDATED" if scorecard_passes >= 2 else "CAUTION",

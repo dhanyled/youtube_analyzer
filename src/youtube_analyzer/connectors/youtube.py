@@ -162,8 +162,8 @@ class YouTubeConnector(BaseConnector):
                     if resp.status_code == 200:
                         cls._shorts_cache[video_id] = True
                         return True, "SHORTS"
-            except Exception:
-                pass
+            except Exception as e:
+                self._last_innertube_debug.append(f"mobile: err={e}")
 
             # Fallback: landscape videos generated with high-res standard 16:9 thumbnails
             if "maxresdefault" in thumbnail_url:
@@ -470,8 +470,8 @@ class YouTubeConnector(BaseConnector):
                     if not meta.get("tags") and it_meta.get("tags"):
                         meta["tags"] = it_meta["tags"]
                     needs_dur = False
-            except Exception:
-                pass
+            except Exception as e:
+                self._last_innertube_debug.append(f"mobile: err={e}")
 
         async with httpx.AsyncClient(timeout=10.0, cookies=cookies, follow_redirects=True) as client:
             # 1. oEmbed for real Title, Author, Thumbnail
@@ -543,8 +543,8 @@ class YouTubeConnector(BaseConnector):
                             meta["is_shorts"] = is_shorts
                             meta["format"] = format_type
                             needs_dur = False
-            except Exception:
-                pass
+            except Exception as e:
+                self._last_innertube_debug.append(f"mobile: err={e}")
 
         # 4. Consent-bypassed HTML duration scrape if still missing
         if needs_dur and (
@@ -564,6 +564,7 @@ class YouTubeConnector(BaseConnector):
                     )
                     if m_resp.status_code == 200:
                         m_html = m_resp.text
+                        self._last_innertube_debug.append(f"mobile: status=200, len={len(m_html)}, pt={re.findall(r'PT[0-9HMS]+', m_html)}")
                         m_mdur = (
                             re.search(r'itemprop=["\']?duration["\']?\s+content=["\'](PT[0-9HMS]+)["\']', m_html)
                             or re.search(r'content=["\'](PT[0-9HMS]+)["\']\s+itemprop=["\']?duration["\']?', m_html)
@@ -578,8 +579,8 @@ class YouTubeConnector(BaseConnector):
                             dur_sec = int(m_mlen.group(1))
                         elif m_mapp:
                             dur_sec = int(int(m_mapp.group(1)) / 1000)
-            except Exception:
-                pass
+            except Exception as e:
+                self._last_innertube_debug.append(f"mobile: err={e}")
 
             # 4b. Direct Shorts URL (if mobile /watch didn't yield duration)
             if dur_sec == 0:
@@ -715,8 +716,8 @@ class YouTubeConnector(BaseConnector):
                                 "thumbnail_url": thumb_url,
                                 "data_source": "YOUTUBE_API_V3",
                             }
-            except Exception:
-                pass
+            except Exception as e:
+                self._last_innertube_debug.append(f"mobile: err={e}")
 
         # Preferred keyless path: YouTube Innertube player endpoint (works from cloud IPs,
         # returns the creator's real Studio tags in videoDetails.keywords)
@@ -737,6 +738,7 @@ class YouTubeConnector(BaseConnector):
                 resp = await client.get(url, headers=headers)
                 if resp.status_code == 200:
                     html = resp.text
+                    self._last_innertube_debug.append(f"desktop_watch: status=200, len={len(html)}, pt={re.findall(r'PT[0-9HMS]+', html)}")
 
                     # 1. Parse embedded ytInitialPlayerResponse
                     player_data = {}
@@ -2105,8 +2107,8 @@ class YouTubeConnector(BaseConnector):
                 prof = studio.get_channel_profile()
                 if prof:
                     my_stats = prof
-            except Exception:
-                pass
+            except Exception as e:
+                self._last_innertube_debug.append(f"mobile: err={e}")
 
         my_subs = int(my_stats.get("subscribers", 0)) if my_stats else 0
         my_vids = int(my_stats.get("video_count", 0)) if my_stats else 0

@@ -81,6 +81,14 @@ class YouTubeConnector(BaseConnector):
         super().__init__(platform=PlatformEnum.YOUTUBE_SEARCH, api_key=key)
         self._last_innertube_debug: list[str] = []
 
+    @property
+    def _api_headers(self) -> dict[str, str]:
+        """Headers ensuring compliance with Google Cloud HTTP Referrer restrictions."""
+        return {
+            "Referer": "https://youtubeanalyzer-taupe.vercel.app/",
+            "Origin": "https://youtubeanalyzer-taupe.vercel.app",
+        }
+
     async def get_autocomplete(
         self, query: str, client_type: str = "youtube", hl: str = "id"
     ) -> list[str]:
@@ -667,7 +675,7 @@ class YouTubeConnector(BaseConnector):
                     "key": self.api_key,
                 }
                 async with httpx.AsyncClient(timeout=10.0) as client:
-                    resp = await client.get(url, params=params)
+                    resp = await client.get(url, params=params, headers=self._api_headers)
                     if resp.status_code == 200:
                         items = resp.json().get("items", [])
                         if items:
@@ -982,7 +990,7 @@ class YouTubeConnector(BaseConnector):
                     "maxResults": min(limit, 25),
                     "key": self.api_key,
                 }
-                s_resp = await client.get(search_url, params=search_params)
+                s_resp = await client.get(search_url, params=search_params, headers=self._api_headers)
                 if s_resp.status_code != 200:
                     return []
                 items = s_resp.json().get("items", [])
@@ -996,7 +1004,7 @@ class YouTubeConnector(BaseConnector):
                     "id": ",".join(vid_ids),
                     "key": self.api_key,
                 }
-                v_resp = await client.get(v_url, params=v_params)
+                v_resp = await client.get(v_url, params=v_params, headers=self._api_headers)
                 if v_resp.status_code != 200:
                     return []
                 v_items = v_resp.json().get("items", [])
@@ -1493,7 +1501,7 @@ class YouTubeConnector(BaseConnector):
                     api_params["videoCategoryId"] = api_cat_id
 
                 async with httpx.AsyncClient(timeout=10.0) as client:
-                    resp = await client.get(api_url, params=api_params)
+                    resp = await client.get(api_url, params=api_params, headers=self._api_headers)
                     if resp.status_code == 200:
                         api_data = resp.json().get("items", [])
                         results = []

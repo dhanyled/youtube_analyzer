@@ -489,94 +489,103 @@ class YouTubeConnector(BaseConnector):
             or meta.get("duration") == "N/A"
             or not meta.get("duration_seconds")
         ):
+            dur_sec = 0
+
+            # 4a. Mobile YouTube URL (ultra-fast, extremely reliable on cloud/datacenter IPs)
             try:
-                headers = self._get_natural_headers(hl="en", gl="US", device="desktop")
-                watch_url = (
-                    f"https://www.youtube.com/watch?v={video_id}&bpctr=9999999999&has_verified=1"
-                )
-                async with httpx.AsyncClient(timeout=8.0, follow_redirects=True) as client:
-                    w_resp = await client.get(watch_url, headers=headers)
-                    w_html = w_resp.text if w_resp.status_code == 200 else ""
-                    dur_sec = 0
-                    m_len = re.search(r'"lengthSeconds"\s*:\s*"(\d+)"', w_html)
-                    if m_len:
-                        try:
-                            dur_sec = int(m_len.group(1))
-                        except (ValueError, TypeError):
-                            pass
-                    if dur_sec == 0:
-                        m_app = re.search(r'"approxDurationMs"\s*:\s*"(\d+)"', w_html)
-                        if m_app:
-                            try:
-                                dur_sec = int(int(m_app.group(1)) / 1000)
-                            except (ValueError, TypeError):
-                                pass
-                    if dur_sec == 0:
-                        m_dur = re.search(
-                            r'<meta itemprop="duration" content="(PT.*?)">', w_html
+                m_headers = self._get_natural_headers(hl="id", gl="ID", device="mobile")
+                async with httpx.AsyncClient(timeout=6.0, follow_redirects=True) as client:
+                    m_resp = await client.get(
+                        f"https://m.youtube.com/watch?v={video_id}&has_verified=1",
+                        headers=m_headers,
+                    )
+                    if m_resp.status_code == 200:
+                        m_html = m_resp.text
+                        m_mdur = re.search(
+                            r'itemprop=["\']duration["\']\s+content=["\'](PT[^"\']+)["\']', m_html
+                        ) or re.search(
+                            r'content=["\'](PT[^"\']+)["\']\s+itemprop=["\']duration["\']', m_html
                         )
-                        if m_dur:
-                            dur_sec = self.parse_duration_to_seconds(m_dur.group(1))
+                        m_mlen = re.search(r'["\']lengthSeconds["\']\s*:\s*["\']?(\d+)["\']?', m_html)
+                        m_mapp = re.search(r'["\']approxDurationMs["\']\s*:\s*["\']?(\d+)["\']?', m_html)
+                        if m_mdur:
+                            dur_sec = self.parse_duration_to_seconds(m_mdur.group(1))
+                        elif m_mlen:
+                            dur_sec = int(m_mlen.group(1))
+                        elif m_mapp:
+                            dur_sec = int(int(m_mapp.group(1)) / 1000)
+            except Exception:
+                pass
 
-                    # If still 0, try mobile YouTube URL (reliable on cloud/datacenter IPs)
-                    if dur_sec == 0:
-                        m_headers = self._get_natural_headers(hl="id", gl="ID", device="mobile")
-                        m_resp = await client.get(
-                            f"https://m.youtube.com/watch?v={video_id}&has_verified=1",
-                            headers=m_headers,
-                        )
-                        if m_resp.status_code == 200:
-                            m_html = m_resp.text
-                            m_mdur = re.search(
-                                r'<meta itemprop="duration" content="(PT.*?)">', m_html
-                            )
-                            m_mlen = re.search(r'"lengthSeconds"\s*:\s*"(\d+)"', m_html)
-                            m_mapp = re.search(r'"approxDurationMs"\s*:\s*"(\d+)"', m_html)
-                            if m_mdur:
-                                dur_sec = self.parse_duration_to_seconds(m_mdur.group(1))
-                            elif m_mlen:
-                                dur_sec = int(m_mlen.group(1))
-                            elif m_mapp:
-                                dur_sec = int(int(m_mapp.group(1)) / 1000)
-
-                    # If still 0, try the direct Shorts URL (vital for YouTube Shorts on cloud IPs)
-                    if dur_sec == 0:
-                        shorts_url = f"https://www.youtube.com/shorts/{video_id}"
-                        s_resp = await client.get(shorts_url, headers=headers)
+            # 4b. Direct Shorts URL (if mobile /watch didn't yield duration)
+            if dur_sec == 0:
+                try:
+                    s_headers = self._get_natural_headers(hl="en", gl="US", device="desktop")
+                    async with httpx.AsyncClient(timeout=6.0, follow_redirects=True) as client:
+                        s_resp = await client.get(f"https://www.youtube.com/shorts/{video_id}", headers=s_headers)
                         if s_resp.status_code == 200:
                             s_html = s_resp.text
-                            m_sdur = re.search(r'<meta itemprop="duration" content="(PT.*?)">', s_html)
-                            m_sapp = re.search(r'"approxDurationMs"\s*:\s*"(\d+)"', s_html)
-                            m_slen = re.search(r'"lengthSeconds"\s*:\s*"(\d+)"', s_html)
+                            m_sdur = re.search(
+                                r'itemprop=["\']duration["\']\s+content=["\'](PT[^"\']+)["\']', s_html
+                            ) or re.search(
+                                r'content=["\'](PT[^"\']+)["\']\s+itemprop=["\']duration["\']', s_html
+                            )
+                            m_sapp = re.search(r'["\']approxDurationMs["\']\s*:\s*["\']?(\d+)["\']?', s_html)
+                            m_slen = re.search(r'["\']lengthSeconds["\']\s*:\s*["\']?(\d+)["\']?', s_html)
                             if m_sdur:
                                 dur_sec = self.parse_duration_to_seconds(m_sdur.group(1))
                             elif m_sapp:
                                 dur_sec = int(int(m_sapp.group(1)) / 1000)
                             elif m_slen:
                                 dur_sec = int(m_slen.group(1))
+                except Exception:
+                    pass
 
-                    if dur_sec > 0:
-                        meta["duration_seconds"] = dur_sec
-                        h, rem = divmod(dur_sec, 3600)
-                        m, s = divmod(rem, 60)
-                        meta["duration"] = (
-                            f"{h}:{m:02d}:{s:02d}" if h > 0 else f"{m:02d}:{s:02d}"
-                        )
-                        is_shorts, format_type = self.detect_video_format(
-                            video_id=video_id,
-                            title=meta.get("title", ""),
-                            duration_seconds=dur_sec,
-                            thumbnail_url=meta.get("thumbnail_url", ""),
-                        )
-                        meta["is_shorts"] = is_shorts
-                        meta["format"] = format_type
+            # 4c. Desktop /watch URL fallback
+            if dur_sec == 0:
+                try:
+                    w_headers = self._get_natural_headers(hl="en", gl="US", device="desktop")
+                    watch_url = f"https://www.youtube.com/watch?v={video_id}&bpctr=9999999999&has_verified=1"
+                    async with httpx.AsyncClient(timeout=6.0, follow_redirects=True) as client:
+                        w_resp = await client.get(watch_url, headers=w_headers)
+                        if w_resp.status_code == 200:
+                            w_html = w_resp.text
+                            m_dur = re.search(
+                                r'itemprop=["\']duration["\']\s+content=["\'](PT[^"\']+)["\']', w_html
+                            ) or re.search(
+                                r'content=["\'](PT[^"\']+)["\']\s+itemprop=["\']duration["\']', w_html
+                            )
+                            m_len = re.search(r'["\']lengthSeconds["\']\s*:\s*["\']?(\d+)["\']?', w_html)
+                            m_app = re.search(r'["\']approxDurationMs["\']\s*:\s*["\']?(\d+)["\']?', w_html)
+                            if m_dur:
+                                dur_sec = self.parse_duration_to_seconds(m_dur.group(1))
+                            elif m_len:
+                                dur_sec = int(m_len.group(1))
+                            elif m_app:
+                                dur_sec = int(int(m_app.group(1)) / 1000)
+                except Exception:
+                    pass
 
-                # Ensure Shorts never use maxresdefault.jpg which returns 404
-                if meta.get("is_shorts") or meta.get("format") == "SHORTS":
-                    if "maxresdefault" in meta.get("thumbnail_url", ""):
-                        meta["thumbnail_url"] = f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg"
-            except Exception:
-                pass
+            if dur_sec > 0:
+                meta["duration_seconds"] = dur_sec
+                h, rem = divmod(dur_sec, 3600)
+                m, s = divmod(rem, 60)
+                meta["duration"] = (
+                    f"{h}:{m:02d}:{s:02d}" if h > 0 else f"{m:02d}:{s:02d}"
+                )
+                is_shorts, format_type = self.detect_video_format(
+                    video_id=video_id,
+                    title=meta.get("title", ""),
+                    duration_seconds=dur_sec,
+                    thumbnail_url=meta.get("thumbnail_url", ""),
+                )
+                meta["is_shorts"] = is_shorts
+                meta["format"] = format_type
+
+            # Ensure Shorts never use maxresdefault.jpg which returns 404
+            if meta.get("is_shorts") or meta.get("format") == "SHORTS":
+                if "maxresdefault" in meta.get("thumbnail_url", ""):
+                    meta["thumbnail_url"] = f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg"
 
         return meta
 
@@ -728,18 +737,22 @@ class YouTubeConnector(BaseConnector):
                         except (ValueError, TypeError):
                             pass
                     if length_sec == 0:
-                        m_dur = re.search(r'<meta itemprop="duration" content="(PT.*?)">', html)
+                        m_dur = re.search(
+                            r'itemprop=["\']duration["\']\s+content=["\'](PT[^"\']+)["\']', html
+                        ) or re.search(
+                            r'content=["\'](PT[^"\']+)["\']\s+itemprop=["\']duration["\']', html
+                        )
                         if m_dur:
                             length_sec = self.parse_duration_to_seconds(m_dur.group(1))
                     if length_sec == 0:
-                        m_len = re.search(r'"lengthSeconds"\s*:\s*"(\d+)"', html)
+                        m_len = re.search(r'["\']lengthSeconds["\']\s*:\s*["\']?(\d+)["\']?', html)
                         if m_len:
                             try:
                                 length_sec = int(m_len.group(1))
                             except (ValueError, TypeError):
                                 pass
                     if length_sec == 0:
-                        m_app = re.search(r'"approxDurationMs"\s*:\s*"(\d+)"', html)
+                        m_app = re.search(r'["\']approxDurationMs["\']\s*:\s*["\']?(\d+)["\']?', html)
                         if m_app:
                             try:
                                 length_sec = int(int(m_app.group(1)) / 1000)

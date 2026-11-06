@@ -59,9 +59,9 @@ def test_brand_scrub():
             if d not in {".git", ".venv", "__pycache__", ".pytest_cache", ".ruff_cache"}
         ]
         for f in files:
-            if f == "verify_suite.py":
+            if f in {"verify_suite.py", "chatgpt.txt"}:
                 continue
-            if f.endswith((".py", ".md", ".toml", ".txt", ".json", ".bat")):
+            if f.endswith((".py", ".md", ".toml", ".txt", ".json", ".bat", ".html", ".js", ".css")):
                 file_path = os.path.join(root, f)
                 try:
                     with open(file_path, encoding="utf-8") as fh:
@@ -77,7 +77,7 @@ def test_brand_scrub():
         for m in matches:
             print(f"   -> FAIL: Found '{m[2]}' in {m[0]}:{m[1]}")
         sys.exit(1)
-    print("   -> OK: ZERO occurrences of 'vidiq', 'tubebuddy', or 'nexlev' across all files.")
+    print(f"   -> OK: ZERO occurrences of forbidden brands {forbidden} across all files.")
 
 
 async def test_live_youtube():

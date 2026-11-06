@@ -493,7 +493,7 @@ async def api_dashboard_analyze(req: AnalyzeRequest):
     )
 
     # ------------------------------------------------------------------
-    # NexLev Niche Validation Scorecard (Cluster 3-5 Channels & Proof)
+    # Algorithmic Niche Validation Scorecard (Cluster 3-5 Channels & Proof)
     # ------------------------------------------------------------------
     unique_channels = {c.get("channel") for c in competitors if c.get("channel")}
     channel_cluster_pass = len(unique_channels) >= 3
@@ -537,7 +537,7 @@ async def api_dashboard_analyze(req: AnalyzeRequest):
             },
         ],
         "verdict": (
-            "Topik ini tervalidasi menurut framework NexLev. Aman & potensial untuk diproduksi."
+            "Topik ini tervalidasi menurut framework 3-Pillar Niche Intelligence. Aman & potensial untuk diproduksi."
             if scorecard_passes >= 2
             else "Perhatian: Niche ini masih sangat sempit atau didominasi oleh 1-2 channel saja. Uji coba dengan 1 video pilot terlebih dahulu."
         ),

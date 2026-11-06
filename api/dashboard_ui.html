@@ -129,14 +129,14 @@
       <p id="verdictBody" class="text-xs md:text-sm text-slate-300 leading-relaxed"></p>
     </div>
 
-    <!-- NexLev 3-Point Niche Validation Scorecard Banner -->
+    <!-- Algorithmic 3-Point Niche Validation Scorecard Banner -->
     <div id="nicheScorecardBanner" class="hidden p-4 rounded-xl border bg-[#161b26] border-slate-800 space-y-2.5">
       <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-slate-800/80 pb-2">
         <div class="flex items-center gap-2">
           <span class="text-lg">🏆</span>
           <div>
             <h4 class="text-xs font-bold text-white flex items-center gap-1.5">
-              <span>NexLev 3-Point Niche Validation Scorecard</span>
+              <span>Algorithmic 3-Point Niche Validation Scorecard</span>
               <span id="nicheScorecardBadge" class="text-[10px] px-2 py-0.5 rounded font-mono font-bold"></span>
             </h4>
             <p id="nicheScorecardVerdict" class="text-[11px] text-slate-400 mt-0.5"></p>
@@ -277,7 +277,7 @@
           <h4 class="text-sm font-bold text-white">📊 Daftar Semua Kompetitor Halaman 1 YouTube (Human vs AI & Outliers):</h4>
           <div class="flex items-center gap-2 flex-wrap">
             <button id="btnSortOutlier" onclick="toggleSortOutliers()" class="px-2.5 py-1 rounded-lg bg-amber-950/60 hover:bg-amber-900/70 border border-amber-800 text-[11px] font-semibold text-amber-300 transition flex items-center gap-1 shadow-sm">
-              <span>🔥</span> <span id="sortOutlierText">Urutkan Outlier Tertinggi (NexLev Mode)</span>
+              <span>🔥</span> <span id="sortOutlierText">Urutkan Outlier Tertinggi (Viral Breakout Mode)</span>
             </button>
             <button onclick="openThumbnailLabPromptModal()" class="px-2.5 py-1 rounded-lg bg-purple-950/60 hover:bg-purple-900/70 border border-purple-800 text-[11px] font-semibold text-purple-300 transition flex items-center gap-1 shadow-sm">
               <span>🎨</span> <span>Prompt AI Thumbnail</span>
@@ -1059,7 +1059,7 @@ https://www.youtube.com/@ppm_consulting</textarea>
     function toggleSortOutliers() {
       _sortOutliersActive = !_sortOutliersActive;
       const btn = document.getElementById('sortOutlierText');
-      if (btn) btn.textContent = _sortOutliersActive ? 'Tampilkan Urutan Ranking Default' : 'Urutkan Outlier Tertinggi (NexLev Mode)';
+      if (btn) btn.textContent = _sortOutliersActive ? 'Tampilkan Urutan Ranking Default' : 'Urutkan Outlier Tertinggi (Viral Breakout Mode)';
       renderCompetitorsTable();
     }
 
@@ -1511,7 +1511,7 @@ https://www.youtube.com/@ppm_consulting</textarea>
       window._currentCompetitors = comps;
       renderCompetitorsTable();
 
-      // Render NexLev 3-Point Niche Validation Scorecard
+      // Render Algorithmic 3-Point Niche Validation Scorecard
       if (d.niche_scorecard) {
         const sc = d.niche_scorecard;
         const banner = document.getElementById('nicheScorecardBanner');
@@ -1900,11 +1900,11 @@ https://www.youtube.com/@ppm_consulting</textarea>
                 </div>
               ` : ''}
 
-              <!-- NexLev Off-Platform Earnings Scanner Card -->
+              <!-- Off-Platform Earnings Scanner Card -->
               <div class="p-3 rounded-lg bg-[#0e1117] border border-slate-700/80 space-y-2 mt-2">
                 <div class="flex items-center justify-between border-b border-slate-800 pb-1.5">
                   <span class="font-bold text-white text-[11px] flex items-center gap-1.5">
-                    <span>💰</span> Deteksi Monetisasi Eksternal (NexLev Off-Platform Earnings):
+                    <span>💰</span> Deteksi Monetisasi Eksternal (Off-Platform Funnel Intelligence):
                   </span>
                   <span class="text-[10px] font-bold px-2 py-0.5 rounded ${offPlatform.length > 0 ? 'bg-emerald-950 text-emerald-300 border border-emerald-700' : 'bg-slate-800 text-slate-400'}">
                     ${offPlatform.length > 0 ? `${offPlatform.length} Jalur Terdeteksi` : 'AdSense Murni'}
@@ -2725,14 +2725,14 @@ https://www.youtube.com/@ppm_consulting</textarea>
     </div>
   </div>
 
-  <!-- Thumbnail Lab AI Prompt Modal (NexLev Inspired) -->
+  <!-- Thumbnail Lab AI Prompt Modal -->
   <div id="thumbnailLabModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
     <div class="bg-[#161b26] border border-slate-700 rounded-2xl max-w-xl w-full p-6 space-y-4 max-h-[92vh] overflow-y-auto text-xs shadow-2xl">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
         <div class="flex items-center gap-2.5">
           <span class="text-xl">🎨</span>
           <div>
-            <h3 class="text-base font-bold text-white">NexLev Thumbnail Lab: AI Prompt Generator</h3>
+            <h3 class="text-base font-bold text-white">Studio Thumbnail Lab: AI Prompt Generator</h3>
             <p class="text-[11px] text-slate-400 mt-0.5">Formula visual thumbnail ranking teratas direverse-engineer menjadi prompt AI siap salin.</p>
           </div>
         </div>

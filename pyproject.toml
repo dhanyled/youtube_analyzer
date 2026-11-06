@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 keywords = ["youtube", "seo", "mcp", "webmcp", "youtube-api", "fastapi", "ai-agents"]
 dependencies = [
-    "alembic>=1.20.0",
+    "alembic>=1.20.1",
     "fastapi>=0.162.0",
     "google-api-python-client>=2.201.0",
     "google-auth-httplib2>=0.4.4",

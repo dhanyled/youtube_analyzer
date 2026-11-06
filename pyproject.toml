@@ -1,6 +1,6 @@
 [project]
 name = "youtube-analyzer"
-version = "2.3.0"
+version = "2.3.1"
 description = "AI-powered YouTube SERP, Competitor Intelligence, Content Gaps, and SEO Optimization Engine (MCP & WebMCP)"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -25,7 +25,7 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://youtubeanalyzer-sand.vercel.app/"
+Homepage = "https://youtubeanalyzer-taupe.vercel.app/"
 Repository = "https://github.com/dhanyled/youtube_analyzer"
 
 [build-system]

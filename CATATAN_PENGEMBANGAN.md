@@ -232,3 +232,21 @@ Setelah perubahan CSS/JS untuk menghilangkan elemen watermark atau avatar profil
 - **Automated Guardrail (tests/verify_suite.py)**:
   - Seluruh file berekstensi .html, .js, .css, .py, .md, .toml, .json dipindai secara rekursif dalam automated test suite.
   - Jika kata terlarang terdeteksi, build otomatis dihentikan dengan status exit code 1.
+
+
+---
+
+## 11. 🎬 Resolusi YouTube Shorts Metadata & Multi-Layer Video Parsing (v2.3.1)
+
+### 11.1. Masalah Thumbnail 404 pada YouTube Shorts
+- **Penyebab Teknis**: YouTube CDN tidak menghasilkan file gambar `maxresdefault.jpg` untuk format video vertikal Shorts (`https://img.youtube.com/vi/<id>/maxresdefault.jpg` menghasilkan HTTP 404 Not Found).
+- **Solusi**:
+  1. Default fallback gambar video Shorts diubah menggunakan endpoint `https://i.ytimg.com/vi/<id>/hqdefault.jpg` yang dijamin selalu tersedia.
+  2. Memanfaatkan respons oEmbed resmi (`https://www.youtube.com/oembed?url=...`) untuk mengambil thumbnail default Shorts resolusi tinggi.
+
+### 11.2. Masalah Durasi N/A pada Shorts Tanpa Transkrip
+- **Penyebab Teknis**: Video Shorts yang murni berupa musik/visual tidak memiliki transkrip ucapan pada `YouTubeTranscriptApi`. Ketika IP datacenter dibatasi pada endpoint `/watch`, sistem sebelumnya mengembalikan durasi `N/A`.
+- **Solusi**:
+  1. Menambahkan parser ekstraksi spesifik ke endpoint `https://www.youtube.com/shorts/{video_id}`.
+  2. Mengekstrak metadata `itemprop="duration"` (format ISO-8601 seperti `PT0M44S`), `approxDurationMs`, atau `lengthSeconds` langsung dari payload HTML halaman Shorts.
+  3. Mengonversi durasi ke format standar `MM:SS` dan secara otomatis mengkategorikan format video menjadi `SHORTS`.

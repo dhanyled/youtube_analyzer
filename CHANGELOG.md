@@ -4,6 +4,20 @@ Semua pembaruan, perbaikan bug, dan rilis versi sistem **YouTube Search & Compet
 
 ---
 
+## [2.3.1] - 2026-11-06 (YouTube Shorts Metadata, Duration & Thumbnail Fix)
+
+### 🐛 Perbaikan Bug & Peningkatan Metadata
+* **YouTube Shorts Thumbnail Auto-Fallback (404 Error Fix):**
+  * Memperbaiki masalah gambar thumbnail rusak pada video vertikal YouTube Shorts. Endpoint CDN `https://img.youtube.com/vi/<id>/maxresdefault.jpg` yang mengembalikan HTTP 404 pada Shorts kini secara otomatis menggunakan fallback ke `https://i.ytimg.com/vi/<id>/hqdefault.jpg` yang dijamin tersedia, serta memanfaatkan thumbnail beresolusi tinggi dari response oEmbed YouTube.
+* **YouTube Shorts Duration & Format Recognition:**
+  * Menambahkan parser fallback langsung ke endpoint `https://www.youtube.com/shorts/{video_id}` untuk mengekstrak durasi riil (`itemprop="duration"` format ISO-8601 seperti `PT0M44S`, `approxDurationMs`, atau `lengthSeconds`).
+  * Video Shorts tanpa transkrip ucapan kini berhasil mendeteksi durasi secara presisi (contoh: `00:44`) dan tidak lagi menampilkan `N/A`.
+  * Memperbaiki deteksi format otomatis dari `LANDSCAPE` menjadi `SHORTS` secara akurat pada audit video tunggal.
+* **Update URL Produksi & Environment Sync:**
+  * Memperbarui URL repositori dan homepage production di `pyproject.toml` ke deployment aktif `https://youtubeanalyzer-taupe.vercel.app/`.
+
+---
+
 ## [2.3.0] - 2026-11-06 (Algorithmic Outlier & Zero-Blindspot White-Label Edition)
 
 ### 🚀 Fitur Baru & Peningkatan Utama

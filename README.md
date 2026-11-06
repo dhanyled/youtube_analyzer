@@ -9,7 +9,7 @@ Powered by algorithmic search intelligence formulas:
 
 ---
 
-## 🎯 Core Features (v2.3.0 Algorithmic Outlier & Zero-Blindspot Edition)
+## 🎯 Core Features (v2.3.1 Algorithmic Outlier & Shorts Fix Edition)
 
 | Feature | Engine | Description |
 | :--- | :--- | :--- |

@@ -20,7 +20,7 @@ async def test_health_check_endpoint():
         assert resp.status_code == 200
         data = resp.json()
         assert data["status"] == "ok"
-        assert data["version"] == "2.3.0"
+        assert data["version"] == "2.3.1"
         assert data["webmcp_tools_count"] >= 8
 
 

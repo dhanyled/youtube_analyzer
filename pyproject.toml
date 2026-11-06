@@ -19,7 +19,7 @@ dependencies = [
     "pytrends>=4.9.2",
     "sqlalchemy>=2.0.38,<2.1.0",
     "sqlmodel>=0.0.22",
-    "streamlit>=1.63.0",
+    "streamlit>=1.66.1",
     "uvicorn>=0.52.4",
     "youtube-transcript-api>=1.2.4",
 ]

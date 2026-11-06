@@ -488,7 +488,12 @@ class TopicNormalizer:
         """Parse comma-separated tags, filter for strict relevance, and format under max_chars."""
         if not tags_str:
             return ""
-        raw_tags = [t.strip() for t in tags_str.split(",") if t.strip()]
+        raw_tags = [
+            re.sub(r"#\S*", "", t).strip() if "#" in t else t.strip()
+            for t in tags_str.split(",")
+            if t.strip()
+        ]
+        raw_tags = [t for t in raw_tags if t]
         filtered = cls.filter_relevant_tags(raw_tags, context_text)
 
         selected: list[str] = []
@@ -565,6 +570,11 @@ class TopicNormalizer:
         ]
 
         for raw_t in raw_list:
+            clean_t = re.sub(r"#\S*", "", raw_t).strip() if "#" in raw_t else raw_t.strip()
+            if not clean_t:
+                clean_t = raw_t.replace("#", "").strip()
+            if clean_t:
+                raw_t = clean_t
             t_low = raw_t.lower()
 
             if t_low in seen_lower:

@@ -627,7 +627,12 @@ KEMBALIKAN HANYA FORMAT JSON MURNI TANPA MARKDOWN LAIN dengan struktur persis se
         prompt = cls.build_audit_prompt(video_details, transcript_text, competitors)
 
         raw_title = video_details.get("title", "Video YouTube")
-        clean_topic = raw_title.split("-")[0].split("|")[0].strip()
+        import re
+
+        clean_topic = re.sub(r"#\S+", "", raw_title).split("-")[0].split("|")[0].strip()
+        clean_topic = re.sub(r"\s+", " ", clean_topic).strip()
+        if not clean_topic:
+            clean_topic = "Video YouTube"
         raw_dur = video_details.get("duration", "10:00")
 
         # AI mode is triggered when provider is requested and key exists
@@ -893,7 +898,12 @@ KEMBALIKAN HANYA FORMAT JSON MURNI TANPA MARKDOWN LAIN dengan struktur persis se
             except Exception as e:
                 logger.warning(f"AI pre-upload plan failed: {e}. Falling back to heuristic plan.")
 
-        clean = topic.strip().title()
+        import re
+
+        clean = re.sub(r"#\S+", "", topic).split("-")[0].split("|")[0].strip()
+        clean = re.sub(r"\s+", " ", clean).strip().title()
+        if not clean:
+            clean = topic.strip().title()
         is_shorts = "9:16" in target_format or "short" in target_format.lower()
         suffix = " #shorts" if is_shorts else ""
 

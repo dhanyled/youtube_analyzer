@@ -1640,6 +1640,22 @@ if keyword_input:
                     else:
                         st.warning("Mohon masukkan URL halaman web terlebih dahulu.")
 
+                st.markdown(
+                    """
+<div style="background-color: #0c2340; border: 1px solid #1e4976; border-radius: 8px; padding: 12px; margin-top: 14px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+        <div>
+            <b style="color: #ffffff; font-size: 13px;">📹 Google Search Console: Creator Profile YouTube</b>
+            <span style="background-color: #064e3b; color: #34d399; font-size: 10px; padding: 2px 8px; border-radius: 4px; margin-left: 8px; border: 1px solid #059669;">🟢 Terhubung</span>
+            <p style="color: #94a3b8; font-size: 11px; margin: 4px 0 0 0;">Channel ID: <code style="color: #fcd34d;">5lofkxhu_2msrodyeji9ng</code> (@mrleddhany)</p>
+        </div>
+        <a href="https://search.google.com/search-console/performance/search-analytics?resource_id=sc-creator-profile%3Ayoutube.com%2Fchannel%2F5lofkxhu_2msrodyeji9ng&num_of_days=28&compare_date=PREV" target="_blank" style="background-color: #0284c7; color: white; padding: 6px 12px; border-radius: 6px; text-decoration: none; font-size: 11px; font-weight: bold;">Buka Analitik GSC ↗</a>
+    </div>
+</div>
+""",
+                    unsafe_allow_html=True,
+                )
+
     # ==================== TAB 4: YOUTUBE TRENDING FEED ====================
     with tab_trending:
         st.subheader("🔥 YouTube Trending Feed Explorer")

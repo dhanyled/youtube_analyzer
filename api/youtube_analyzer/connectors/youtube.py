@@ -311,35 +311,58 @@ class YouTubeConnector(BaseConnector):
 
     INNERTUBE_PLAYER_URL = "https://www.youtube.com/youtubei/v1/player?prettyPrint=false"
     INNERTUBE_WEB_CLIENT_VERSION = "2.20260210.01.00"
+    INNERTUBE_MWEB_CLIENT_VERSION = "2.20240401.05.00"
 
     async def _fetch_innertube_player(self, video_id: str) -> dict[str, Any] | None:
-        """Fetch real video metadata + creator Studio tags via YouTube Innertube player API."""
-        payload = {
-            "context": {
-                "client": {
-                    "clientName": "WEB",
-                    "clientVersion": self.INNERTUBE_WEB_CLIENT_VERSION,
-                    "hl": "id",
-                    "gl": "ID",
-                }
-            },
-            "videoId": video_id,
+        """Fetch real video metadata + creator Studio tags via YouTube Innertube player API with multi-client fallback."""
+        clients_to_try = [
+            ("WEB", self.INNERTUBE_WEB_CLIENT_VERSION, "1", "desktop"),
+            ("MWEB", self.INNERTUBE_MWEB_CLIENT_VERSION, "2", "mobile"),
+        ]
+        cookies = {
+            "SOCS": "CAESEwgDEgk2MTQ1NzU1OTQaAmVuIAEaBgiA_LyaBg",
+            "CONSENT": "YES+cb.20210328-17-p0.en+FX+478",
+            "PREF": "tz=Asia.Jakarta&hl=id&gl=ID",
         }
-        headers = {
-            "User-Agent": random.choice(self.USER_AGENTS_DESKTOP),
-            "Origin": "https://www.youtube.com",
-            "Referer": f"https://www.youtube.com/watch?v={video_id}",
-            "Accept-Language": "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7",
-            "Content-Type": "application/json",
-        }
-        try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                resp = await client.post(self.INNERTUBE_PLAYER_URL, json=payload, headers=headers)
-            if resp.status_code != 200:
-                return None
-            data = resp.json()
-        except Exception as e:
-            logger.warning(f"Innertube player failed for '{video_id}': {e}")
+
+        data = None
+        for client_name, client_ver, client_id, dev_type in clients_to_try:
+            payload = {
+                "context": {
+                    "client": {
+                        "clientName": client_name,
+                        "clientVersion": client_ver,
+                        "hl": "id",
+                        "gl": "ID",
+                    }
+                },
+                "videoId": video_id,
+            }
+            ua = random.choice(
+                self.USER_AGENTS_MOBILE if dev_type == "mobile" else self.USER_AGENTS_DESKTOP
+            )
+            headers = {
+                "User-Agent": ua,
+                "Origin": "https://www.youtube.com",
+                "Referer": f"https://www.youtube.com/watch?v={video_id}",
+                "Accept-Language": "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7",
+                "Content-Type": "application/json",
+                "X-YouTube-Client-Name": client_id,
+                "X-YouTube-Client-Version": client_ver,
+            }
+            try:
+                async with httpx.AsyncClient(timeout=10.0, cookies=cookies) as client:
+                    resp = await client.post(self.INNERTUBE_PLAYER_URL, json=payload, headers=headers)
+                if resp.status_code == 200:
+                    cand_data = resp.json()
+                    cand_vdet = cand_data.get("videoDetails") or {}
+                    if cand_vdet.get("videoId") and cand_vdet.get("title"):
+                        data = cand_data
+                        break
+            except Exception as e:
+                logger.warning(f"Innertube player ({client_name}) failed for '{video_id}': {e}")
+
+        if not data:
             return None
 
         v_det = data.get("videoDetails") or {}
@@ -356,6 +379,14 @@ class YouTubeConnector(BaseConnector):
         title = str(v_det.get("title", ""))
         raw_views = _to_int(v_det.get("viewCount"))
         length_sec = _to_int(v_det.get("lengthSeconds"))
+        if length_sec == 0:
+            length_sec = _to_int(mf.get("lengthSeconds"))
+        if length_sec == 0:
+            for fmt in (data.get("streamingData") or {}).get("adaptiveFormats", []):
+                if fmt.get("approxDurationMs"):
+                    length_sec = int(int(fmt["approxDurationMs"]) / 1000)
+                    break
+
         if length_sec > 0:
             h, rem = divmod(length_sec, 3600)
             m, s = divmod(rem, 60)
@@ -411,7 +442,29 @@ class YouTubeConnector(BaseConnector):
         if not (needs_title or needs_views or needs_dur):
             return meta
 
-        async with httpx.AsyncClient(timeout=8.0, follow_redirects=True) as client:
+        cookies = {
+            "SOCS": "CAESEwgDEgk2MTQ1NzU1OTQaAmVuIAEaBgiA_LyaBg",
+            "CONSENT": "YES+cb.20210328-17-p0.en+FX+478",
+            "PREF": "tz=Asia.Jakarta&hl=id&gl=ID",
+        }
+
+        # 0. If duration is missing and data_source wasn't INNERTUBE_PLAYER, try Innertube first
+        if needs_dur and meta.get("data_source") != "INNERTUBE_PLAYER":
+            try:
+                it_meta = await self._fetch_innertube_player(video_id)
+                if it_meta and it_meta.get("duration_seconds"):
+                    dur_sec = it_meta["duration_seconds"]
+                    meta["duration_seconds"] = dur_sec
+                    meta["duration"] = it_meta["duration"]
+                    meta["is_shorts"] = it_meta["is_shorts"]
+                    meta["format"] = it_meta["format"]
+                    if not meta.get("tags") and it_meta.get("tags"):
+                        meta["tags"] = it_meta["tags"]
+                    needs_dur = False
+            except Exception:
+                pass
+
+        async with httpx.AsyncClient(timeout=10.0, cookies=cookies, follow_redirects=True) as client:
             # 1. oEmbed for real Title, Author, Thumbnail
             if needs_title or not meta.get("channel") or not meta.get("thumbnail_url") or "maxresdefault" in meta.get("thumbnail_url", ""):
                 try:
@@ -480,6 +533,7 @@ class YouTubeConnector(BaseConnector):
                             )
                             meta["is_shorts"] = is_shorts
                             meta["format"] = format_type
+                            needs_dur = False
             except Exception:
                 pass
 
@@ -494,17 +548,18 @@ class YouTubeConnector(BaseConnector):
             # 4a. Mobile YouTube URL (ultra-fast, extremely reliable on cloud/datacenter IPs)
             try:
                 m_headers = self._get_natural_headers(hl="id", gl="ID", device="mobile")
-                async with httpx.AsyncClient(timeout=6.0, follow_redirects=True) as client:
+                async with httpx.AsyncClient(timeout=10.0, cookies=cookies, follow_redirects=True) as client:
                     m_resp = await client.get(
                         f"https://m.youtube.com/watch?v={video_id}&has_verified=1",
                         headers=m_headers,
                     )
                     if m_resp.status_code == 200:
                         m_html = m_resp.text
-                        m_mdur = re.search(
-                            r'itemprop=["\']duration["\']\s+content=["\'](PT[^"\']+)["\']', m_html
-                        ) or re.search(
-                            r'content=["\'](PT[^"\']+)["\']\s+itemprop=["\']duration["\']', m_html
+                        m_mdur = (
+                            re.search(r'itemprop=["\']?duration["\']?\s+content=["\'](PT[0-9HMS]+)["\']', m_html)
+                            or re.search(r'content=["\'](PT[0-9HMS]+)["\']\s+itemprop=["\']?duration["\']?', m_html)
+                            or re.search(r'["\']duration["\']\s*:\s*["\'](PT[0-9HMS]+)["\']', m_html)
+                            or re.search(r'["\'](PT[0-9HMS]+)["\']', m_html)
                         )
                         m_mlen = re.search(r'["\']lengthSeconds["\']\s*:\s*["\']?(\d+)["\']?', m_html)
                         m_mapp = re.search(r'["\']approxDurationMs["\']\s*:\s*["\']?(\d+)["\']?', m_html)
@@ -521,14 +576,15 @@ class YouTubeConnector(BaseConnector):
             if dur_sec == 0:
                 try:
                     s_headers = self._get_natural_headers(hl="en", gl="US", device="desktop")
-                    async with httpx.AsyncClient(timeout=6.0, follow_redirects=True) as client:
+                    async with httpx.AsyncClient(timeout=10.0, cookies=cookies, follow_redirects=True) as client:
                         s_resp = await client.get(f"https://www.youtube.com/shorts/{video_id}", headers=s_headers)
                         if s_resp.status_code == 200:
                             s_html = s_resp.text
-                            m_sdur = re.search(
-                                r'itemprop=["\']duration["\']\s+content=["\'](PT[^"\']+)["\']', s_html
-                            ) or re.search(
-                                r'content=["\'](PT[^"\']+)["\']\s+itemprop=["\']duration["\']', s_html
+                            m_sdur = (
+                                re.search(r'itemprop=["\']?duration["\']?\s+content=["\'](PT[0-9HMS]+)["\']', s_html)
+                                or re.search(r'content=["\'](PT[0-9HMS]+)["\']\s+itemprop=["\']?duration["\']?', s_html)
+                                or re.search(r'["\']duration["\']\s*:\s*["\'](PT[0-9HMS]+)["\']', s_html)
+                                or re.search(r'["\'](PT[0-9HMS]+)["\']', s_html)
                             )
                             m_sapp = re.search(r'["\']approxDurationMs["\']\s*:\s*["\']?(\d+)["\']?', s_html)
                             m_slen = re.search(r'["\']lengthSeconds["\']\s*:\s*["\']?(\d+)["\']?', s_html)
@@ -546,14 +602,15 @@ class YouTubeConnector(BaseConnector):
                 try:
                     w_headers = self._get_natural_headers(hl="en", gl="US", device="desktop")
                     watch_url = f"https://www.youtube.com/watch?v={video_id}&bpctr=9999999999&has_verified=1"
-                    async with httpx.AsyncClient(timeout=6.0, follow_redirects=True) as client:
+                    async with httpx.AsyncClient(timeout=10.0, cookies=cookies, follow_redirects=True) as client:
                         w_resp = await client.get(watch_url, headers=w_headers)
                         if w_resp.status_code == 200:
                             w_html = w_resp.text
-                            m_dur = re.search(
-                                r'itemprop=["\']duration["\']\s+content=["\'](PT[^"\']+)["\']', w_html
-                            ) or re.search(
-                                r'content=["\'](PT[^"\']+)["\']\s+itemprop=["\']duration["\']', w_html
+                            m_dur = (
+                                re.search(r'itemprop=["\']?duration["\']?\s+content=["\'](PT[0-9HMS]+)["\']', w_html)
+                                or re.search(r'content=["\'](PT[0-9HMS]+)["\']\s+itemprop=["\']?duration["\']?', w_html)
+                                or re.search(r'["\']duration["\']\s*:\s*["\'](PT[0-9HMS]+)["\']', w_html)
+                                or re.search(r'["\'](PT[0-9HMS]+)["\']', w_html)
                             )
                             m_len = re.search(r'["\']lengthSeconds["\']\s*:\s*["\']?(\d+)["\']?', w_html)
                             m_app = re.search(r'["\']approxDurationMs["\']\s*:\s*["\']?(\d+)["\']?', w_html)
@@ -662,7 +719,12 @@ class YouTubeConnector(BaseConnector):
         try:
             url = f"https://www.youtube.com/watch?v={video_id}&bpctr=9999999999&has_verified=1"
             headers = self._get_natural_headers(hl="id", gl="ID", device="desktop")
-            async with httpx.AsyncClient(timeout=12.0, follow_redirects=True) as client:
+            cookies = {
+                "SOCS": "CAESEwgDEgk2MTQ1NzU1OTQaAmVuIAEaBgiA_LyaBg",
+                "CONSENT": "YES+cb.20210328-17-p0.en+FX+478",
+                "PREF": "tz=Asia.Jakarta&hl=id&gl=ID",
+            }
+            async with httpx.AsyncClient(timeout=12.0, cookies=cookies, follow_redirects=True) as client:
                 resp = await client.get(url, headers=headers)
                 if resp.status_code == 200:
                     html = resp.text
@@ -737,10 +799,11 @@ class YouTubeConnector(BaseConnector):
                         except (ValueError, TypeError):
                             pass
                     if length_sec == 0:
-                        m_dur = re.search(
-                            r'itemprop=["\']duration["\']\s+content=["\'](PT[^"\']+)["\']', html
-                        ) or re.search(
-                            r'content=["\'](PT[^"\']+)["\']\s+itemprop=["\']duration["\']', html
+                        m_dur = (
+                            re.search(r'itemprop=["\']?duration["\']?\s+content=["\'](PT[0-9HMS]+)["\']', html)
+                            or re.search(r'content=["\'](PT[0-9HMS]+)["\']\s+itemprop=["\']?duration["\']?', html)
+                            or re.search(r'["\']duration["\']\s*:\s*["\'](PT[0-9HMS]+)["\']', html)
+                            or re.search(r'["\'](PT[0-9HMS]+)["\']', html)
                         )
                         if m_dur:
                             length_sec = self.parse_duration_to_seconds(m_dur.group(1))

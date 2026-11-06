@@ -1881,7 +1881,7 @@ https://www.youtube.com/@ppm_consulting</textarea>
           : (v.duration_seconds ? (Math.floor(v.duration_seconds / 60) + ':' + String(v.duration_seconds % 60).padStart(2, '0')) : 'N/A');
         const viewsText = (v.views_display && v.views_display !== 'N/A')
           ? v.views_display
-          : (v.views ? Number(v.views).toLocaleString('id-ID') + ' views' : 'N/A');
+          : ((v.views !== undefined && v.views !== null && v.views !== '') ? Number(v.views).toLocaleString('id-ID') + ' views' : '0 views');
         const descText = v.description || ar.full_description || '';
         const offPlatform = scanOffPlatformMonetization(descText);
 
